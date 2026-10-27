@@ -1751,7 +1751,7 @@ class Landmark:
         -------
         bool
         """
-        return all([all(coords) for coords in self.coords.values()])
+        return not any(np.isnan(coords).any() for coords in self.coords.values())  # Unset: NaN (0 is a position)
 
     def activate(self):
         self.button.click()
