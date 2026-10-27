@@ -37,6 +37,10 @@ TARGET_ANY_CPU = 'compiler-default'
 FALSE_SPELLINGS = ('false', '0', 'no', 'off')
 ARCHITECTURE_NAME = re.compile(r'[a-z0-9][a-z0-9._+-]*')  # The value goes to the compiler: nothing else
 
+LARGE_SOURCE_FILES_OPTION = '-flarge-source-files'
+HELP_ARGUMENT = '--help=common'  # GCC: lists the options of the compiler. Other compilers may not know it
+PROBE_TIMEOUT_SECONDS = 30
+
 requirements = [  # pip
     'lxml'
 ]
@@ -128,15 +132,54 @@ def target_compile_arguments(environment):
     return [f'-march={architecture}']
 
 
+def build_compiler_command():
+    """
+    The command of the compiler that distutils builds the extensions with (``CC``, else the one of the
+    interpreter), with its leading arguments. Empty if distutils does not give one (MSVC).
+    """
+    from distutils.ccompiler import new_compiler  # The distutils of setuptools: it is imported above
+    from distutils.sysconfig import customize_compiler
+    compiler = new_compiler()
+    customize_compiler(compiler)
+    return list(getattr(compiler, 'compiler_so', []))
+
+
+def compiler_lists_option(compiler_command, option):
+    """
+    Whether the compiler lists an option in its help, to use it only where it is known (GCC only options).
+
+    Parameters
+    ----------
+    compiler_command : Sequence[str]
+        The compiler and its leading arguments (see :func:`build_compiler_command`).
+    option : str
+        The option, e.g. ``-flarge-source-files``.
+
+    Returns
+    -------
+    bool
+        False if it is not listed, and whenever the compiler cannot say: it is missing, does not understand
+        :data:`HELP_ARGUMENT` (clang), fails or takes too long. Never raises: an option not seen is left out.
+    """
+    if not compiler_command:
+        return False
+    try:
+        completed = subprocess.run([*compiler_command, HELP_ARGUMENT], capture_output=True, text=True,
+                                   errors='replace', check=False, timeout=PROBE_TIMEOUT_SECONDS)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return completed.returncode == 0 and option in completed.stdout
+
+
 def default_compile_arguments():
     arguments = []
     if not os_name.startswith('windows'):
         arguments += ['-w', '-O3']
 
     if os_name.startswith('linux'):
-        out = subprocess.check_output(['gcc', '--help=common']).decode('utf-8')
-        if '-flarge-source-files' in out:  # Add only if supported by the compiler
-            arguments += ['-flarge-source-files']
+        # Add only if supported by the compiler that builds (GCC only, and not necessarily named gcc)
+        if compiler_lists_option(build_compiler_command(), LARGE_SOURCE_FILES_OPTION):
+            arguments += [LARGE_SOURCE_FILES_OPTION]
 
     if not os_name.startswith('windows'):  # MSVC has no -march
         arguments += target_compile_arguments(os.environ)

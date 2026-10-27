@@ -6,8 +6,6 @@ recent. A build for several machines (a module for a cluster, a wheel) names a l
 The former ``OPTIMISE_CLEARMAP_COMPILATION_FOR_TARGET`` still works, but only the exact string ``False`` used to turn
 it off, so ``0``, ``false`` or ``no`` silently left the build native.
 """
-import subprocess
-
 import pytest
 
 TARGET = 'CLEARMAP_TARGET_ARCHITECTURE'
@@ -61,12 +59,7 @@ def test_a_value_that_is_not_an_architecture_name_is_refused_before_it_reaches_t
 
 @pytest.fixture
 def requested_level(monkeypatch):
-    """The environment asks for a level, and the compiler is not run (the probe is not what is tested here)"""
-    def say_nothing(*_, **__):
-        return b''
-
     monkeypatch.setenv(TARGET, 'x86-64-v3')
-    monkeypatch.setattr(subprocess, 'check_output', say_nothing)
 
 
 @pytest.mark.parametrize('system', ('linux', 'darwin'))
