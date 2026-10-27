@@ -23,7 +23,7 @@ from ClearMap.Utils.events import (ChannelRenamed, UiAtlasIdChanged,
                                    UiAtlasStructureTreeIdChanged,  RegistrationStatusChanged, WorkspaceChannelsUpdated)
 from ClearMap.Utils.exceptions import (ClearMapAssetError, ParamsOrientationError, MissingRequirementException,
                                        NotAnOmeFile, MetadataError, ClearMapRuntimeError, ClearMapConfigError,
-                                       ReversedRegistrationWarning)
+                                       ReversedRegistrationWarning, AssetNotFoundError, ClearMapNotImplementedError)
 from ClearMap.Utils.utilities import runs_on_ui, check_stopped, sanitize_n_processes
 from ClearMap.config.orientation import DEFAULT_ORIENTATION, validate_orientation
 
@@ -510,11 +510,17 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
                            if weight > 0]
         if landmarks_steps:
             if len(landmarks_steps) != len(self.registration_params_files[channel]):
-                raise NotImplemented('Selecting landmarks for a subset of steps is currently not implemented')
+                raise ClearMapNotImplementedError('Landmarks for a subset of the registration steps are not'
+                                                  ' implemented yet: set a weight to all the steps or to none')
             landmarks_files = {
                 'moving_landmarks_path': self.get_elx_asset('moving_landmarks', channel=channel).path,
                 'fixed_landmarks_path': self.get_elx_asset('fixed_landmarks', channel=channel).path,
             }
+            for landmarks_path in landmarks_files.values():
+                if not Path(landmarks_path).exists():  # Else elastix would align without them, silently
+                    raise AssetNotFoundError(f'Landmarks weights are set for {channel}, but its landmarks are not'
+                                             f' selected: select them, or set the weights to 0',
+                                             asset_path=str(landmarks_path), missing_step_name='landmarks selection')
         else:
             landmarks_files = {'moving_landmarks_path': '', 'fixed_landmarks_path': ''}  # Disable landmarks w/ empty str
         landmarks_weights = [elastix_landmarks_weight(percent) for percent in channel_cfg['landmarks_weights']]

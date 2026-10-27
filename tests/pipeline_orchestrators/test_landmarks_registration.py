@@ -1,11 +1,16 @@
 """
 The config holds the landmarks weights in percent, as the sliders of the GUI show them: the registration gives
 elastix the weights of these percents (elastix_landmarks_weight), growing geometrically from 1 to 100 percent.
+
+A registration with landmarks weights needs the landmarks (to align without them, set the weights to 0). Without
+their files, elastix aligned without them, silently; with weights for a subset of the steps, the message was lost
+(raise NotImplemented: TypeError).
 """
 import re
 
 import pytest
 
+from ClearMap.Utils.exceptions import AssetNotFoundError, ClearMapNotImplementedError
 from ClearMap.pipeline_orchestrators import registration_orchestrator
 from ClearMap.pipeline_orchestrators.registration_orchestrator import (LANDMARKS_WEIGHT_MAX, LANDMARKS_WEIGHT_MIN,
                                                                      RegistrationProcessor, elastix_landmarks_weight)
@@ -67,6 +72,7 @@ def alignments(monkeypatch):
 
 def test_elastix_is_given_the_weights_of_the_percents_of_the_config(tmp_path, alignments):
     processor = FakeRegistrationProcessor(tmp_path, landmarks_weights=[50, 50])
+    select_landmarks(tmp_path)
 
     processor.align_channel(CHANNEL)
 
@@ -80,3 +86,42 @@ def test_the_weight_of_elastix_grows_geometrically_from_none_at_0_to_the_maximum
     weights = {percent: elastix_landmarks_weight(percent) for percent in (25, 50, 75)}
     assert weights[50] ** 2 == pytest.approx(weights[25] * weights[75])  # The same ratio for the same step
     assert elastix_landmarks_weight(1) > LANDMARKS_WEIGHT_MIN
+
+
+def select_landmarks(folder):
+    (folder / 'aligned').mkdir()
+    for asset_type in ('fixed_landmarks', 'moving_landmarks'):
+        (folder / 'aligned' / f'{asset_type}.txt').write_text('point\n0\n')
+
+
+def test_landmarks_weights_without_landmarks_are_reported_before_aligning(tmp_path, alignments):
+    processor = FakeRegistrationProcessor(tmp_path, landmarks_weights=[50, 50])
+
+    with pytest.raises(AssetNotFoundError, match='landmarks are not selected'):
+        processor.align_channel(CHANNEL)
+    assert alignments == []
+
+
+def test_selected_landmarks_are_given_to_the_alignment(tmp_path, alignments):
+    select_landmarks(tmp_path)
+    processor = FakeRegistrationProcessor(tmp_path, landmarks_weights=[50, 50])
+
+    processor.align_channel(CHANNEL)
+
+    assert alignments[0]['landmarks_files']['fixed_landmarks_path'] == tmp_path / 'aligned' / 'fixed_landmarks.txt'
+
+
+def test_landmarks_weights_for_a_subset_of_the_steps_are_reported(tmp_path, alignments):
+    select_landmarks(tmp_path)
+    processor = FakeRegistrationProcessor(tmp_path, landmarks_weights=[50, 0])
+
+    with pytest.raises(ClearMapNotImplementedError, match='subset of the registration steps'):
+        processor.align_channel(CHANNEL)
+
+
+def test_without_landmarks_weights_the_alignment_runs_without_landmarks(tmp_path, alignments):
+    processor = FakeRegistrationProcessor(tmp_path, landmarks_weights=[0, 0])
+
+    processor.align_channel(CHANNEL)
+
+    assert alignments[0]['landmarks_files'] == {'moving_landmarks_path': '', 'fixed_landmarks_path': ''}
