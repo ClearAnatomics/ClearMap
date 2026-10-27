@@ -157,7 +157,7 @@ def rescale_channel(folder, atlas_base_name=None, dest_resolution=(3, 3, 6), n_c
     -------
 
     """
-    n_cpus = sanitize_n_processes(-2) if n_cpus is None else n_cpus
+    n_cpus = sanitize_n_processes(-2 if n_cpus is None else n_cpus)
 
     orchestrators = init_sample_manager_and_processors(folder)
     sample_manager = orchestrators['sample_manager']

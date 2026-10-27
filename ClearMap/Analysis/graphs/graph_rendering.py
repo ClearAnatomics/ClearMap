@@ -23,6 +23,7 @@ import vispy.util.transforms as trf
 import ClearMap.ParallelProcessing.SharedMemoryManager as smm
 import ClearMap.ParallelProcessing.ParallelTraceback as ptb
 import ClearMap.Analysis.Curves.Resampling as crs
+from ClearMap.Utils.utilities import sanitize_n_processes
 
 
 ###############################################################################
@@ -100,7 +101,7 @@ def mesh_tube_from_coordinates_and_radii(coordinates, radii, indices, n_tube_poi
     argdata = np.arange(len(indices))
 
     # process in parallel
-    pool = smm.mp.Pool(processes=processes)
+    pool = smm.mp.Pool(processes=sanitize_n_processes(processes))
     results = pool.map(func, argdata)
     pool.close()
     pool.join()
@@ -258,7 +259,7 @@ def interpolate_edge_geometry(graph, smooth = 5, order = 2,
                       smooth=smooth, order=order, points_per_pixel=points_per_pixel, verbose=verbose)
     argdata = np.arange(len(indices))
 
-    pool = smm.mp.Pool(processes=processes)
+    pool = smm.mp.Pool(processes=sanitize_n_processes(processes))
     results = pool.map(func, argdata)
     pool.close()
     pool.join()

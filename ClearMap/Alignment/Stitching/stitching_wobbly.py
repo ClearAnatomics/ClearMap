@@ -1662,6 +1662,7 @@ def _place_slice_component(positions, alignment_pairs, displacements, fixed = No
 
 def _optimize_slice_positions(positions, components, processes = None, workspace=None, verbose = False):
     """Helper to optimize the positions of the slices on top of each other"""
+    processes = sanitize_n_processes(processes, can_run_in_calling_process=True)
 
     # Setting:
     # refer to the slice components as 'clusters'
@@ -1782,7 +1783,7 @@ def _optimize_slice_positions(positions, components, processes = None, workspace
         #print M
         #print np.linalg.pinv(-M)
 
-        if isinstance(processes, int) and processes > 1:
+        if processes > 1:
             M = [SharedMemmoryManager.insert(m) for m in M]
             X = [SharedMemmoryManager.insert(x) for x in X]
             with CancelableProcessPoolExecutor(min(processes, ndim)) as executor:
