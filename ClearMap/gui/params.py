@@ -1113,52 +1113,27 @@ class ChannelRegistrationParams(ChannelUiParameter):
             return snake_to_title(base)
         params_files_with_ext = self.tab.paramsFilesListWidget.get_items_text()
         new_params_files = [file_name_to_title(p) for p in params_files_with_ext]
-        # Now match length of weights (prune or pad with 0)
+        # Now match length of weights (prune or pad with 0). Slider values (percents) in the config too
         new_weights = trim_or_pad(self.view['landmarks_weights'], len(new_params_files), pad_value=0)
 
         self.tab.landmarksWeightsPanel.set_items(new_params_files, new_weights)
 
         patch = {}
         set_item_recursive(patch, self.cfg_subtree + ['params_files'], params_files_with_ext)
-        scaled_weights = [self.scale_landmarks(w) for w in new_weights]
-        set_item_recursive(patch, self.cfg_subtree + ['landmarks_weights'], scaled_weights)
+        set_item_recursive(patch, self.cfg_subtree + ['landmarks_weights'], new_weights)
         self._apply_patch(patch)
 
     @param_handler  # FIXME: check
     def handle_landmarks_weight_changed(self, idx: int, value: int):
-        scaled = self.scale_landmarks(value)
         new_weights = self.view['landmarks_weights'][:]
         if idx == len(new_weights):
-            new_weights.append(scaled)
+            new_weights.append(value)
         elif idx < len(new_weights):
-            new_weights[idx] = scaled
+            new_weights[idx] = value
         else:
             raise ValueError(f'Index {idx} out of bounds for channel {self.name} '
                              f'landmarks weights {self.view["landmarks_weights"]}')
         self._update_value(['landmarks_weights'], new_weights)
-
-    @staticmethod
-    def scale_landmarks(value: int):
-        """
-        Scale the weight of the landmarks using an exponential function so that
-        the ratio between the weights follows a geometric progression with the slider value
-
-        Parameters
-        ----------
-        value: int
-            The value of the slider (between 0 and 100)
-
-        Returns
-        -------
-        float
-            The scaled weight (between 0 and max_ratio)
-        """
-        if value == 0:
-            return 0
-        else:
-            min_ratio = 1 / 20000
-            max_ratio = 200
-            return min_ratio * (max_ratio / min_ratio) ** (value / 100)
 
 
 class SharedRegistrationParams(UiParameter):

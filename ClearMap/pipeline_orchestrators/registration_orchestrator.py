@@ -42,6 +42,21 @@ if TYPE_CHECKING:
     from ClearMap.Visualization import Plot3d as q_plot_3d  # WARNING: Local imports, for reference only
 
 
+LANDMARKS_WEIGHT_MIN = 1 / 20000  # The start of the geometric scale (at 0 percent, which is no landmarks: weight 0)
+LANDMARKS_WEIGHT_MAX = 200  # The weight elastix gives to the landmarks at 100 percent
+
+
+def elastix_landmarks_weight(percent: float) -> float:
+    """
+    The weight elastix gives to the landmarks (Metric1Weight) for the percent of the config (a slider in the GUI).
+    It grows geometrically with the percent, from LANDMARKS_WEIGHT_MIN (excluded) to LANDMARKS_WEIGHT_MAX at 100 percent
+    (x1.16 per percent); 0 percent is no landmarks (weight 0).
+    """
+    if percent == 0:
+        return 0
+    return LANDMARKS_WEIGHT_MIN * (LANDMARKS_WEIGHT_MAX / LANDMARKS_WEIGHT_MIN) ** (percent / 100)
+
+
 def _atlas_orientation(orientation) -> Optional[tuple[int, ...]]:
     """
     The sample orientation as a tuple (the config stores a list), so that it compares
@@ -502,7 +517,8 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
             }
         else:
             landmarks_files = {'moving_landmarks_path': '', 'fixed_landmarks_path': ''}  # Disable landmarks w/ empty str
-        elastix.align_from_dict(align_parameters, landmarks_files, landmarks_weights=channel_cfg['landmarks_weights'])
+        landmarks_weights = [elastix_landmarks_weight(percent) for percent in channel_cfg['landmarks_weights']]
+        elastix.align_from_dict(align_parameters, landmarks_files, landmarks_weights=landmarks_weights)
 
     def annotator_of(self, channel: str) -> Annotation:
         """

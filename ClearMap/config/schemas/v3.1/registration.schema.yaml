@@ -58,7 +58,7 @@ properties:
           type: ["array"]
           items: { type: "string" }
 
-        landmarks_weights:
+        landmarks_weights:  # Per params file, in percent (0: no landmarks), see elastix_landmarks_weight
           type: ["array"]
           items: { type: "number" }
 

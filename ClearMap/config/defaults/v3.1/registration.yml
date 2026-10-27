@@ -14,7 +14,7 @@ templates:
     align_with: "${reference}"   # atlas (constant)
     moving_channel: "other"   # The atlas moves onto the channel (self: the channel, intrinsically_aligned: neither)
     params_files: ["align_affine.txt", "align_bspline.txt"]
-    landmarks_weights: [0, 0]
+    landmarks_weights: [0, 0]   # Per params file, in percent: 0 (no landmarks) to 100 (see elastix_landmarks_weight)
   regular:
     resample: true
     resampled_resolution: [25, 25, 25]
