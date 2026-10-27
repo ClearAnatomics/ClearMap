@@ -33,6 +33,7 @@ import ClearMap.ParallelProcessing.BlockProcessing as bp
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
 
 import ClearMap.Utils.Timer as tmr
+from ClearMap.Utils.utilities import sanitize_n_processes
 from ClearMap.IO import source_initialization, io_ops
 
 
@@ -288,17 +289,15 @@ def generate_lookup_table(function = index_to_smoothing, verbose = True, process
   if verbose:
     print('Smoothing: Generating look-up table!')
     
-  if processes is None:
-    processes = mp.cpu_count()
-
-  if processes == 'serial':
+  processes = sanitize_n_processes(processes, can_run_in_calling_process=True)
+  if processes == 0:
     lut = [function(i) for i in range(2**27)]
   else:
     #import concurrent.futures as cf
     #with cf.ProcessPoolExecutor(max_workers=processes) as executor:
     #  lut = executor.map(function, range(2**27));
-    pool = mp.Pool(mp.cpu_count())
-    lut = pool.map(function, range(2**27), chunksize=2**27//8//mp.cpu_count())
+    pool = mp.Pool(processes)
+    lut = pool.map(function, range(2**27), chunksize=2**27//8//processes)
     pool.close()
     pool.join()
     lut = list(lut)
@@ -469,7 +468,7 @@ def _test():
   
   noisy = binary.copy()
   noisy[np.logical_and(border, np.random.rand(*shape) > 0.925)] = True
-  smoothed  = sm.smooth_by_configuration(noisy, iterations=3, verbose=True, processes='serial')
+  smoothed  = sm.smooth_by_configuration(noisy, iterations=3, verbose=True, processes=0)
   
   import ClearMap.Visualization.Plot3d as p3d
   p3d.plot([noisy, smoothed])

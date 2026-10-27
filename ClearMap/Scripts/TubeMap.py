@@ -153,7 +153,7 @@ if __name__ == '__main__':
                                                                                                                                                                   
   layout.replace_source_location(expression_raw, expression_arteries, method='expression')
   
-  stw.stitch_layout(layout, sink = ws.filename('stitched', postfix='arteries'), method = 'interpolation', processes='serial', verbose=True)
+  stw.stitch_layout(layout, sink = ws.filename('stitched', postfix='arteries'), method = 'interpolation', processes=0, verbose=True)
   
   #p3d.plot(ws.filename('stitched', postfix='arteries')) 
   #p3d.plot([ws.filename('stitched'), ws.filename('stitched', postfix='arteries')])

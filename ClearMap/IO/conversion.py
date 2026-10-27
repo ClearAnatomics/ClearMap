@@ -1,6 +1,5 @@
 import functools
 import math
-import multiprocessing as mp
 import pathlib
 
 from ClearMap.IO import FileUtils as fu, io_ops
@@ -8,7 +7,7 @@ from ClearMap.IO.io_ops import open_ro, write
 from ClearMap.IO.dispatch import source_to_module
 from ClearMap.ParallelProcessing import ParallelTraceback as ptb
 from ClearMap.Utils import Timer as tmr
-from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
+from ClearMap.Utils.utilities import CancelableProcessPoolExecutor, sanitize_n_processes
 
 
 def convert(source_, sink, processes=None, verbose=False, **kwargs):
@@ -50,8 +49,8 @@ def convert_files(filenames, extension=None, path=None, processes=None, verbose=
         The new file format extension.
     path : str or None
         Optional path specification.
-    processes : int, 'serial' or None
-        The number of processes to use for parallel conversion.
+    processes : int or None
+        The number of processes to use for parallel conversion, 0: in the calling process (no subprocess).
     verbose : bool
         If True, print progress information.
 
@@ -76,13 +75,12 @@ def convert_files(filenames, extension=None, path=None, processes=None, verbose=
         timer = tmr.Timer()
         print(f'Converting {n_files} files to {extension}!')
 
-    if not isinstance(processes, int) and processes != 'serial':
-        processes = mp.cpu_count()
+    processes = sanitize_n_processes(processes, can_run_in_calling_process=True)
 
     # print(n_files, extension, filenames, sinks)
     _convert = functools.partial(_convert_files, n_files=n_files, extension=extension, verbose=verbose, verify=verify)
 
-    if processes == 'serial':
+    if processes == 0:
         [_convert(source_, sink, i) for i, source_, sink in zip(range(n_files), filenames, sinks)]
     else:
         with CancelableProcessPoolExecutor(processes) as executor:

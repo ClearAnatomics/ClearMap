@@ -18,7 +18,6 @@ import warnings
 
 import numpy as np
 import functools as ft
-import multiprocessing as mp
 
 from ClearMap.IO import io_ops, FileUtils as file_utils
 import ClearMap.IO.source.Slice as slc
@@ -35,7 +34,7 @@ from ClearMap.ParallelProcessing.SharedMemoryManager import SharedMemmoryManager
 import ClearMap.Utils.Timer as tmr
 import ClearMap.Utils.tag_expression as te
 
-from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
+from ClearMap.Utils.utilities import CancelableProcessPoolExecutor, sanitize_n_processes
 
 
 from ClearMap.Alignment.Stitching.layout_graph_utils import cluster_components
@@ -888,10 +887,9 @@ def align_layout(layout, axis_range=None, max_shifts=10, axis_mip=None,
                         find_shifts=find_shifts,
                         verbose=verbose)
 
-    if not isinstance(processes, int) and processes != 'serial':
-        processes = mp.cpu_count()
+    processes = sanitize_n_processes(processes, can_run_in_calling_process=True)
 
-    if processes == 'serial':
+    if processes == 0:
         results = [_align(a.pre, a.post) for a in alignments]
     else:
         layout.sources_as_virtual()
@@ -1483,10 +1481,9 @@ def place_layout(layout, min_quality = None, method = 'optimization',
     #place each slice
     _place = ft.partial(_place_slice, positions=positions, alignment_pairs=alignment_pairs, min_quality=min_quality)
 
-    if not isinstance(processes, int) and processes != 'serial':
-        processes = mp.cpu_count()
+    processes = sanitize_n_processes(processes, can_run_in_calling_process=True)
 
-    if processes == 'serial':
+    if processes == 0:
         results = [_place(d,q,s) for d,q,s in zip(displacements, qualities, status)]
     else:
         with CancelableProcessPoolExecutor(processes) as executor:
@@ -2071,8 +2068,8 @@ def stitch_layout(layout, sink, method = 'interpolation', processes = None, verb
       The layout of the stacks to stitch.
     method : 'interpolation', 'max', 'min', 'mean'
       The method to use to stitch the sources.
-    processes : int or 'serial'
-      Number of processor to use for parallel processing, if 'serial' process in serial.
+    processes : int or None
+      Number of processor to use for parallel processing, 0: in the calling process (no subprocess).
     verbose : bool
       If True, print progress information.
 
@@ -2113,10 +2110,9 @@ def stitch_layout(layout, sink, method = 'interpolation', processes = None, verb
                          axis=axis, full_region=full_region, verbose=verbose)
 
     # stitch the data
-    if not isinstance(processes, int) and processes != 'serial':
-        processes = mp.cpu_count()
+    processes = sanitize_n_processes(processes, can_run_in_calling_process=True)
 
-    if processes == 'serial':
+    if processes == 0:
         [_stitch(l,i) for i,l in enumerate(layout_slices)]
     else:
         #for l in layout_slices:
@@ -2194,14 +2190,14 @@ def _test():
     plt.plot(wobble[:,0])
 
     l = stw.WobblyLayout([data1, data2], overlaps = 20)
-    stw.align_layout(l, max_shifts = 20, verbose = True, processes = 'serial', stack_validation_params= True, find_shifts ='tracing')
+    stw.align_layout(l, max_shifts = 20, verbose = True, processes = 0, stack_validation_params= True, find_shifts ='tracing')
 
     a = l.alignments[0]
     a.plot_overlay_wobbly()
 
-    stw.place_layout(l, method='!optimization', smooth = None, lower_to_origin=True, verbose = True, processes = 'serial')
+    stw.place_layout(l, method='!optimization', smooth = None, lower_to_origin=True, verbose = True, processes = 0)
 
-    s = stw.stitch_layout(l, sink = 'test.npy', method='max', processes = 'serial')
+    s = stw.stitch_layout(l, sink = 'test.npy', method='max', processes = 0)
 
     stw.strg.p3d.plot(s)
 
@@ -2241,11 +2237,11 @@ def _test():
     reload(stw.strg)
     reload(stw)
     l = stw.WobblyLayout([data1, data2], overlaps = 20)
-    stw.align_layout(l, max_shifts = 20, verbose = True, processes = 'serial', stack_validation_params= False)
+    stw.align_layout(l, max_shifts = 20, verbose = True, processes = 0, stack_validation_params= False)
 
-    stw.place_layout(l, method='!optimization',  lower_to_origin=True, smooth = None, verbose = True, processes = 'serial')
+    stw.place_layout(l, method='!optimization',  lower_to_origin=True, smooth = None, verbose = True, processes = 0)
 
-    s = stw.stitch_layout(l, sink = 'test.npy', method='max', processes = 'serial')
+    s = stw.stitch_layout(l, sink = 'test.npy', method='max', processes = 0)
 
     plt.figure(2); plt.clf()
     for s in l.sources:
@@ -2302,7 +2298,7 @@ def _test():
 
     stw.place_layout(l, method = 'optimization',  lower_to_origin=True, smooth = None, min_quality=-np.inf, processes = '!serial', verbose = True)
 
-    s = stw.stitch_layout(l, sink = 'test.npy', method='max', processes = 'serial')
+    s = stw.stitch_layout(l, sink = 'test.npy', method='max', processes = 0)
 
     stw.strg.dv.plot(s)
 
@@ -2370,7 +2366,7 @@ def _test():
                      prepare = 'normalization',
                      slice_validation_params= dict(method='foreground', valid_range = (1, None), size = None),
                      find_shifts = dict(method='tracing', cutoff=np.sqrt(2 * 3**2), debug = True),
-                     verbose = True, processes = 'serial')
+                     verbose = True, processes = 0)
 
     a = l.alignments[0]
     plot_status(a, fig=2)
@@ -2426,12 +2422,12 @@ def _test():
                      prepare='normalization',
                      slice_validation_params=dict(method='foreground', valid_range=(1, None), size=None),
                      find_shifts = dict(method='tracing', cutoff=np.sqrt(2 * 3**2), debug = False),
-                     verbose = True, processes = 'serial')
+                     verbose = True, processes = 0)
     stw.place_layout(l, method = '!optimization',  lower_to_origin=True, min_quality=-np.inf,
                      smooth = None, smooth_optimized = dict(method='window', window_length=10, binary = 2),
                      processes = '!serial', verbose = True)
 
-    s = stw.stitch_layout(l, sink = 'test.npy', method='max', processes = 'serial')
+    s = stw.stitch_layout(l, sink = 'test.npy', method='max', processes = 0)
 
     stw.strg.dv.plot(s)
 

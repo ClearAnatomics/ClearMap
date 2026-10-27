@@ -508,9 +508,9 @@ def resample(original, resampled=None,
     method : 'shared' or 'memmap'
       Method to handle intermediate resampling results. If 'shared' use shared
       memory, otherwise use a memory map on disk.
-    processes : int, None or 'serial'
+    processes : int or None
       Number of processes to use for parallel resampling, if None use maximal
-      processes available, if 'serial' process in serial.
+      processes available, if 0 in the calling process (no subprocess).
     verbose : bool
       If True, display progress information.
 
@@ -582,7 +582,7 @@ def resample(original, resampled=None,
 
     interpolation = _interpolation_to_cv2(interpolation, dtype=dtype)
 
-    processes = sanitize_n_processes(processes)
+    processes = sanitize_n_processes(processes, can_run_in_calling_process=True)
 
     # determine order of resampling
     axes_order, shape_order = _axes_order(axes_order, original_shape, resampled_shape_in_original_orientation,
@@ -627,7 +627,7 @@ def resample(original, resampled=None,
         _resample = ft.partial(_resample_2d, source=last_virtual, sink=resampled_data_virtual, axes=axes, shape=shape,
                                interpolation=interpolation, n_indices=n_indices, verbose=verbose)
 
-        if processes == 'serial':
+        if processes == 0:
             for index in indices:
                 _resample(index=index)
         else:
@@ -693,9 +693,9 @@ def resample_inverse(resampled, original=None,
     method : 'shared' or 'memmap'
       Method to handle intermediate resampling results. If 'shared' use shared
       memory, otherwise use a memory map on disk.
-    processes : int, None or 'serial'
+    processes : int or None
       Number of processes to use for parallel resampling, if None use maximal
-      processes available, if 'serial' process in serial.
+      processes available, if 0 in the calling process (no subprocess).
     verbose : bool
       If True, display progress information.
 
@@ -1200,10 +1200,10 @@ def _test():
     # original = x + y + z
     original = np.array(x + y + z, dtype=float)
 
-    resampled = res.resample(original, original_resolution=(1, 1, 1), resampled_shape=(10, 10, 10), processes='serial')
+    resampled = res.resample(original, original_resolution=(1, 1, 1), resampled_shape=(10, 10, 10), processes=0)
     print(resampled.shape)
     upsampled = res.resample_inverse(resampled, original_resolution=(1, 1, 1), original_shape=original.shape,
-                                     processes='serial')
+                                     processes=0)
     print(upsampled.shape)
     import ClearMap.Visualization.Plot3d as p3d
     p3d.plot([resampled])
@@ -1226,7 +1226,7 @@ def _test():
     p3d.plot(source)
 
     inverse = res.resample_inverse(resampled, sink=None, resample_source=source, source_resolution=(1, 1, 1),
-                                   sink_resolution=(10, 10, 2), orientation=None, processes='serial')
+                                   sink_resolution=(10, 10, 2), orientation=None, processes=0)
     p3d.plot([source, inverse])
 
     resampled = res.resample(source, sink, source_resolution=(1, 1, 1), sink_resolution=(10, 10, 2),
@@ -1256,9 +1256,9 @@ def _test():
     reload(res)
 
     source = np.random.rand(20, 30, 40)
-    resampled = res.resample(source, source_resolution=(1, 1, 1), sink_shape=(10, 11, 12), processes='serial')
+    resampled = res.resample(source, source_resolution=(1, 1, 1), sink_shape=(10, 11, 12), processes=0)
     print(resampled.shape)
-    upsampled = res.resample_inverse(resampled, source_resolution=(1, 1, 1), resample_source=source, processes='serial')
+    upsampled = res.resample_inverse(resampled, source_resolution=(1, 1, 1), resample_source=source, processes=0)
     print(upsampled.shape)
     import ClearMap.Visualization.Plot3d as p3d
     p3d.plot([resampled])

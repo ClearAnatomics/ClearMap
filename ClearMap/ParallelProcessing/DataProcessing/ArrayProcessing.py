@@ -553,9 +553,9 @@ def initialize_processing(processes=None, verbose=False, function=None, blocks=N
 
     Parameters
     ----------
-    processes : int, 'serial', or None
+    processes : int or None
         Number of worker processes to use. If None, use ``default_processes``.
-        If ``'serial'``, use one process.
+        0 (1 core in the calling process).
     verbose : bool
         If True, print initialization information and return a timer.
     function : str or None

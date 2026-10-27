@@ -316,13 +316,13 @@ class FileListSource(source_mod.VirtualSource):
         #@ptb.parallel_traceback
         def func(filename, index, data=data, slicing=slicing_file):
             index = (Ellipsis,) + index
-            data[index] = io_ops.read(filename, slicing=slicing, processes ='serial')
+            data[index] = io_ops.read(filename, slicing=slicing, processes=0)
 
-        if processes == 'serial':
+        processes = sanitize_n_processes(processes, can_run_in_calling_process=True)
+        if processes == 0:
             for f,i in zip(fl, slicing_list_indices):
                 func(f,i)
         else:
-            processes = sanitize_n_processes(processes)
             with concurrent.futures.ThreadPoolExecutor(processes) as executor:
                 results = executor.map(func, fl, slicing_list_indices)
             _ = list(results)
@@ -381,13 +381,13 @@ class FileListSource(source_mod.VirtualSource):
         @ptb.parallel_traceback
         def func(filename, index, data=data, slicing=slicing_file):
           index = (Ellipsis,) + index
-          io_ops.write(sink=filename, data=data[index], slicing=slicing, processes='serial')
+          io_ops.write(sink=filename, data=data[index], slicing=slicing, processes=0)
 
-        if processes == 'serial':
+        processes = sanitize_n_processes(processes, can_run_in_calling_process=True)
+        if processes == 0:
             for f, i in zip(fl, indices):
                 func(f, i)
         else:
-            processes = sanitize_n_processes(processes)
             with concurrent.futures.ThreadPoolExecutor(processes) as executor:
                 results = executor.map(func, fl, indices)
             _ = list(results)
@@ -910,19 +910,19 @@ def convert(source, sink, processes=None, verbose=False):
             slicing = (Ellipsis,) + index_slicing
             if verbose:
                 print(f'Converting slice {slicing} from {filename} to {sink}')
-            sink.as_real()[slicing] = io_ops.read(filename, processes='serial')
-            # FIXME: replace with       sink[(Ellipsis,) + index_slicing] = io_ops.read(filename, processes='serial') for performance. avoids the as_real references
+            sink.as_real()[slicing] = io_ops.read(filename, processes=0)
+            # FIXME: replace with       sink[(Ellipsis,) + index_slicing] = io_ops.read(filename, processes=0) for performance. avoids the as_real references
             return True
         except Exception as e:
             print(f'Error converting slice {slicing} from {filename} to {sink}: {e}')
             traceback.print_exc()
             raise
 
-    if processes == 'serial':
+    processes = sanitize_n_processes(processes, can_run_in_calling_process=True)
+    if processes == 0:
         for f, i in zip(file_list, indices_slice):
             _convert(f, i)
     else:
-        processes = sanitize_n_processes(processes)
         with concurrent.futures.ThreadPoolExecutor(processes) as executor:
             futures = [executor.submit(_convert, f, i)
                        for f, i in zip(file_list, indices_slice)]
@@ -955,7 +955,7 @@ def _test():
     print(f)
     print(f.expression.string({'Z': 10}))
 
-    d = f.__getitem__((slice(None), slice(None), 1), processes='serial')
+    d = f.__getitem__((slice(None), slice(None), 1), processes=0)
     d = f[:,:,1]
 
     import numpy as np
@@ -968,13 +968,13 @@ def _test():
 
     f = FileListSource('./test_file_list/test<I,3>_<I,2>.npy', shape=(4,5,2,3), dtype='int32')
 
-    f.__setitem__(slice(None,), data, processes='serial')
+    f.__setitem__(slice(None,), data, processes=0)
 
     reload(fl)
     f2 = FileListSource('./test_file_list')
     print(f2)
 
-    data2 = f2.__getitem__(slice(None), processes='serial')
+    data2 = f2.__getitem__(slice(None), processes=0)
 
     s = io_ops.open_ro(data)
     s2 = io_ops.open_ro(data2)

@@ -44,7 +44,7 @@ Block-Numpy-Source(50, 100, 38)[float64]|F|
 >>>    return sink
 >>> 
 >>> bp.process(process_image, source, sink,
->>>            processes = 'serial', size_max = 4, size_min = 1, overlap = 0, axes = [2],
+>>>            processes = 0, size_max = 4, size_min = 1, overlap = 0, axes = [2],
 >>>            optimization = True, verbose = True)
 >>>
 >>> print(np.all(sink[:] == process_image(source)))
@@ -79,7 +79,7 @@ from ClearMap.IO import source_initialization, io_ops
 ###############################################################################
 ### Default parameter
 ###############################################################################
-from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
+from ClearMap.Utils.utilities import CancelableProcessPoolExecutor, sanitize_n_processes
 
 default_size_max = None
 """Default maximal size of a block.
@@ -176,7 +176,7 @@ def process(function, source, sink = None,
   return_blocks : bool
     If True, return the block information used to distribute the processing.
   processes : int, None
-    The number of parallel processes, if 'serial', use serial processing.
+    The number of parallel processes, 0: in the calling process (no subprocess).
   verbose : bool
     Print information on sub-stack generation.
       
@@ -233,14 +233,15 @@ def process(function, source, sink = None,
   else:
     raise ValueError(f"function type {function_type} not 'array', 'source', 'block' or None!")
 
-  if not isinstance(processes, int) and processes != "serial":
-    processes = mp.cpu_count()
+  processes = sanitize_n_processes(processes, can_run_in_calling_process=True)
 
   if verbose:
     timer = tmr.Timer()
     print("Processing %d blocks with function %r." % (n_blocks, function.__name__))
 
-  if isinstance(processes, int):
+  if processes == 0:
+    result = [func(*args) for args in zip(source_blocks, sink_blocks)]  #analysis:ignore
+  else:
     #from bounded_pool_executor import BoundedProcessPoolExecutor
     #with BoundedProcessPoolExecutor(max_workers=processes) as executor:
     #   executor.map(function, source_blocks, sink_blocks)
@@ -259,8 +260,6 @@ def process(function, source, sink = None,
 
       if workspace is not None:
         workspace.executor = None
-  else:
-    result = [func(*args) for args in zip(source_blocks, sink_blocks)]  #analysis:ignore
 
   if verbose:
     timer.print_elapsed_time(f"Processed {n_blocks:d} blocks with function {function.__name__!r}")
@@ -763,7 +762,7 @@ def _test():
     return sink
 
   bp.process(process_image, source, sink,
-             processes = 'serial', size_max = 4, size_min = 1, overlap = 0, axes = [2],
+             processes = 0, size_max = 4, size_min = 1, overlap = 0, axes = [2],
              optimization = True, verbose = True)
 
   print(np.all(sink[:] == process_image(source)))

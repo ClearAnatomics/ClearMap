@@ -25,7 +25,6 @@ import pickle
 import warnings
 
 import numpy as np
-import multiprocessing as mp
 import concurrent.futures
 
 from ClearMap.IO import io_ops
@@ -44,7 +43,7 @@ from ClearMap.Alignment.Stitching.layout_graph_utils import (get_connected_compo
                                                              get_positions_from_tree)
 from ClearMap.Utils.exceptions import ClearMapIoException
 
-from ClearMap.Utils.utilities import CancelableProcessPoolExecutor
+from ClearMap.Utils.utilities import CancelableProcessPoolExecutor, sanitize_n_processes
 
 from ClearMap.Utils.Lazy import lazy_mixin
 
@@ -1498,8 +1497,8 @@ class Layout(SourceRegion, src.AbstractSource):
           If not None, clip the sources at this value when calculating the alignment.
         background : number or None
           If not None, if the values in the overlap region are less than this number make alignment return -inf quality as there is no signal to use for alignment.
-        processes : int or 'serial'
-          Number of processor to use for parallel processing, if 'serial' process in serial.
+        processes : int or None
+          Number of processor to use for parallel processing, 0: in the calling process (no subprocess).
         verbose : bool
           Print progress information.
         """
@@ -1861,8 +1860,8 @@ class TiledLayout(Layout):
           If not None, clip the sources at this value when calculating the alignment.
         background : number or None
           If not None, if the values in the overlap region are less than this number make alignment return -inf quality as there is no signal to use for alignment.
-        processes : int or 'serial'
-          Number of processor to use for parallel processing, if 'serial' process in serial.
+        processes : int or None
+          Number of processor to use for parallel processing, 0: in the calling process (no subprocess).
         verbose : bool
           If True, print progress information.
 
@@ -2795,8 +2794,8 @@ def align_layout(layout, max_shifts = 10, clip = None, background = None, proces
       If not None, clip the soruces at this value when calculating the alignment.
     background : number or None
       If not None, if the values in the overlap region are less than this number make alignment return -inf quality as there is no signal to use for alignment.
-    processes : int or 'serial'
-      Number of processor to use for parallel processing, if 'serial' process in serial.
+    processes : int or None
+      Number of processor to use for parallel processing, 0: in the calling process (no subprocess).
     verbose : bool
       If True, print progress information.
 
@@ -2815,13 +2814,12 @@ def align_layout(layout, max_shifts = 10, clip = None, background = None, proces
         timer = tmr.Timer()
         print(f'Alignment: Aligning {layout!r}')
 
-    if not isinstance(processes, int) and processes != 'serial':
-        processes = mp.cpu_count()
+    processes = sanitize_n_processes(processes, can_run_in_calling_process=True)
 
     _align = ft.partial(_align_layout, n_alignments=n_alignments, max_shifts=max_shifts,
                         clip=clip, background=background, verbose=verbose)
 
-    if processes == 'serial':
+    if processes == 0:
         results = [_align(a.pre, a.post, i) for i,a in enumerate(layout.alignments)]
     else:
         layout.sources_as_virtual()
@@ -2868,8 +2866,8 @@ def align_layout_on_tiling(layout, overlaps = 10, max_shifts = 10, clip = None, 
       If not None, clip the soruces at this value when calculating the alignment.
     background : number or None
       If not None, if the values in the overlap region are less than this number make alignment return -inf quality as there is no signal to use for alignment.
-    processes : int or 'serial'
-      Number of processor to use for parallel processing, if 'serial' process in serial.
+    processes : int or None
+      Number of processor to use for parallel processing, 0: in the calling process (no subprocess).
     verbose : bool
       If True, print progress information.
 
@@ -2901,10 +2899,9 @@ def align_layout_on_tiling(layout, overlaps = 10, max_shifts = 10, clip = None, 
                         overlaps=overlaps, max_shifts=max_shifts,
                         clip=clip, background=background, verbose=verbose)
 
-    if not isinstance(processes, int) and processes != 'serial':
-        processes = mp.cpu_count()
+    processes = sanitize_n_processes(processes, can_run_in_calling_process=True)
 
-    if processes == 'serial':
+    if processes == 0:
         results = [_align(a.pre, a.post, ax, i) for a,ax,i in zip(alignments, axes, range(n_alignments))]
     else:
         layout.sources_as_virtual()
@@ -2955,8 +2952,8 @@ def align_layout_axis(layout, axis = 2, depth = 10, max_shifts = 10, axis_range 
       If not None, clip the soruces at this value when calculating the alignment.
     background : number or None
       If not None, if the values in the overlap region are less than this number make alignment return -inf quality as there is no signal to use for alignment.
-    processes : int or 'serial'
-      Number of processor to use for parallel processing, if 'serial' process in serial.
+    processes : int or None
+      Number of processor to use for parallel processing, 0: in the calling process (no subprocess).
     verbose : bool
       Print progress information.
 
@@ -2989,10 +2986,9 @@ def align_layout_axis(layout, axis = 2, depth = 10, max_shifts = 10, axis_range 
                         depth=depth, max_shifts=max_shifts,
                         clip=clip, background=background, verbose=verbose)
 
-    if not isinstance(processes, int) and processes != 'serial':
-        processes = mp.cpu_count()
+    processes = sanitize_n_processes(processes, can_run_in_calling_process=True)
 
-    if processes == 'serial':
+    if processes == 0:
         results = [_align(a.pre, a.post, i) for i,a in enumerate(layout.alignments)]
     else:
         layout.sources_as_virtual()
@@ -3093,8 +3089,8 @@ def align_layout_rigid_mip(layout, depth=10, max_shifts=10, ranges=None, clip=No
       If not None, clip the sources at this value when calculating the alignment.
     background : number or None
       If not None, if the values in the overlap region are less than this number make alignment return -inf quality as there is no signal to use for alignment.
-    processes : int or 'serial' layout.alig
-      Number of processor to use for parallel processing, if 'serial' process in serial.
+    processes : int or None
+      Number of processor to use for parallel processing, 0: in the calling process (no subprocess).
     verbose : bool
       Print progress information.
 
@@ -3127,10 +3123,9 @@ def align_layout_rigid_mip(layout, depth=10, max_shifts=10, ranges=None, clip=No
                         depth=depth, max_shifts=max_shifts, ranges=ranges,
                         clip=clip, background=background, verbose=verbose)
 
-    if not isinstance(processes, int) and processes != 'serial':
-        processes = mp.cpu_count()
+    processes = sanitize_n_processes(processes, can_run_in_calling_process=True)
 
-    if processes == 'serial':
+    if processes == 0:
         results = [_align(a.pre, a.post, i) for i,a in enumerate(layout.alignments)]
     else:
         layout.sources_as_virtual()
@@ -3233,8 +3228,8 @@ def align_layout_rigid_mips(layout, depth = 10, max_shifts = 10, ranges = None, 
       If not None, clip the soruces at this value when calculating the alignment.
     background : number or None
       If not None, if the values in the overlap region are less than this number make alignment return -inf quality as there is no signal to use for alignment.
-    processes : int or 'serial' layout.alig
-      Number of processor to use for parallel processing, if 'serial' process in serial.
+    processes : int or None
+      Number of processor to use for parallel processing, 0: in the calling process (no subprocess).
     verbose : bool
       Print progress information.
 
@@ -3267,10 +3262,9 @@ def align_layout_rigid_mips(layout, depth = 10, max_shifts = 10, ranges = None, 
                         depth=depth, max_shifts=max_shifts, ranges=ranges,
                         clip=clip, background=background, verbose=verbose)
 
-    if not isinstance(processes, int) and processes != 'serial':
-        processes = mp.cpu_count()
+    processes = sanitize_n_processes(processes, can_run_in_calling_process=True)
 
-    if processes == 'serial':
+    if processes == 0:
         results = [_align(a.pre, a.post, i) for i,a in enumerate(layout.alignments)]
     else:
         layout.sources_as_virtual()

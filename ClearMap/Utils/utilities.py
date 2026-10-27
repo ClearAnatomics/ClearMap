@@ -24,9 +24,12 @@ from typing import List
 import numpy as np
 import psutil
 
+from ClearMap.Utils.exceptions import ClearMapTypeError, ClearMapValueError
+
 
 # The environment variables with which Slurm tells a job how many CPUs it may use (the cores of the node are not its own)
 CPU_LIMIT_ENV_VARS = ('SLURM_CPUS_PER_TASK', 'SLURM_CPUS_ON_NODE')
+PROCESSES_EXPECTED = 'None (all the CPUs), n, -n (all but n) or 0 (in the calling process)'
 
 colors = {
     "WHITE": '\033[1;37m',
@@ -270,26 +273,42 @@ def slurm_cpu_limits():
     return [int(value) for value in values if value.isdecimal() and int(value) > 0]
 
 
-def sanitize_n_processes(processes):
-    if processes is None:
-        processes = available_cpu_count()
-    elif isinstance(processes, str):
-        warnings.warn(f'Using a string to specify the number of processes is deprecated. '
-                      f'Please use an integer (positive or negative) or None.', DeprecationWarning)
+def sanitize_n_processes(processes, can_run_in_calling_process=False):
+    """
+    The number of processes to use: None for all the CPUs of the job (:func:`available_cpu_count`), -n for all
+    but n (at least 1).
+
+    0 is no subprocess: the calling process does the work, one item after the other (to debug). It stays 0 for
+    the code that can run that way (``can_run_in_calling_process``) and is 1 for the code that only needs a count
+    (the threads of compiled code...). The former 'serial' is 0 and '!serial' -1, but they are deprecated.
+
+    Raises
+    ------
+    ClearMapValueError
+        If processes is a string other than the former ones.
+    ClearMapTypeError
+        If processes is neither None, an integer nor a string.
+    """
+    if isinstance(processes, str):
+        warnings.warn('Using a string to specify the number of processes is deprecated. Please use an integer '
+                      '(positive, negative, or 0 for the calling process) or None.', DeprecationWarning, stacklevel=2)
         if processes.lower() == 'serial':
-            processes = 1
+            processes = 0
         elif processes.lower() == '!serial':
-            processes = available_cpu_count() - 1
+            processes = -1
         else:
-            raise ValueError(f'Unknown string value for processes: {processes}. '
-                             f'Use None, "serial" or an integer.')
-    if isinstance(processes, int):
-        if processes < 0:
-            processes = available_cpu_count() + processes
-        processes = max(1, processes)
-        return processes
-    else:
-        raise ValueError(f'Processes must be an integer or None, got {processes} of type {type(processes)}')
+            raise ClearMapValueError(f'Unknown string value for processes: {processes!r}', value=processes,
+                                     expected=PROCESSES_EXPECTED)
+    if processes is None:
+        return available_cpu_count()
+    if not isinstance(processes, int):
+        raise ClearMapTypeError(f'processes must be None or an integer ({PROCESSES_EXPECTED}), got {processes!r} '
+                                f'of type {type(processes).__name__}')
+    if processes == 0:
+        return 0 if can_run_in_calling_process else 1
+    if processes < 0:
+        processes = available_cpu_count() + processes
+    return max(1, processes)  # A number relative to the CPUs never means the calling process
 
 
 def get_ok_n_ok_symbols():

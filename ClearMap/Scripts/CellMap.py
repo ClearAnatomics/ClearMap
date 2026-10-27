@@ -191,7 +191,7 @@ if __name__ == "__main__":
   
   processing_parameter = cells.default_cell_detection_processing_parameter.copy();
   processing_parameter.update(
-      processes = None, # 'serial',
+      processes = None, # 0: in the calling process (to debug)
       size_max = 20, #100, #35,
       size_min = 11,# 30, #30,
       overlap  = 10, #32, #10,
