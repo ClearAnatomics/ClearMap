@@ -983,7 +983,11 @@ class DataViewer(QWidget):
 
         x_axis, y_axis = self.getXYAxes()
         scaled_x, scaled_y = self.scale_coords(x, x_axis, y, y_axis)
-        self.mouse_clicked.emit(scaled_x, scaled_y, self.source_index[self.scroll_axis])
+        position = [0, 0, 0]  # (x, y, z) of the source, whichever axis the view scrolls through (as _updateCoords)
+        position[x_axis] = scaled_x
+        position[y_axis] = scaled_y
+        position[self.scroll_axis] = self.source_index[self.scroll_axis]
+        self.mouse_clicked.emit(*(int(coordinate) for coordinate in position))
 
     def padded_shape(self, shape):
         pad_size = max(3, len(shape))
