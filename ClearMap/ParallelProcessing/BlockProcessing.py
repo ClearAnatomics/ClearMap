@@ -61,7 +61,6 @@ __copyright__ = 'Copyright 2020 by Christoph Kirst'
 
 
 import functools as ft
-import multiprocessing as mp
 import warnings
 import gc
 
@@ -189,6 +188,8 @@ def process(function, source, sink = None,
   ----
   This implementation only supports processing into sinks with the same shape as the source.
   """
+  processes = sanitize_n_processes(processes, can_run_in_calling_process=True)
+
   #sources and sinks
   if isinstance(source, list):
     sources = source
@@ -232,8 +233,6 @@ def process(function, source, sink = None,
     func = ft.partial(process_block_source, function=function, as_memory=as_memory, as_array=True, verbose=verbose, **kwargs)
   else:
     raise ValueError(f"function type {function_type} not 'array', 'source', 'block' or None!")
-
-  processes = sanitize_n_processes(processes, can_run_in_calling_process=True)
 
   if verbose:
     timer = tmr.Timer()
@@ -406,12 +405,7 @@ def block_sizes(size, processes = None,
   the blocks over processes, assuming each block processes a similar amount of
   time.
   """
-  if processes is None:
-    processes = mp.cpu_count()
-  if not isinstance(processes, int):
-    processes = 1
-  if processes <= 0:
-    processes = 1
+  processes = sanitize_n_processes(processes)  # The calling process (0) is one
 
   if size_max is None or size_max > size: 
     size_max = size

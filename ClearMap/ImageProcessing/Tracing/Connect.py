@@ -21,6 +21,7 @@ import ClearMap.ImageProcessing.Differentiation.Hessian as cur
 import ClearMap.ImageProcessing.Topology.Topology3d as t3d
 
 import ClearMap.Visualization.Plot3d as p3d
+from ClearMap.Utils.utilities import available_cpu_count
 
 
 def extractNeighbourhood(data, center, radius):
@@ -460,7 +461,7 @@ def addConnections(data, mask, skeleton, points, radius = 20,
                    start_points = None, 
                    remove_local_mask = True, min_quality = 15.0,
                    add_to_skeleton = True, add_to_mask = False,
-                   verbose = True, processes = mp.cpu_count(), block_size = 5000, debug = False):
+                   verbose = True, processes = available_cpu_count(), block_size = 5000, debug = False):
   global temporary_folder;
   
   timer = tmr.Timer();

@@ -7,7 +7,6 @@ The processor set of scripts to batch process a group of samples.
 This can be used from the GUI, from the CLI or interactively from the python interpreter
 """
 import functools
-import multiprocessing
 import sys
 from concurrent.futures import ThreadPoolExecutor
 
@@ -22,6 +21,7 @@ try:
 except ImportError:
     graph_gt = False
 from ClearMap.pipeline_orchestrators.utils import init_sample_manager_and_processors
+from ClearMap.Utils.utilities import sanitize_n_processes
 from ClearMap.pipeline_orchestrators.cell_map import CellDetector
 
 from ClearMap.IO import io_ops
@@ -157,7 +157,7 @@ def rescale_channel(folder, atlas_base_name=None, dest_resolution=(3, 3, 6), n_c
     -------
 
     """
-    n_cpus = multiprocessing.cpu_count() - 2 if n_cpus is None else n_cpus
+    n_cpus = sanitize_n_processes(-2) if n_cpus is None else n_cpus
 
     orchestrators = init_sample_manager_and_processors(folder)
     sample_manager = orchestrators['sample_manager']

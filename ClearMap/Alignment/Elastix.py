@@ -71,11 +71,11 @@ import shutil
 import re
 from io import UnsupportedOperation
 from pathlib import Path
-import multiprocessing as mp
 
 import numpy as np
 
 import ClearMap.Settings as settings
+from ClearMap.Utils.utilities import sanitize_n_processes
 from ClearMap.IO import conversion, io_ops
 from ClearMap.IO.FileUtils import atomic_write
 from ClearMap.IO.source.backends.tif_backend import TifSource
@@ -663,7 +663,7 @@ def align(fixed_image, moving_image, affine_parameter_file=None, bspline_paramet
         if affine_parameter_file or bspline_parameter_file:
             raise ClearMapValueError('Cannot specify both parameter_files and affine_parameter_file or bspline_parameter_file')
 
-    processes = processes if processes is not None else mp.cpu_count()
+    processes = sanitize_n_processes(processes)
 
     check_elastix_initialized()
 

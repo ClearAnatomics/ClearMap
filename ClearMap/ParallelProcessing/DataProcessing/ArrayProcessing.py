@@ -22,7 +22,6 @@ import os
 import warnings
 
 import numpy as np
-import multiprocessing as mp
 
 import pyximport
 
@@ -31,7 +30,7 @@ import ClearMap.IO.source.Slice as slc
 from ClearMap.IO import FileUtils as file_utils
 
 import ClearMap.Utils.Timer as tmr
-from ClearMap.Utils.utilities import sanitize_n_processes
+from ClearMap.Utils.utilities import sanitize_n_processes, available_cpu_count
 import ClearMap.Utils.array_checks as ac
 
 pyximport.install(setup_args={"include_dirs": [np.get_include(), os.path.dirname(os.path.abspath(__file__))]},
@@ -43,7 +42,7 @@ import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessingCode as code
 # Default Machine Settings
 ###############################################################################
 
-default_processes = mp.cpu_count()
+default_processes = available_cpu_count()
 """Default number of processes to use"""
 
 default_blocks_per_process = 10

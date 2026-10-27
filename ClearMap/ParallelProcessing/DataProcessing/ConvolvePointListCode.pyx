@@ -13,9 +13,6 @@ __webpage__   = 'https://idisco.info'
 __download__  = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 
-from multiprocessing import cpu_count
-ncpus = cpu_count()
-
 cimport cython
 from cython.parallel import prange, parallel
 import numpy as np

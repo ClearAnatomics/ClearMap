@@ -1,5 +1,4 @@
 import inspect
-import multiprocessing
 import warnings
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
@@ -8,6 +7,7 @@ import igraph
 import numpy as np
 
 from ClearMap.Alignment import Annotation as annotation, Annotation as ano
+from ClearMap.Utils.utilities import sanitize_n_processes
 
 """These are the values of the "nkind" property of the edges in the graph
 these are used to have an integer value for the edges that can be used in the linear system"""
@@ -18,7 +18,7 @@ n_kinds = {
 }
 
 
-MAX_PROCS = multiprocessing.cpu_count() - 1
+MAX_PROCS = sanitize_n_processes(-1)
 
 
 # ############################## Brain graph generic ########################################

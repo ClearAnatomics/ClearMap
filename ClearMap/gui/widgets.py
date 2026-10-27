@@ -43,7 +43,6 @@ from ast import literal_eval
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from itertools import permutations
-from multiprocessing import cpu_count
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
 from typing import Optional, List, Tuple, Callable, Dict
@@ -72,7 +71,7 @@ from ClearMap.IO.tile_patterns import pattern_finders_from_base_dir, ChannelPatt
 from ClearMap.config.channel import ChannelId
 from ClearMap.config.compound_keys import compound_channel_parts
 from ClearMap.Utils.exceptions import ClearMapValueError
-from ClearMap.Utils.utilities import bytes_to_human, trim_or_pad
+from ClearMap.Utils.utilities import bytes_to_human, trim_or_pad, available_cpu_count, sanitize_n_processes
 from ClearMap.Utils.nvidia_utils import gpu_params
 from ClearMap.Visualization import Plot3d as plot_3d
 from ClearMap.Visualization.Qt.widgets import Scatter3D
@@ -1256,7 +1255,7 @@ class ManageAssetsWidget(WizardWidget):
             params['check'] = dlg_help.prompt_dialog('Decompression',
                                                      'Do you want to verify the integrity of the files?')
         if action_name == 'convert':
-            params['processes'] = cpu_count() - 2
+            params['processes'] = sanitize_n_processes(-2)
             for asset in self.selected_assets:
                 if asset.type_spec.extensions:
                     extensions = asset.type_spec.extensions
@@ -1330,7 +1329,7 @@ class ManageAssetsWidget(WizardWidget):
 
     def resample_assets(self):
         resampling_params = {k: v for k, v in self.resampling_params.items() if v not in (1, None)}
-        self.sample_manager.resample_assets(self.selected_assets, processes=cpu_count() -2, **resampling_params)
+        self.sample_manager.resample_assets(self.selected_assets, processes=sanitize_n_processes(-2), **resampling_params)
 
 
 class PatternDialog(WizardWidget):
@@ -3056,7 +3055,7 @@ class NProcessesWidget(QWidget):
         self._spin = QSpinBox(self)
         self._spin.setMinimum(1)
         # Slightly conservative default; user can override in Designer or from code
-        self._spin.setMaximum(max(1, cpu_count()))
+        self._spin.setMaximum(available_cpu_count())
 
         layout.addWidget(self._label)
         layout.addWidget(self._spin)

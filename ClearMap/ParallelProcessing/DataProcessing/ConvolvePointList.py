@@ -22,14 +22,13 @@ __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 
 import numpy as np;
-from multiprocessing import cpu_count
 
 import ClearMap.Utils.array_checks as ac
 
 import pyximport;
 
 from ClearMap.IO import source_geometry
-from ClearMap.Utils.utilities import sanitize_n_processes
+from ClearMap.Utils.utilities import sanitize_n_processes, available_cpu_count
 
 pyximport.install(setup_args={"include_dirs": [np.get_include()]}, reload_support=True)
 
@@ -68,7 +67,7 @@ def _prepare(source, kernel, sink, sink_dtype, npts, processes):
   return d, k, sink, o, sanitize_n_processes(processes)
 
 
-def convolve_3d(source, kernel, points = None, indices = None, x = None, y = None, z = None, sink = None, sink_dtype = None, strides = None, check_border = True, processes = cpu_count()):
+def convolve_3d(source, kernel, points = None, indices = None, x = None, y = None, z = None, sink = None, sink_dtype = None, strides = None, check_border = True, processes = available_cpu_count()):
   """Convolves source with a specified kernel at specific points only.
     
   Arguments
@@ -124,7 +123,7 @@ def convolve_3d(source, kernel, points = None, indices = None, x = None, y = Non
   
 
 
-def convolve_3d_points(source, kernel, points, sink = None, sink_dtype = None, check_border = True, processes = cpu_count()):
+def convolve_3d_points(source, kernel, points, sink = None, sink_dtype = None, check_border = True, processes = available_cpu_count()):
   """Convolves source with a specified kernel at specific points only
   
   Arguments
@@ -161,7 +160,7 @@ def convolve_3d_points(source, kernel, points, sink = None, sink_dtype = None, c
   return sink;
 
 
-def convolve_3d_xyz(source, kernel, x, y, z, sink = None, sink_dtype = None, check_border = True, processes = cpu_count()):
+def convolve_3d_xyz(source, kernel, x, y, z, sink = None, sink_dtype = None, check_border = True, processes = available_cpu_count()):
   """Convolves source with a specified kernel at specific points only
     
   Arguments
@@ -200,7 +199,7 @@ def convolve_3d_xyz(source, kernel, x, y, z, sink = None, sink_dtype = None, che
   return sink;
 
 
-def convolve_3d_indices(source, kernel, indices, sink = None, sink_dtype = None, strides = None, check_border = True, processes = cpu_count()):
+def convolve_3d_indices(source, kernel, indices, sink = None, sink_dtype = None, strides = None, check_border = True, processes = available_cpu_count()):
   """Convolves source with a specified kernel at specific points given by a flat array index.
     
   Arguments
@@ -242,7 +241,7 @@ def convolve_3d_indices(source, kernel, indices, sink = None, sink_dtype = None,
   return sink;
 
 
-def convolve_3d_indices_if_smaller_than(source, kernel, indices, max_value, sink = None, strides = None, check_border = True, processes = cpu_count()):
+def convolve_3d_indices_if_smaller_than(source, kernel, indices, max_value, sink = None, strides = None, check_border = True, processes = available_cpu_count()):
   """Convolves source with a specified kernel at specific points given by a flat array indx under conditon the value is smaller than a number
     
   Arguments
@@ -292,7 +291,7 @@ def convolve_3d_indices_if_smaller_than(source, kernel, indices, max_value, sink
     k = kernel;
   
   if processes is None:
-    processes = cpu_count();
+    processes = available_cpu_count();
   
   if strides is None:
     strides = np.array(source_geometry.element_strides(source), dtype=int);
@@ -308,7 +307,7 @@ def convolve_3d_indices_if_smaller_than(source, kernel, indices, max_value, sink
 
 
 
-def convolve_3d_find_smaller_than(source, search, indices, max_value, sink = None, processes = cpu_count()):
+def convolve_3d_find_smaller_than(source, search, indices, max_value, sink = None, processes = available_cpu_count()):
   """Convolves source with a specified kernel at specific points given by a flat array indx under conditon the value is smaller than a number
     
   Arguments:
@@ -342,7 +341,7 @@ def convolve_3d_find_smaller_than(source, search, indices, max_value, sink = Non
     o = sink;
   
   if processes is None:
-    processes = cpu_count();
+    processes = available_cpu_count();
   
   code.convolve_3d_find_smaller_than(d, search, indices, max_value, o, processes);
   

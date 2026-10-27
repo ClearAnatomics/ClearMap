@@ -13,7 +13,6 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 import functools
-import multiprocessing
 import warnings
 from typing import Dict, Callable, List, Sequence, runtime_checkable, Protocol
 
@@ -869,7 +868,7 @@ class PropertyAggregator:
         offsets = np.cumsum([0] + [len(x) for x in self.chain_indices]).astype(np.uint64)
         self.offsets = offsets
 
-        n_procs = max(1, self.n_processes if self.n_processes is not None else multiprocessing.cpu_count() - 2)
+        n_procs = sanitize_n_processes(-2 if self.n_processes is None else self.n_processes)
 
         for prop_name, arr in self.properties.items():
             reduction_fn = self.aggregation_functions[prop_name]

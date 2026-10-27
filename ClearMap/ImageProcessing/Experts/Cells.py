@@ -17,7 +17,6 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import gc
-import multiprocessing
 import shutil
 import tempfile
 import warnings
@@ -49,7 +48,7 @@ from ClearMap.ImageProcessing.Experts.utils import initialize_sinks, run_step, p
 from ClearMap.ImageProcessing.LocalStatistics import local_percentile
 
 from ClearMap.Utils.exceptions import ClearMapValueError
-from ClearMap.Utils.utilities import sanitize_n_processes
+from ClearMap.Utils.utilities import sanitize_n_processes, available_cpu_count
 
 ###############################################################################
 # ## Default parameter
@@ -307,7 +306,7 @@ def detect_cells(source, sink=None, cell_detection_parameter=default_cell_detect
     cell_detection_parameter.update(verbose=processing_parameter.get('verbose', False))
 
     n_processes = sanitize_n_processes(processing_parameter.get('processes'))
-    n_threads = max(1, int(multiprocessing.cpu_count() / n_processes))  # Number of threads so that * n_processes, fills CPUs
+    n_threads = max(1, int(available_cpu_count() / n_processes))  # Number of threads so that * n_processes, fills CPUs
 
     sink_location = clearmap_io.location(sink) if sink is not None else None
     sink_path = Path(sink_location) if sink_location is not None else None

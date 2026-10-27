@@ -32,7 +32,7 @@ import ClearMap.Utils.Timer as tmr
 
 import ClearMap.IO.FileUtils as fu
 from ClearMap.IO import io_ops
-from ClearMap.Utils.utilities import sanitize_n_processes
+from ClearMap.Utils.utilities import sanitize_n_processes, available_cpu_count
 
 
 ###############################################################################
@@ -239,8 +239,8 @@ def match_non_removable(index, verbose = True):
 def generate_lookup_table(function = match_index, verbose = True):
   """Generates lookup table for templates"""
    
-  pool = mp.Pool(mp.cpu_count());
-  lut = pool.map(function, range(2**26),chunksize=2**26/8/mp.cpu_count())
+  pool = mp.Pool(available_cpu_count());
+  lut = pool.map(function, range(2**26),chunksize=2**26/8/available_cpu_count())
   lut = list(lut)
   
   return np.array(lut, dtype = bool);
