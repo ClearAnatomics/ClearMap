@@ -13,7 +13,6 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import inspect
-import multiprocessing
 import os
 import re
 import sys
@@ -25,6 +24,9 @@ from typing import List
 import numpy as np
 import psutil
 
+
+# The environment variables with which Slurm tells a job how many CPUs it may use (the cores of the node are not its own)
+CPU_LIMIT_ENV_VARS = ('SLURM_CPUS_PER_TASK', 'SLURM_CPUS_ON_NODE')
 
 colors = {
     "WHITE": '\033[1;37m',
@@ -233,22 +235,57 @@ def check_stopped(func):
     return wrapper
 
 
+def available_cpu_count():
+    """
+    The number of CPUs this process may use, which is not the number of CPUs of the machine on a cluster (or in
+    a container): ``multiprocessing.cpu_count()`` gives the cores of the node, and a job that starts that many
+    processes on the few cores Slurm gave it fights with itself (and with the jobs of the others).
+
+    This is the smallest of what each source says:
+
+    * the CPUs the process is allowed to run on (``taskset``, the cpuset of a Slurm job with the cgroup plugin),
+      or the CPUs of the machine where the system does not say (macOS, Windows)
+    * the ``SLURM_CPUS_PER_TASK`` and ``SLURM_CPUS_ON_NODE`` of the job, which are all there is where Slurm
+      does not restrict the CPUs the process can run on. A value that is not a positive integer is ignored.
+
+    Returns
+    -------
+    int
+        At least 1: every limit is, by construction.
+    """
+    return min([cpus_the_process_may_run_on(), *slurm_cpu_limits()])
+
+
+def cpus_the_process_may_run_on():
+    """The CPUs taskset, or Slurm with its affinity or cgroup plugin, lets this process run on"""
+    try:
+        return len(os.sched_getaffinity(0))
+    except AttributeError:  # No such function on macOS and Windows: the CPUs of the machine
+        return os.cpu_count() or 1
+
+
+def slurm_cpu_limits():
+    """What SLURM_CPUS_PER_TASK and SLURM_CPUS_ON_NODE say, where they are positive integers"""
+    values = (os.environ.get(name, '').strip() for name in CPU_LIMIT_ENV_VARS)
+    return [int(value) for value in values if value.isdecimal() and int(value) > 0]
+
+
 def sanitize_n_processes(processes):
     if processes is None:
-        processes = multiprocessing.cpu_count()
+        processes = available_cpu_count()
     elif isinstance(processes, str):
         warnings.warn(f'Using a string to specify the number of processes is deprecated. '
                       f'Please use an integer (positive or negative) or None.', DeprecationWarning)
         if processes.lower() == 'serial':
             processes = 1
         elif processes.lower() == '!serial':
-            processes = multiprocessing.cpu_count() - 1
+            processes = available_cpu_count() - 1
         else:
             raise ValueError(f'Unknown string value for processes: {processes}. '
                              f'Use None, "serial" or an integer.')
     if isinstance(processes, int):
         if processes < 0:
-            processes = multiprocessing.cpu_count() + processes
+            processes = available_cpu_count() + processes
         processes = max(1, processes)
         return processes
     else:
