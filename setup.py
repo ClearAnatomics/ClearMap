@@ -7,31 +7,40 @@ from multiprocessing import cpu_count
 from pathlib import Path
 
 from setuptools import setup, find_packages, Extension
+from setuptools.command.build_ext import build_ext as _build_ext
 
-import numpy as np
-
-from Cython.Build import cythonize
-
-# from https://stackoverflow.com/a/3042436
-# To modify the data install dir to match the source install dir...
-# Pull the installation dir info from distutils with:
-from distutils.command.install import INSTALL_SCHEMES
-
-# Modify the data install dir to match the source install dir:
-for scheme in INSTALL_SCHEMES.values():
-    scheme['data'] = scheme['purelib']
-
+# Nothing is built when this file is imported (the tests do), only when it is run (see main): numpy and Cython are
+# imported where they are used.
 
 FORCE = '--force' in sys.argv   # python setup.py build_ext --inplace --force
+
+# N_PROCS must be defined before parallel_build_ext is used.
+N_PROCS = max(1, cpu_count() - 2)
+
+os_name = platform.system().lower()
+
+OPTIMISE_COMPILATION_FOR_TARGET = os.environ.get('OPTIMISE_CLEARMAP_COMPILATION_FOR_TARGET', True) != 'False' # Cython code will run on the machine where it was compiled
+
+requirements = [  # pip
+    'lxml'
+]
+
+excluded_pyx = ['_Old', '_Todo', 'StatisticsPointListCode', 'flow', 'OrientationCode']
+
+data_dirs = [
+    'ClearMap/External/elastix',
+    'ClearMap/External/geodesic_distance',
+    'ClearMap/Resources',
+    'ClearMap/ImageProcessing/Skeletonization',   # .npy and .npy.zip
+    'ClearMap/ImageProcessing/Binary',  # .npy and .npy.zip
+    'ClearMap/ImageProcessing/machine_learning/vessel_filling/resources'  # .pth
+]
 
 
 ###############################################################################
 # Parallel C/C++ compilation
 ###############################################################################
 
-from setuptools.command.build_ext import build_ext as _build_ext
-
-# N_PROCS must be defined before this class is used.
 class parallel_build_ext(_build_ext):
     def initialize_options(self):
         super().initialize_options()
@@ -62,42 +71,60 @@ def _to_msvc_flags(flags):
             out.append(arg)
     return out
 
-requirements = [  # pip
-    'lxml'
-]
-os_name = platform.system().lower()
 
-OPTIMISE_COMPILATION_FOR_TARGET = os.environ.get('OPTIMISE_CLEARMAP_COMPILATION_FOR_TARGET', True) != 'False' # Cython code will run on the machine where it was compiled
-N_PROCS = max(1, cpu_count() - 2)
-
-DEFAULT_COMPILE_ARGS = []
-DEFAULT_LIBRARIES = []
-DEFAULT_LINK_ARGS = []
-
-if not os_name.startswith('windows'):
-    DEFAULT_COMPILE_ARGS += ['-w', '-O3']
-    DEFAULT_LIBRARIES += ['m']
-
-if os_name.startswith('linux'):
-    out = subprocess.check_output(['gcc', '--help=common']).decode('utf-8')
-    if '-flarge-source-files' in out:  # Add only if supported by the compiler
-        DEFAULT_COMPILE_ARGS += ['-flarge-source-files']
+def use_the_source_install_dir_for_data():
+    """Modify the data install dir to match the source install dir (from https://stackoverflow.com/a/3042436)"""
+    from distutils.command.install import INSTALL_SCHEMES  # The distutils of setuptools: it is imported above
+    for scheme in INSTALL_SCHEMES.values():
+        scheme['data'] = scheme['purelib']
 
 
-if '--no-openmp' in sys.argv:
-    sys.argv.remove('--no-openmp')
-    USE_OPENMP = False
-else:
+def default_compile_arguments():
+    arguments = []
+    if not os_name.startswith('windows'):
+        arguments += ['-w', '-O3']
+
+    if os_name.startswith('linux'):
+        out = subprocess.check_output(['gcc', '--help=common']).decode('utf-8')
+        if '-flarge-source-files' in out:  # Add only if supported by the compiler
+            arguments += ['-flarge-source-files']
+
+    if OPTIMISE_COMPILATION_FOR_TARGET and not os_name.startswith('windows'):
+        arguments += ['-march=native', '-mtune=native']
+    return arguments
+
+
+def default_libraries():
+    return [] if os_name.startswith('windows') else ['m']
+
+
+def openmp_is_used():
+    """Whether to compile with OpenMP (``--no-openmp`` turns it off, and is removed from the arguments)"""
+    if '--no-openmp' in sys.argv:
+        sys.argv.remove('--no-openmp')
+        return False
     if os_name.startswith('linux') or os_name.startswith('windows'):
-        USE_OPENMP = True
-    elif os_name.startswith('darwin'):
+        return True
+    if os_name.startswith('darwin'):
         cpp_compiler_version = subprocess.check_output(['c++', '--version']).decode('ascii').split('\n')[0]
-        USE_OPENMP = 'g++' in cpp_compiler_version
-    else:
-        raise ValueError(f'Unknown OS {os_name}')
+        return 'g++' in cpp_compiler_version
+    raise ValueError(f'Unknown OS {os_name}')
 
-if OPTIMISE_COMPILATION_FOR_TARGET and not os_name.startswith('windows'):
-    DEFAULT_COMPILE_ARGS += ['-march=native', '-mtune=native']
+
+def compile_and_link_arguments(use_openmp):
+    """The (compile, link) arguments of every extension"""
+    extra_compile_args = default_compile_arguments()
+    extra_link_args = []
+
+    # OpenMP flags (platform-conditional — NOT in file headers)
+    if use_openmp:
+        extra_compile_args += ['-fopenmp']
+        extra_link_args += ['-fopenmp']
+
+    if os_name.startswith('windows'):
+        extra_compile_args = _to_msvc_flags(extra_compile_args)
+        extra_link_args = _to_msvc_flags(extra_link_args)
+    return extra_compile_args, extra_link_args
 
 
 def module_path_to_dotted(ext_path):
@@ -115,64 +142,32 @@ def find_data_files(src_dir):
     return out
 
 
-excluded_pyx = ['_Old', '_Todo', 'StatisticsPointListCode', 'flow', 'OrientationCode']
-extension_paths = [str(p) for p in Path('ClearMap').rglob('*.pyx')
-                   if not any(excl in str(p) for excl in excluded_pyx)]
+def get_data_files():
+    data_files = [('licenses', ['LICENSE.txt', 'LICENSE'])]
+    for p in data_dirs:
+        data_files.extend([(k, v) for k, v in find_data_files(p).items()])
+    data_files.extend([('', ['start_gui.sh'])])
+    return data_files
 
-###############################################################################
-# OpenMP flags (platform-conditional — NOT in file headers)
-###############################################################################
 
-extra_compile_args = list(DEFAULT_COMPILE_ARGS)
-extra_link_args = list(DEFAULT_LINK_ARGS)
+def make_extensions(extra_compile_args, extra_link_args, libraries):
+    import numpy as np
+    extension_paths = [str(p) for p in Path('ClearMap').rglob('*.pyx')
+                       if not any(excl in str(p) for excl in excluded_pyx)]
+    extensions = []
+    for ext_path in extension_paths:
+        extension = Extension(
+            name=module_path_to_dotted(ext_path),
+            sources=[ext_path],
+            libraries=libraries,
+            # language= intentionally omitted — read from #distutils: header
+            include_dirs=[np.get_include(), os.path.dirname(os.path.abspath(ext_path))],
+            extra_compile_args=extra_compile_args,
+            extra_link_args=extra_link_args,
+        )
+        extensions.append(extension)
+    return extensions
 
-if USE_OPENMP:
-    extra_compile_args += ['-fopenmp']
-    extra_link_args += ['-fopenmp']
-
-if os_name.startswith('windows'):
-    extra_compile_args = _to_msvc_flags(extra_compile_args)
-    extra_link_args = _to_msvc_flags(extra_link_args)
-
-extensions = []
-for ext_path in extension_paths:
-    extension = Extension(
-        name=module_path_to_dotted(ext_path),
-        sources=[ext_path],
-        libraries=DEFAULT_LIBRARIES,
-        # language= intentionally omitted — read from #distutils: header
-        include_dirs=[np.get_include(), os.path.dirname(os.path.abspath(ext_path))],
-        extra_compile_args=extra_compile_args,
-        extra_link_args=extra_link_args,
-    )
-    extensions.append(extension)
-
-print(f'Building {len(extensions)} extensions with {N_PROCS} processes, '
-      f'using OpenMP: {USE_OPENMP}, '
-      f'libraries: {DEFAULT_LIBRARIES}, ',
-      f'compile args: {extra_compile_args},'
-      f'link args: {extra_link_args}')
-if os_name.startswith('darwin') or os_name.startswith('windows'):
-    ext_modules = cythonize(extensions, quiet=True, force=FORCE)
-else:
-    ext_modules = cythonize(extensions, nthreads=N_PROCS, quiet=True, force=FORCE)
-
-data_dirs = [
-    'ClearMap/External/elastix',
-    'ClearMap/External/geodesic_distance',
-    'ClearMap/Resources',
-    'ClearMap/ImageProcessing/Skeletonization',   # .npy and .npy.zip
-    'ClearMap/ImageProcessing/Binary',  # .npy and .npy.zip
-    'ClearMap/ImageProcessing/machine_learning/vessel_filling/resources'  # .pth
-]
-
-data_files = [('licenses', ['LICENSE.txt', 'LICENSE'])]
-for p in data_dirs:
-    data_files.extend([(k, v) for k, v in find_data_files(p).items()])
-data_files.extend([('', ['start_gui.sh'])])
-
-packages = find_packages(exclude=('doc', 'tests*', 'pickle_python_2', 'deprecated',
-                                  'ClearMap.External.elastix', 'ClearMap.External.geodesic_distance'))
 
 def read_clearmap_version():
     """The version written in ClearMap/_version.py (read, not imported: ClearMap is not built yet)"""
@@ -181,46 +176,73 @@ def read_clearmap_version():
     return namespace['__version__']
 
 
-setup(
-    name='ClearMap',
-    version=read_clearmap_version(),
-    description='3D cell counting and vasculature analysis for lightsheet microscopy',
-    install_requires=requirements,
-    packages=packages,
-    ext_modules=ext_modules,
-    cmdclass={'build_ext': parallel_build_ext},
-    entry_points={
-        'gui_scripts': [
-            'clearmap-ui = ClearMap.gui.app:entry_point'
-        ],
-        'console_scripts': [
-            'cell_map = ClearMap.Scripts.cell_map_new_api:main',
-            'clearmap-utils = ClearMap.Scripts.clearmap_utils:main'
-        ],
-    },
-    url='',
-    license='MIT',
-    author='Christoph Kirst, Sophie Skriabine, Charly Rousseau, Etienne Doumazane',
-    author_email='',
-    include_package_data=True,
-    package_data={
-        'ClearMap.config': [
-            '*.cfg',
-            'defaults/*/*.yml',
-            'schemas/*/*.yaml',
-            'defaults/*/*.cfg',
-        ],
-        'ClearMap.gui': [
-            'creator/*.ui',
-            'creator/*.qrc',
-            'creator/graphics_resources/*.png',
-            'creator/graphics_resources/*.jpg',
-            'creator/graphics_resources/*.svg',
-            'creator/icons/*.png',
-            'creator/icons/*.jpg',
-            'creator/icons/*.svg',
-        ],
-    },
-    data_files=data_files,
-    zip_safe=False
-)
+def main():
+    from Cython.Build import cythonize
+
+    use_the_source_install_dir_for_data()
+    use_openmp = openmp_is_used()
+    libraries = default_libraries()
+    extra_compile_args, extra_link_args = compile_and_link_arguments(use_openmp)
+    extensions = make_extensions(extra_compile_args, extra_link_args, libraries)
+
+    print(f'Building {len(extensions)} extensions with {N_PROCS} processes, '
+          f'using OpenMP: {use_openmp}, '
+          f'libraries: {libraries}, ',
+          f'compile args: {extra_compile_args},'
+          f'link args: {extra_link_args}')
+    if os_name.startswith('darwin') or os_name.startswith('windows'):
+        ext_modules = cythonize(extensions, quiet=True, force=FORCE)
+    else:
+        ext_modules = cythonize(extensions, nthreads=N_PROCS, quiet=True, force=FORCE)
+
+    packages = find_packages(exclude=('doc', 'tests*', 'pickle_python_2', 'deprecated',
+                                      'ClearMap.External.elastix', 'ClearMap.External.geodesic_distance'))
+    data_files = get_data_files()
+
+    setup(
+        name='ClearMap',
+        version=read_clearmap_version(),
+        description='3D cell counting and vasculature analysis for lightsheet microscopy',
+        install_requires=requirements,
+        packages=packages,
+        ext_modules=ext_modules,
+        cmdclass={'build_ext': parallel_build_ext},
+        entry_points={
+            'gui_scripts': [
+                'clearmap-ui = ClearMap.gui.app:entry_point'
+            ],
+            'console_scripts': [
+                'cell_map = ClearMap.Scripts.cell_map_new_api:main',
+                'clearmap-utils = ClearMap.Scripts.clearmap_utils:main'
+            ],
+        },
+        url='',
+        license='MIT',
+        author='Christoph Kirst, Sophie Skriabine, Charly Rousseau, Etienne Doumazane',
+        author_email='',
+        include_package_data=True,
+        package_data={
+            'ClearMap.config': [
+                '*.cfg',
+                'defaults/*/*.yml',
+                'schemas/*/*.yaml',
+                'defaults/*/*.cfg',
+            ],
+            'ClearMap.gui': [
+                'creator/*.ui',
+                'creator/*.qrc',
+                'creator/graphics_resources/*.png',
+                'creator/graphics_resources/*.jpg',
+                'creator/graphics_resources/*.svg',
+                'creator/icons/*.png',
+                'creator/icons/*.jpg',
+                'creator/icons/*.svg',
+            ],
+        },
+        data_files=data_files,
+        zip_safe=False
+    )
+
+
+if __name__ == '__main__':  # Not when it is imported (the tests do); setuptools and pip run it as __main__
+    main()
