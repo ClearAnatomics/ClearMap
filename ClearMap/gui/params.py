@@ -1202,8 +1202,11 @@ class RegistrationParams(ChannelsUiParameterCollection):  # TEST: does not seem 
                                                         get_view=self._get_view, apply_patch=self._apply_patch)
             self[channel_name] = channel_params
             channel_params.tab.selectLandmarksPushButton.clicked.connect(
-                lambda ch_idx=channel_params.page_index: self.publish(
-                    UiRequestLandmarksDialog(page_index=ch_idx)))
+                functools.partial(self.request_landmarks_dialog, channel_params))
+
+    def request_landmarks_dialog(self, channel_params, *_checked):  # *_checked: the button passes its checked state
+        """Ask for the landmarks dialog of the channel, by the index its page has now (its name may change)"""
+        self.publish(UiRequestLandmarksDialog(page_index=channel_params.page_index))
 
     @property
     def params(self):

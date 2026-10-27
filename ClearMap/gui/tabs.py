@@ -924,9 +924,10 @@ class RegistrationTab(PreProcessingTab['RegistrationProcessor']):
         self.worker.clear_landmarks(channel)
         # TODO: use landmark_selector
 
-    def launch_landmarks_dialog(self, channel: int | str) -> None:
-        if isinstance(channel, int):
-            channel = self.params.get_channel_name(channel)
+    def launch_landmarks_dialog(self, event: UiRequestLandmarksDialog) -> None:
+        if event.page_index < 0:  # The page of the channel is gone
+            return
+        channel = self.params.get_channel_name(event.page_index)
         # We have to keep reference to make it persistent but should be per channel
         self.landmark_selector = LandmarksSelectorDialog(
             fixed_image_path=self.worker.get_fixed_image(channel).path,
