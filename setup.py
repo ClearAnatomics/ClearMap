@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import subprocess
 import platform
@@ -19,7 +20,22 @@ N_PROCS = max(1, cpu_count() - 2)
 
 os_name = platform.system().lower()
 
-OPTIMISE_COMPILATION_FOR_TARGET = os.environ.get('OPTIMISE_CLEARMAP_COMPILATION_FOR_TARGET', True) != 'False' # Cython code will run on the machine where it was compiled
+# The CPU the compiled code is built for: CLEARMAP_TARGET_ARCHITECTURE is the -march of the compiler.
+# * native (the default): the CPU of the machine that builds. Fastest, but the code only runs on CPUs at least as
+#   recent.
+# * a level that every machine that will run the code has, to build once for several machines (a module for a
+#   cluster, a wheel): x86-64-v2, x86-64-v3 (AVX2, FMA)... These names need GCC 11 or later (clang 12 or later);
+#   /lib64/ld-linux-x86-64.so.2 --help lists the levels a machine supports.
+# * compiler-default: no -march, the baseline of the compiler. Slowest, runs everywhere.
+# OPTIMISE_CLEARMAP_COMPILATION_FOR_TARGET (false: compiler-default) is still understood when the above is not set.
+TARGET_ARCHITECTURE_ENV_VAR = 'CLEARMAP_TARGET_ARCHITECTURE'
+LEGACY_OPTIMISE_FOR_TARGET_ENV_VAR = 'OPTIMISE_CLEARMAP_COMPILATION_FOR_TARGET'
+# -march=native: every instruction of the CPU that compiles, so only the same or newer CPUs can run the code
+TARGET_THE_CPU_THAT_BUILDS = 'native'
+# No -march: only the baseline instructions of the architecture (SSE2 on x86-64), so any CPU of it can run the code
+TARGET_ANY_CPU = 'compiler-default'
+FALSE_SPELLINGS = ('false', '0', 'no', 'off')
+ARCHITECTURE_NAME = re.compile(r'[a-z0-9][a-z0-9._+-]*')  # The value goes to the compiler: nothing else
 
 requirements = [  # pip
     'lxml'
@@ -79,6 +95,39 @@ def use_the_source_install_dir_for_data():
         scheme['data'] = scheme['purelib']
 
 
+def target_compile_arguments(environment):
+    """
+    The arguments that choose the CPU the code is built for (not for MSVC, which has no ``-march``).
+
+    Parameters
+    ----------
+    environment : Mapping[str, str]
+        The environment variables (``os.environ``).
+
+    Returns
+    -------
+    list[str]
+        ``-march`` (and ``-mtune`` for the CPU of the machine that builds), nothing for the compiler default.
+
+    Raises
+    ------
+    ValueError
+        If ``CLEARMAP_TARGET_ARCHITECTURE`` cannot be the name of an architecture.
+    """
+    architecture = environment.get(TARGET_ARCHITECTURE_ENV_VAR, '').strip().lower()
+    if not architecture:
+        optimisation_is_off = environment.get(LEGACY_OPTIMISE_FOR_TARGET_ENV_VAR, '').strip().lower() in FALSE_SPELLINGS
+        architecture = TARGET_ANY_CPU if optimisation_is_off else TARGET_THE_CPU_THAT_BUILDS
+    if not ARCHITECTURE_NAME.fullmatch(architecture):
+        raise ValueError(f'{TARGET_ARCHITECTURE_ENV_VAR}={architecture!r} is not the name of an architecture '
+                         f'(e.g. "{TARGET_THE_CPU_THAT_BUILDS}", "x86-64-v3" or "{TARGET_ANY_CPU}")')
+    if architecture == TARGET_ANY_CPU:
+        return []
+    if architecture == TARGET_THE_CPU_THAT_BUILDS:
+        return [f'-march={architecture}', '-mtune=native']
+    return [f'-march={architecture}']
+
+
 def default_compile_arguments():
     arguments = []
     if not os_name.startswith('windows'):
@@ -89,8 +138,8 @@ def default_compile_arguments():
         if '-flarge-source-files' in out:  # Add only if supported by the compiler
             arguments += ['-flarge-source-files']
 
-    if OPTIMISE_COMPILATION_FOR_TARGET and not os_name.startswith('windows'):
-        arguments += ['-march=native', '-mtune=native']
+    if not os_name.startswith('windows'):  # MSVC has no -march
+        arguments += target_compile_arguments(os.environ)
     return arguments
 
 
