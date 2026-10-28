@@ -163,7 +163,11 @@ from ClearMap.Utils.utilities import title_to_snake, snake_to_title
 from ClearMap.config.config_adjusters.patch_ops import deep_merge
 from ClearMap.Utils.nvidia_utils import cuda_available
 from ClearMap.Utils.event_bus import EventBus, BusSubscriberMixin, GUI_THREAD
-from ClearMap.Utils.events import (CfgChanged, UiRequestRefreshTabs, UiTabActivated, TabActivationResult,
+from ClearMap.Utils.progress import ProgressWatcher
+from ClearMap.Utils.events import (ProgressMainStepNameChanged, ProgressSubStepNameChanged, ProgressMainValueChanged,
+                                   ProgressMainMaximumChanged, ProgressSubValueChanged, ProgressSubMaximumChanged,
+                                   ProgressFinished,
+                                   CfgChanged, UiRequestRefreshTabs, UiTabActivated, TabActivationResult,
                                    TabsUpdated,  ChannelsSnapshot, ChannelDefaultsChanged)
 
 from ClearMap.config.update_config import update_default_config
@@ -213,15 +217,17 @@ class ClearMapAppBase(QMainWindow, Ui_ClearMapGui):
     progress bars and performance monitors and appearance.
     Anything more application related is coded in the child class.
     """
-    def __init__(self):
+    def __init__(self, bus: EventBus):
         super().__init__()
+        self.bus = bus
         self.graphs = []
         self._reload_icon = self.style().standardIcon(QStyle.SP_BrowserReload)
         self.logger = None
         self.progress_logger = Printer(logger_type='progress')
         self.error_logger = None
         self.progress_dialog = None
-        self.progress_watcher = cmp_widgets.ProgressWatcher(timer_interval_ms=250)
+        self.progress_watcher = ProgressWatcher(bus, timer_interval_ms=250)
+        self._subscribe_the_progress_dialog()
 
         self.default_font_size = self.compute_default_font_size()
 
@@ -547,37 +553,12 @@ class ClearMapAppBase(QMainWindow, Ui_ClearMapGui):
             self.progress_dialog = ClearMap.gui.dialog_helpers.make_nested_progress_dialog(
                 title=title, overall_maximum=n_steps,
                 abort_callback=abort, parent=parent)
-
-            # Dialog-bound slots — disconnect_all because target widget changes each call
-            unique_connect(self.progress_watcher.main_max_changed,
-                           self.progress_dialog.mainProgressBar.setMaximum,
-                           disconnect_all=True)
-            unique_connect(self.progress_watcher.main_progress_changed,
-                           self.progress_dialog.mainProgressBar.setValue,
-                           disconnect_all=True)
-
-            # Stable slot — just ensure no duplicate
-            unique_connect(self.progress_watcher.main_step_name_changed,
-                           self.handle_step_name_change)
         else:
             nested = False
             self.progress_dialog = ClearMap.gui.dialog_helpers.make_simple_progress_dialog(
                 title=title, abort_callback=abort, parent=parent)
 
-        # Dialog-bound slots — disconnect_all because target widget changes each call
-        unique_connect(self.progress_watcher.max_changed,
-                       self.progress_dialog.subProgressBar.setMaximum,
-                       disconnect_all=True)
-        unique_connect(self.progress_watcher.progress_changed,
-                       self.progress_dialog.subProgressBar.setValue,
-                       disconnect_all=True)
-
-        # Stable slots — just ensure no duplicate
-        unique_connect(self.progress_watcher.sub_step_name_changed,
-                       self.handle_sub_step_change)
-        unique_connect(self.progress_watcher.finished,
-                       self.signal_process_finished)
-
+        # The dialog follows the watcher through the events (see _subscribe_the_progress_dialog)
         if nested:
             self.progress_watcher.setup(main_step_name=title, main_step_length=n_steps)
         else:
@@ -587,6 +568,45 @@ class ClearMapAppBase(QMainWindow, Ui_ClearMapGui):
 
     def set_tabs_progress_watchers(self, nested: bool = False):
         raise NotImplementedError()
+
+    def _subscribe_the_progress_dialog(self):
+        """
+        The current progress dialog follows the progress watcher. The handlers run in the GUI thread (they touch
+        widgets): the watcher publishes from the processing thread and from its log poller.
+        """
+        for event_type, handler in ((ProgressMainMaximumChanged, self._set_main_progress_maximum),
+                                    (ProgressMainValueChanged, self._set_main_progress_value),
+                                    (ProgressSubMaximumChanged, self._set_sub_progress_maximum),
+                                    (ProgressSubValueChanged, self._set_sub_progress_value),
+                                    (ProgressMainStepNameChanged, self._on_main_step_name_changed),
+                                    (ProgressSubStepNameChanged, self._on_sub_step_name_changed),
+                                    (ProgressFinished, self._on_progress_finished)):
+            self.bus.subscribe(event_type, handler, affinity=GUI_THREAD)
+
+    def _set_main_progress_maximum(self, event: ProgressMainMaximumChanged):
+        if self.progress_dialog is not None:
+            self.progress_dialog.mainProgressBar.setMaximum(event.maximum)
+
+    def _set_main_progress_value(self, event: ProgressMainValueChanged):
+        if self.progress_dialog is not None:
+            self.progress_dialog.mainProgressBar.setValue(event.value)
+
+    def _set_sub_progress_maximum(self, event: ProgressSubMaximumChanged):
+        if self.progress_dialog is not None:
+            self.progress_dialog.subProgressBar.setMaximum(event.maximum)
+
+    def _set_sub_progress_value(self, event: ProgressSubValueChanged):
+        if self.progress_dialog is not None:
+            self.progress_dialog.subProgressBar.setValue(event.value)
+
+    def _on_main_step_name_changed(self, event: ProgressMainStepNameChanged):
+        self.handle_step_name_change(event.name)
+
+    def _on_sub_step_name_changed(self, event: ProgressSubStepNameChanged):
+        self.handle_sub_step_change(event.name)
+
+    def _on_progress_finished(self, event: ProgressFinished):
+        self.signal_process_finished(event.main_step_name)
 
     def wrap_in_thread(self, func: Callable, *args, **kwargs):
         """
@@ -712,9 +732,8 @@ class ClearMapApp(ClearMapAppBase):
     tabs derived from GenericTab , which correspond to different steps of the program.
     """
     def __init__(self, experiment_controller, bus, gui_controller):
-        super().__init__()
+        super().__init__(bus)
         self.experiment_controller = experiment_controller
-        self.bus = bus
         self.gui_controller = gui_controller
 
         self.setupUi(self)

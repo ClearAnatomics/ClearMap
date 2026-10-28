@@ -26,7 +26,7 @@ from ClearMap.pipeline_orchestrators.generic_orchestrators import IndependentCha
 from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
 
 if TYPE_CHECKING:
-    from ClearMap.gui.widgets import ProgressWatcher
+    from ClearMap.Utils.progress import ProgressWatcher
 
 
 class StitchingProcessor(IndependentChannelsPipelineOrchestrator):

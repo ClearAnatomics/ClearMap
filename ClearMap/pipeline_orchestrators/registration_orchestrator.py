@@ -38,7 +38,7 @@ from ClearMap.pipeline_orchestrators.generic_orchestrators import IndependentCha
 from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
 
 if TYPE_CHECKING:
-    from ClearMap.gui.widgets import ProgressWatcher
+    from ClearMap.Utils.progress import ProgressWatcher
     from ClearMap.Visualization import Plot3d as q_plot_3d  # WARNING: Local imports, for reference only
 
 

@@ -114,7 +114,7 @@ if TYPE_CHECKING:    # WARNING: some circular imports below, use only for type c
     from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
     from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
     from ClearMap.pipeline_orchestrators.experiment_controller import AnalysisGroupController
-    from ClearMap.gui.widgets import ProgressWatcher
+    from ClearMap.Utils.progress import ProgressWatcher
 
 
 def check_sample_channels_in_workspace(sample_manager: "SampleManager", channels: Iterable[str], *,

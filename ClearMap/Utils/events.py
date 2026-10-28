@@ -147,3 +147,40 @@ class UiBatchResultsFolderChanged:
 @dataclass(frozen=True)
 class UiBatchGroupsChanged:
     groups: Dict[str, List[str]]
+
+
+# The progress of the processing (published by ClearMap.Utils.progress.ProgressWatcher; the progress dialog of the
+# GUI and the log of a headless run subscribe). The main steps, then the substep inside the current main step.
+@dataclass(frozen=True)
+class ProgressMainStepNameChanged:
+    name: str
+
+
+@dataclass(frozen=True)
+class ProgressSubStepNameChanged:
+    name: Optional[str]
+
+
+@dataclass(frozen=True)
+class ProgressMainValueChanged:
+    value: int
+
+
+@dataclass(frozen=True)
+class ProgressMainMaximumChanged:
+    maximum: int
+
+
+@dataclass(frozen=True)
+class ProgressSubValueChanged:
+    value: int
+
+
+@dataclass(frozen=True)
+class ProgressSubMaximumChanged:
+    maximum: int
+
+
+@dataclass(frozen=True)
+class ProgressFinished:
+    main_step_name: str
