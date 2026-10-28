@@ -3,7 +3,7 @@ import re
 import warnings
 from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 
 import numpy as np
 
@@ -25,9 +25,6 @@ from ClearMap.config.config_coordinator import ConfigCoordinator
 from ClearMap.pipeline_orchestrators.generic_orchestrators import IndependentChannelsPipelineOrchestrator
 from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
 
-if TYPE_CHECKING:
-    from ClearMap.Utils.progress import ProgressWatcher
-
 
 class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
     """
@@ -40,7 +37,6 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
     def __init__(self, sample_manager: SampleManager, cfg_coordinator: ConfigCoordinator):
         super().__init__(cfg_coordinator)
         self.sample_manager: SampleManager = sample_manager
-        self.progress_watcher: Optional["ProgressWatcher"] = None
         self.__wobbly_stitching_place_re = 'done constructing constraints for component'
         self.__wobbly_stitching_align_lyt_re = ('Alignment: Wobbly alignment',
                                                 re.compile(r"Alignment:\sWobbly alignment \(\d+, \d+\)->\(\d+, \d+\) "

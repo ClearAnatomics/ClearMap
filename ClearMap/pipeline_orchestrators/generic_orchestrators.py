@@ -106,6 +106,7 @@ from ClearMap.config.compound_keys import (CompoundKey, compound_channel_key, co
 from ClearMap.Utils.event_bus import BusSubscriberMixin
 from ClearMap.Utils.exceptions import (ClearMapRuntimeError, ClearMapValueError, ClearMapConfigError,
                                        ClearMapNotImplementedError, MissingChannelError, MissingRequirementException)
+from ClearMap.Utils.progress import ProgressWatcherBase
 from ClearMap.Utils.utilities import handle_deprecated_args, infer_origin_from_caller
 from ClearMap.config.config_adjusters.dict_ops import deep_freeze
 
@@ -114,7 +115,6 @@ if TYPE_CHECKING:    # WARNING: some circular imports below, use only for type c
     from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
     from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
     from ClearMap.pipeline_orchestrators.experiment_controller import AnalysisGroupController
-    from ClearMap.Utils.progress import ProgressWatcher
 
 
 def check_sample_channels_in_workspace(sample_manager: "SampleManager", channels: Iterable[str], *,
@@ -597,8 +597,9 @@ class PipelineOrchestrator(OrchestratorBase):
         The configuration coordinator to manage the configuration files.
     stopped: bool
         Flag to indicate if the process has been stopped.
-    progress_watcher: ProgressWatcher or None
-        The progress watcher to monitor the progress of the processing.
+    progress_watcher: ProgressWatcherBase
+        The progress watcher to monitor the progress of the processing (one that shows nothing until a display
+        sets its own).
     workspace: Workspace or None
         The workspace to manage the assets.
     pipeline: str
@@ -621,7 +622,7 @@ class PipelineOrchestrator(OrchestratorBase):
     def __init__(self, coordinator: "ConfigCoordinator"):
         super().__init__(coordinator)
         self.stopped: bool = False
-        self.progress_watcher: Optional["ProgressWatcher"] = None  # FIXME: ensure assigned
+        self.progress_watcher: ProgressWatcherBase = ProgressWatcherBase()
         self.sample_manager: Optional["SampleManager"] = None  # FIXME: ensure assigned
         self._setup_done: bool = False  # Whether setup() ran, see setup_complete
 
@@ -724,8 +725,7 @@ class PipelineOrchestrator(OrchestratorBase):
         val : int
             Number of units to add.
         """
-        if self.progress_watcher is not None:
-            self.progress_watcher.increment(val)
+        self.progress_watcher.increment(val)
 
     def update_watcher_main_progress(self, val=1):
         """
@@ -737,8 +737,7 @@ class PipelineOrchestrator(OrchestratorBase):
             Number of main steps completed.  Default is 1.
         """
 
-        if self.progress_watcher is not None:
-            self.progress_watcher.increment_main_progress(val)
+        self.progress_watcher.increment_main_progress(val)
 
     def set_watcher_step(self, step_name):
         """
@@ -749,8 +748,7 @@ class PipelineOrchestrator(OrchestratorBase):
         step_name : str
             Human-readable name of the current processing step.
         """
-        if self.progress_watcher is not None:
-            self.progress_watcher.main_step_name = step_name
+        self.progress_watcher.main_step_name = step_name
 
     def prepare_watcher_for_substep(self, counter_size, pattern, title, increment_main=False):
         """
@@ -768,10 +766,9 @@ class PipelineOrchestrator(OrchestratorBase):
         increment_main: bool
             Whether a new step should be added to the main progress bar
         """
-        if self.progress_watcher is not None:
-            self.progress_watcher.prepare_for_substep(counter_size, pattern, title)
-            if increment_main:
-                self.update_watcher_main_progress()
+        self.progress_watcher.prepare_for_substep(counter_size, pattern, title)
+        if increment_main:
+            self.update_watcher_main_progress()
 
     def stop_process(self):  # REFACTOR: put in parent class ??
         """
@@ -1033,7 +1030,7 @@ class GroupOrchestratorBase:
         self.channel: Optional[str] = channel
 
         # injected by UI/tab
-        self._progress_watcher = None             # ProgressWatcher-like
+        self._progress_watcher: ProgressWatcherBase = ProgressWatcherBase()
         self._wrap_in_thread: Optional[Callable] = None
 
     def set_progress_watcher(self, watcher) -> None:
@@ -1092,8 +1089,7 @@ class GroupOrchestratorBase:
         return Path(g[0])
 
     def _increment_progress_main(self, n: int = 1) -> None:
-        if self._progress_watcher is not None:
-            self._progress_watcher.increment_main_progress(n)
+        self._progress_watcher.increment_main_progress(n)
 
     def _threaded(self, func: Callable, *args, **kwargs):
         if self._wrap_in_thread is None:

@@ -38,7 +38,6 @@ from ClearMap.pipeline_orchestrators.generic_orchestrators import IndependentCha
 from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
 
 if TYPE_CHECKING:
-    from ClearMap.Utils.progress import ProgressWatcher
     from ClearMap.Visualization import Plot3d as q_plot_3d  # WARNING: Local imports, for reference only
 
 
@@ -114,7 +113,6 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
         self.annotators: Dict[str, Annotation] = {}  # 1 for each channel
         self._source_annotator: Optional[Annotation] = None  # see source_annotator
         self._source_annotator_key: Optional[tuple[str, str]] = None
-        self.progress_watcher: Optional["ProgressWatcher"] = None  # FIXME:
         self.__bspline_registration_re = re.compile(r"\d+\s-?\d+\.\d+\s\d+\.\d+\s\d+\.\d+\s\d+\.\d+")
         self.__affine_registration_re = re.compile(r"\d+\s-\d+\.\d+\s\d+\.\d+\s\d+\.\d+\s\d+\.\d+\s\d+\.\d+")
         self.__resample_re = ('Resampling: resampling',

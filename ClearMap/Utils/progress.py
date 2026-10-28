@@ -38,7 +38,94 @@ PRINTED_FRACTION_STEP = 0.1          # The LoggingProgressBar writes a line ever
 LINE_TIME_FORMAT = '%H:%M:%S'
 
 
-class ProgressWatcher:
+class ProgressWatcherBase:
+    """
+    What any code may call on a progress watcher, and the watcher that shows nothing: each method does nothing and
+    each property gives its default (its setter ignores the value).
+
+    The code that reports its progress is given one when no display was set (e.g. an orchestrator in a headless
+    run), so it never tests whether it has a watcher. :class:`ProgressWatcher` is the one that publishes; each of
+    its public members must be defined here too (tests/utils/test_progress_watcher_base.py checks it).
+    """
+    log_path = None
+    pattern = None
+
+    def reset(self):
+        pass
+
+    def setup(self, main_step_name, main_step_length, sub_step_length=0, pattern=None):
+        pass
+
+    def set_poll_interval(self, ms: int):
+        pass
+
+    def start_polling(self):
+        pass
+
+    def stop_polling(self):
+        pass
+
+    def prepare_for_substep(self, step_length, pattern, step_name):
+        pass
+
+    def get_progress(self):
+        return 0
+
+    def set_progress(self, value):
+        pass
+
+    def set_main_progress(self, value):
+        pass
+
+    def increment_main_progress(self, increment=1):
+        pass
+
+    def increment(self, increment):
+        pass
+
+    @property
+    def max_progress(self):
+        return DEFAULT_MAX_PROGRESS
+
+    @max_progress.setter
+    def max_progress(self, value):
+        pass
+
+    @property
+    def main_max_progress(self):
+        return 1
+
+    @main_max_progress.setter
+    def main_max_progress(self, value):
+        pass
+
+    @property
+    def main_step_name(self):
+        return DEFAULT_MAIN_STEP_NAME
+
+    @main_step_name.setter
+    def main_step_name(self, step_name):
+        pass
+
+    @property
+    def sub_step_name(self):
+        return None
+
+    @sub_step_name.setter
+    def sub_step_name(self, step_name):
+        pass
+
+    def count_dones(self):
+        return 0
+
+    def reset_log_length(self):
+        pass
+
+    def finish(self):
+        pass
+
+
+class ProgressWatcher(ProgressWatcherBase):
     """
     Watches the progress of a process and publishes it on the event bus.
 
@@ -75,8 +162,8 @@ class ProgressWatcher:
         self._progress = 0
         self._max_progress = max_progress
 
-        self.n_dones = 0
-        self.previous_log_length = 0  # The log length at the end of the previous operation
+        self._n_dones = 0
+        self._previous_log_length = 0  # The log length at the end of the previous operation
         self.log_path = None
         self.pattern = None
 
@@ -93,8 +180,8 @@ class ProgressWatcher:
         self._progress = 0
         self._max_progress = DEFAULT_MAX_PROGRESS
 
-        self.n_dones = 0
-        self.previous_log_length = 0  # The log length at the end of the previous operation
+        self._n_dones = 0
+        self._previous_log_length = 0  # The log length at the end of the previous operation
         self.log_path = None
         self.pattern = None
 
@@ -310,32 +397,32 @@ class ProgressWatcher:
                 return 0
             try:
                 with open(self.log_path, 'rb') as log:      # binary: seek is byte-exact
-                    log.seek(self.previous_log_length)
+                    log.seek(self._previous_log_length)
                     raw = log.read()
-                    self.previous_log_length = log.tell()   # update to real end position
+                    self._previous_log_length = log.tell()   # update to real end position
             except (FileNotFoundError, OSError):
-                return self.n_dones
+                return self._n_dones
 
             text = raw.decode('utf-8', errors='replace')    # 0x9C → �, no crash
             new_lines = text.splitlines(keepends=True)
 
             n_dones = len([ln for ln in new_lines if self._matches_pattern(ln)])
-            self.n_dones += n_dones
-            return self.n_dones
+            self._n_dones += n_dones
+            return self._n_dones
 
     def reset_log_length(self):
         """Reset the done counter and seek to the end of the log file."""
         with self._log_lock:
-            self.n_dones = 0
+            self._n_dones = 0
             if not self.log_path:
-                self.previous_log_length = 0
+                self._previous_log_length = 0
                 return
             try:
                 with open(self.log_path, 'rb') as log:
                     log.seek(0, 2)                          # SEEK_END
-                    self.previous_log_length = log.tell()   # real byte offset
+                    self._previous_log_length = log.tell()   # real byte offset
             except FileNotFoundError:
-                self.previous_log_length = 0
+                self._previous_log_length = 0
 
     def finish(self):
         """Publish that the processing is finished."""
