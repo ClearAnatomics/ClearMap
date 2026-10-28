@@ -34,6 +34,7 @@ throughout the ClearMap graphical interface, including:
 import os
 import re
 import tempfile
+import threading
 import functools
 from math import floor
 import getpass
@@ -321,9 +322,10 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
         self.log_path = None
         self.pattern = None
 
-        self._timer = QTimer(self)
-        self._timer.timeout.connect(self._on_tick)
         self._interval_ms = timer_interval_ms
+        self._log_lock = threading.RLock()  # The poller reads the counters, the processing thread resets them
+        self._polling_stop_requested = threading.Event()
+        self._poller = None
 
     def __del__(self):
         self.set_main_progress(self.main_max_progress)
@@ -374,27 +376,37 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
         self.progress_changed.emit(self.__progress)
 
     def set_poll_interval(self, ms: int):
-        """Set the log-polling interval in milliseconds."""
+        """Set the log-polling interval in milliseconds (from the next poll on)."""
         self._interval_ms = ms
-        if self._timer.isActive():
-            self._timer.start(self._interval_ms)
 
     def start_polling(self):
-        """Start polling the log file for progress pattern matches."""
+        """Start polling the log file for progress pattern matches, in a thread of its own."""
         if not self.log_path:  # If not setup
             return
+        self.stop_polling()  # At most one poller
         self.reset_log_length()
-        self._timer.start(self._interval_ms)
+        self._polling_stop_requested.clear()
+        self._poller = threading.Thread(target=self._poll_until_stop_requested, name='progress log poller',
+                                        daemon=True)
+        self._poller.start()
 
     def stop_polling(self):
-        """Stop log-file polling."""
-        self._timer.stop()
+        """Stop log-file polling (returns once the poller has stopped)."""
+        self._polling_stop_requested.set()
+        if self._poller is not None:
+            self._poller.join()
+            self._poller = None
+
+    def _poll_until_stop_requested(self):
+        while not self._polling_stop_requested.wait(self._interval_ms / 1000):  # True once the stop is requested
+            self._on_tick()
 
     def _on_tick(self):
-        if not self.pattern or not self.log_path:
-            return
-        dones = self.count_dones()
-        self.set_progress(dones)
+        with self._log_lock:
+            if not self.pattern or not self.log_path:
+                return
+            dones = self.count_dones()
+            self.set_progress(dones)
 
     def prepare_for_substep(self, step_length, pattern, step_name):
         """
@@ -409,10 +421,11 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
         step_name : str
             Name (title) of the substep.
         """
-        self.max_progress = step_length
-        self.pattern = pattern
-        self.reset_log_length()
-        self.set_progress(0)
+        with self._log_lock:
+            self.max_progress = step_length
+            self.pattern = pattern
+            self.reset_log_length()
+            self.set_progress(0)
         self.sub_step_name = step_name
 
     def get_progress(self):
@@ -542,35 +555,37 @@ class ProgressWatcher(QWidget):  # Inspired from https://stackoverflow.com/a/662
         int
             The cumulative number of matched operations.
         """
-        if self.pattern is None:
-            return 0
-        try:
-            with open(self.log_path, 'rb') as log:      # binary: seek is byte-exact
-                log.seek(self.previous_log_length)
-                raw = log.read()
-                self.previous_log_length = log.tell()   # update to real end position
-        except (FileNotFoundError, OSError):
+        with self._log_lock:
+            if self.pattern is None:
+                return 0
+            try:
+                with open(self.log_path, 'rb') as log:      # binary: seek is byte-exact
+                    log.seek(self.previous_log_length)
+                    raw = log.read()
+                    self.previous_log_length = log.tell()   # update to real end position
+            except (FileNotFoundError, OSError):
+                return self.n_dones
+
+            text = raw.decode('utf-8', errors='replace')    # 0x9C → \ufffd, no crash
+            new_lines = text.splitlines(keepends=True)
+
+            n_dones = len([ln for ln in new_lines if self.__match(ln)])
+            self.n_dones += n_dones
             return self.n_dones
-
-        text = raw.decode('utf-8', errors='replace')    # 0x9C → \ufffd, no crash
-        new_lines = text.splitlines(keepends=True)
-
-        n_dones = len([ln for ln in new_lines if self.__match(ln)])
-        self.n_dones += n_dones
-        return self.n_dones
 
     def reset_log_length(self):
         """Reset the done counter and seek to the end of the log file."""
-        self.n_dones = 0
-        if not self.log_path:
-            self.previous_log_length = 0
-            return
-        try:
-            with open(self.log_path, 'rb') as log:
-                log.seek(0, 2)                          # SEEK_END
-                self.previous_log_length = log.tell()   # real byte offset
-        except FileNotFoundError:
-            self.previous_log_length = 0
+        with self._log_lock:
+            self.n_dones = 0
+            if not self.log_path:
+                self.previous_log_length = 0
+                return
+            try:
+                with open(self.log_path, 'rb') as log:
+                    log.seek(0, 2)                          # SEEK_END
+                    self.previous_log_length = log.tell()   # real byte offset
+            except FileNotFoundError:
+                self.previous_log_length = 0
 
     def finish(self):
         """Trigger the finished signal."""
