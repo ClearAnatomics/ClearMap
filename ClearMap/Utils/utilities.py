@@ -276,7 +276,8 @@ def slurm_cpu_limits():
 def sanitize_n_processes(processes, can_run_in_calling_process=False):
     """
     The number of processes to use: None for all the CPUs of the job (:func:`available_cpu_count`), -n for all
-    but n (at least 1).
+    but n (at least 1) and n for n, but never more than the CPUs of the job: the number of a configuration written
+    for a larger machine does not make a small job fight with itself.
 
     0 is no subprocess: the calling process does the work, one item after the other (to debug). It stays 0 for
     the code that can run that way (``can_run_in_calling_process``) and is 1 for the code that only needs a count
@@ -306,9 +307,9 @@ def sanitize_n_processes(processes, can_run_in_calling_process=False):
                                 f'of type {type(processes).__name__}')
     if processes == 0:
         return 0 if can_run_in_calling_process else 1
-    if processes < 0:
-        processes = available_cpu_count() + processes
-    return max(1, processes)  # A number relative to the CPUs never means the calling process
+    available = available_cpu_count()
+    requested = available + processes if processes < 0 else processes
+    return min(max(1, requested), available)  # A number relative to the CPUs never means the calling process
 
 
 def get_ok_n_ok_symbols():

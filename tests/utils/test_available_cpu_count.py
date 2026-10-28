@@ -101,3 +101,18 @@ def test_negative_numbers_of_processes_are_taken_from_the_cpus_of_the_job(job_of
 def test_not_serial_leaves_one_cpu_of_the_job(job_of_8_cores):
     with pytest.warns(DeprecationWarning):
         assert utilities.sanitize_n_processes('!serial') == ALLOWED_CORES - 1
+
+
+@pytest.mark.parametrize('processes', (ALLOWED_CORES + 1, 23, CORES_OF_THE_NODE, 10 ** 6))
+def test_more_processes_than_the_cpus_of_the_job_are_the_cpus_of_the_job(job_of_8_cores, processes):
+    """The defaults of the configuration are written for a large workstation: a small job does not fight with itself"""
+    assert utilities.sanitize_n_processes(processes) == ALLOWED_CORES
+
+
+def test_as_many_processes_as_the_cpus_of_the_job_are_kept(job_of_8_cores):
+    assert utilities.sanitize_n_processes(ALLOWED_CORES) == ALLOWED_CORES
+
+
+@pytest.mark.parametrize('can_run_in_calling_process, expected', [(True, 0), (False, 1)])
+def test_the_cap_does_not_touch_the_calling_process(job_of_8_cores, can_run_in_calling_process, expected):
+    assert utilities.sanitize_n_processes(0, can_run_in_calling_process=can_run_in_calling_process) == expected
