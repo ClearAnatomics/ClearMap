@@ -7,7 +7,7 @@ The progress of the processing, independent of the front end.
 
 :class:`ProgressWatcher` publishes the progress on the event bus (the ``Progress...`` events of
 :mod:`ClearMap.Utils.events`), and the displays subscribe to them: the progress dialog of the GUI, the log of a
-headless run. A watcher whose bus nobody listens to shows nothing.
+headless run (:class:`LoggingProgressBar`). A watcher whose bus nobody listens to shows nothing.
 
 .. warning:: Temporary workaround
 
@@ -17,7 +17,9 @@ headless run. A watcher whose bus nobody listens to shows nothing.
     by the code itself (e.g. the finished blocks, counted by the parent process).
 """
 import re
+import sys
 import threading
+import time
 
 from ClearMap.Utils.event_bus import EventBus
 from ClearMap.Utils.events import (ProgressMainStepNameChanged, ProgressSubStepNameChanged, ProgressMainValueChanged,
@@ -32,6 +34,8 @@ __download__ = 'https://www.github.com/ClearAnatomics/ClearMap'
 DEFAULT_MAIN_STEP_NAME = 'Processing'
 DEFAULT_MAX_PROGRESS = 100
 DEFAULT_POLL_INTERVAL_MS = 250
+PRINTED_FRACTION_STEP = 0.1          # The LoggingProgressBar writes a line every 10 % of a substep
+LINE_TIME_FORMAT = '%H:%M:%S'
 
 
 class ProgressWatcher:
@@ -336,3 +340,85 @@ class ProgressWatcher:
     def finish(self):
         """Publish that the processing is finished."""
         self.bus.publish(ProgressFinished(self.main_step_name))
+
+
+class LoggingProgressBar:
+    """
+    The progress as lines of text, for a headless run (e.g. the output file of a Slurm job): the steps, each
+    substep with its size, a line every 10 % of a substep, and the end with its duration.
+
+    Subscribed without affinity: the handlers run in the thread that publishes (the processing thread, the log
+    poller), so they share a lock.
+    """
+    def __init__(self, bus: EventBus, stream=None):
+        """
+        Parameters
+        ----------
+        bus : EventBus
+            The bus the ProgressWatcher publishes on.
+        stream : file-like or None
+            Where the lines are written; standard output by default.
+        """
+        self.stream = stream if stream is not None else sys.stdout
+        self._lock = threading.Lock()
+        self._main_maximum = 1
+        self._printed_main_value = None
+        self._sub_step_name = None
+        self._sub_maximum = 0
+        self._printed_fraction_steps = 0
+        self._start_time = time.monotonic()
+        for event_type, handler in ((ProgressMainStepNameChanged, self._on_main_step_name_changed),
+                                    (ProgressMainMaximumChanged, self._on_main_maximum_changed),
+                                    (ProgressMainValueChanged, self._on_main_value_changed),
+                                    (ProgressSubStepNameChanged, self._on_sub_step_name_changed),
+                                    (ProgressSubMaximumChanged, self._on_sub_maximum_changed),
+                                    (ProgressSubValueChanged, self._on_sub_value_changed),
+                                    (ProgressFinished, self._on_finished)):
+            bus.subscribe(event_type, handler)
+
+    def _write(self, line):
+        print(f'{time.strftime(LINE_TIME_FORMAT)} {line}', file=self.stream, flush=True)
+
+    def _on_main_step_name_changed(self, event: ProgressMainStepNameChanged):
+        with self._lock:
+            self._printed_main_value = None
+            self._start_time = time.monotonic()
+            if event.name:
+                self._write(event.name)
+
+    def _on_main_maximum_changed(self, event: ProgressMainMaximumChanged):
+        with self._lock:
+            self._main_maximum = event.maximum
+
+    def _on_main_value_changed(self, event: ProgressMainValueChanged):
+        with self._lock:
+            is_a_step = 1 <= event.value <= self._main_maximum   # main maximum + 1 is the end
+            if self._main_maximum > 1 and is_a_step and event.value != self._printed_main_value:
+                self._printed_main_value = event.value
+                self._write(f'Step {event.value} of {self._main_maximum}')
+
+    def _on_sub_step_name_changed(self, event: ProgressSubStepNameChanged):
+        with self._lock:
+            self._sub_step_name = event.name
+            self._printed_fraction_steps = 0
+            if event.name:
+                self._write(f'    {event.name}' + (f' ({self._sub_maximum})' if self._sub_maximum else ''))
+
+    def _on_sub_maximum_changed(self, event: ProgressSubMaximumChanged):
+        with self._lock:
+            self._sub_maximum = event.maximum
+
+    def _on_sub_value_changed(self, event: ProgressSubValueChanged):
+        with self._lock:
+            if self._sub_maximum <= 0:
+                return
+            fraction = min(event.value / self._sub_maximum, 1)
+            fraction_steps = int(round(fraction / PRINTED_FRACTION_STEP, 6))   # 0.3 / 0.1 is 2.9999999999999996
+            if fraction_steps > self._printed_fraction_steps:
+                self._printed_fraction_steps = fraction_steps
+                self._write(f'    {self._sub_step_name or ""}: {fraction:.0%}')
+
+    def _on_finished(self, event: ProgressFinished):
+        with self._lock:
+            seconds = time.monotonic() - self._start_time
+            self._write(f'{event.main_step_name or "Processing"} finished in {seconds:.0f} s')
