@@ -84,10 +84,6 @@ class CancelableProcessPoolExecutor(ProcessPoolExecutor):
                     proc.terminate()
 
 
-def is_in_range(src_array, value_range):
-    return np.logical_and(src_array >= value_range[0], src_array <= value_range[1])
-
-
 def title_to_snake(string):
     """
         Convert a human/TitleCase/mixed string into canonical snake_case.
