@@ -8,6 +8,7 @@ release, so that the documentation shows the GUI of the release.
 Usage, from the root of the repository, in the ClearMap environment::
 
     python -m tests.gui_screenshots <out_dir> [--work-dir <dir>] [--whole-window] [--size WIDTHxHEIGHT]
+    [--panel-widening PERCENT]
 
 The pictures are written to ``<out_dir>/<tab>/<tab>__<page>__<subpage>.png`` and listed, with the titles they were
 reached by, in ``<out_dir>/manifest.tsv``.
@@ -25,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import faulthandler
 import os
 import re
 import sys
@@ -51,12 +53,23 @@ UNTITLED = 'untitled'
 MANIFEST_NAME = 'manifest.tsv'
 MANIFEST_TITLE_SEPARATOR = ' > '
 
+HANG_REPORT_SECONDS = 180  # A run that takes longer prints the stack of every thread, and again at each interval
+# The yes/no questions the application asks on its own while it loads the experiment, which are answered with "No":
+# the data is not imported (the data of the fake experiment is not meant to be processed)
+DECLINED_QUESTION_TITLES = ('Channel data import',)
+
 LOAD_SETTLE_SECONDS = 3.0  # The experiment is loaded through events, and the tabs are built when it is
 PAGE_SETTLE_SECONDS = 0.3  # The pages are built and painted when they are shown
 EVENT_LOOP_STEP_SECONDS = 0.01
 
-DEFAULT_WINDOW_SIZE = '1000x900'
+DEFAULT_WINDOW_SIZE = '1000x1300'  # Tall: the open page of a toolbox only gets the height the headers leave
+DEFAULT_PANEL_WIDENING_PERCENT = 30.0  # The panel of the application is a little too narrow for its own controls
 WINDOW_SIZE_PATTERN = re.compile(r'(\d+)x(\d+)')
+
+
+def report(message: str) -> None:
+    """Say where the run is, at once: in a pipe the output is buffered, and a crash of Qt would lose it"""
+    print(message, flush=True)
 
 
 # ################################################ NAMES (no Qt) ###################################################
@@ -101,6 +114,22 @@ def parse_window_size(text: str) -> tuple[int, int]:
     return int(match.group(1)), int(match.group(2))
 
 
+def parse_widening_percent(text: str) -> float:
+    """The argument of ``--panel-widening``: a number of percent that is not negative"""
+    try:
+        percent = float(text)
+    except ValueError:
+        percent = -1.0
+    if percent < 0:
+        raise argparse.ArgumentTypeError(f'expected a number of percent that is 0 or more, got "{text}"')
+    return percent
+
+
+def widened_dock_width(*, dock_width: int, panel_width: int, widening_percent: float) -> int:
+    """The width the dock must be given for the panel next to it to be wider by ``widening_percent``"""
+    return max(dock_width - round(panel_width * widening_percent / 100), 0)
+
+
 def build_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog='python -m tests.gui_screenshots', description=__doc__.split('\n\n')[0])
     parser.add_argument('out_dir', type=Path, help='the folder where the screenshots are written (created if missing)')
@@ -111,6 +140,10 @@ def build_argument_parser() -> argparse.ArgumentParser:
                         help='picture the main window instead of its tab area')
     parser.add_argument('--size', type=parse_window_size, default=parse_window_size(DEFAULT_WINDOW_SIZE),
                         help=f'size of the main window in pixels (default {DEFAULT_WINDOW_SIZE})')
+    parser.add_argument('--panel-widening', type=parse_widening_percent, default=DEFAULT_PANEL_WIDENING_PERCENT,
+                        metavar='PERCENT',
+                        help='widen the control panel (the tabs) by this much, as if dragging its right border, '
+                             f'before the pictures (default {DEFAULT_PANEL_WIDENING_PERCENT:g}, 0 to keep the width)')
     parser.add_argument('--use-real-home', action='store_true',
                         help='run with the real home folder (and so the real ~/.clearmap) instead of a new one')
     return parser
@@ -145,7 +178,10 @@ def create_experiment(work_dir: Path) -> Path:
 
 def forbid_modal_dialogs() -> None:
     """
-    Make every way of opening a modal dialog raise, so that a run that would wait for an answer fails and says where.
+    Make every way of opening a modal dialog raise, so that a run that would wait for an answer fails and says where,
+    except the questions of ``DECLINED_QUESTION_TITLES``, which are answered "No", and the notices (a warning or an
+    information box with an OK button, e.g. "No cells file found" on an experiment that has not been run), which are
+    dismissed with OK and logged: a notice is what a new experiment legitimately shows.
     """
     from PyQt5.QtWidgets import QDialog, QFileDialog, QInputDialog, QMessageBox
 
@@ -154,15 +190,36 @@ def forbid_modal_dialogs() -> None:
             raise RuntimeError(f'{description} would open a modal dialog, which nobody can answer in this run')
         return refuse_modal_dialog
 
+    refuse_question = refuse('QMessageBox.question')
+
+    def answer_no_to_known_questions(parent, title, *args, **kwargs):
+        if title not in DECLINED_QUESTION_TITLES:
+            return refuse_question(parent, title, *args, **kwargs)
+        report(f'Declined the question "{title}"')
+        return QMessageBox.No
+
+    refuse_message_box_exec = refuse('QMessageBox.exec')
+
+    def dismiss_notices(message_box, *args, **kwargs):
+        is_notice = (message_box.icon() in (QMessageBox.Warning, QMessageBox.Information)
+                     and bool(message_box.standardButtons() & QMessageBox.Ok))
+        if not is_notice:
+            return refuse_message_box_exec(message_box, *args, **kwargs)
+        notice = f'{message_box.text()} {message_box.informativeText()}'.strip()
+        report(f'Dismissed the notice "{notice}"')
+        return QMessageBox.Ok
+
     for qt_class, static_methods, instance_methods in (
             (QDialog, (), ('exec', 'exec_')),
-            (QMessageBox, ('warning', 'information', 'critical', 'question'), ('exec', 'exec_')),
+            (QMessageBox, ('warning', 'information', 'critical'), ('exec', 'exec_')),
             (QInputDialog, ('getText', 'getInt', 'getDouble', 'getItem'), ()),
             (QFileDialog, ('getExistingDirectory', 'getOpenFileName', 'getSaveFileName'), ())):
         for method_name in static_methods:
             setattr(qt_class, method_name, staticmethod(refuse(f'{qt_class.__name__}.{method_name}')))
         for method_name in instance_methods:
             setattr(qt_class, method_name, refuse(f'{qt_class.__name__}.{method_name}'))
+    QMessageBox.question = staticmethod(answer_no_to_known_questions)
+    QMessageBox.exec = QMessageBox.exec_ = dismiss_notices
 
 
 def close_other_dialogs(qapp, window) -> None:
@@ -172,6 +229,39 @@ def close_other_dialogs(qapp, window) -> None:
     for widget in qapp.topLevelWidgets():
         if widget is not window and isinstance(widget, QDialog) and widget.isVisible():
             widget.close()
+
+
+def make_excepthook(uncaught_exceptions: list):
+    """
+    The hook for the exceptions nothing catches: the ones of the slots, which PyQt would otherwise abort the process
+    for (the run goes on, and fails at the end), and the one that ends the run. Each is printed at once, as Python does,
+    and kept to count the failures.
+    """
+    def print_and_keep_uncaught_exception(exception_type, exception, exception_traceback):
+        description = ''.join(traceback.format_exception(exception_type, exception, exception_traceback))
+        uncaught_exceptions.append(description)
+        print(description, file=sys.stderr, flush=True)
+
+    return print_and_keep_uncaught_exception
+
+
+def prepare_output_dir(out_dir: Path) -> Path:
+    """
+    Create the folder of the pictures and check that a file can be written in it, before the slow part of the run
+    (the application takes minutes to start the first time, and a folder that cannot be written discards all of it).
+    """
+    from ClearMap.Utils.exceptions import ClearMapIoException, ClearMapPermissionError
+
+    advice = 'Pass an out_dir that exists, or that this user can create.'
+    try:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryFile(dir=out_dir):
+            pass
+    except PermissionError as error:
+        raise ClearMapPermissionError(f'Cannot write in the output folder "{out_dir}": {error}. {advice}') from error
+    except OSError as error:
+        raise ClearMapIoException(f'Cannot use "{out_dir}" as the output folder: {error}. {advice}') from error
+    return out_dir
 
 
 def settle(qapp, seconds: float) -> None:
@@ -216,6 +306,12 @@ class ScreenshotSession:
         self.saved: list[tuple[Path, list[str]]] = []
         self.errors: list[str] = []
 
+    def record_error(self, titles: list[str]) -> None:
+        """Keep the exception being handled for the count and print it at once (the run is long: nobody waits for it)"""
+        description = f'{MANIFEST_TITLE_SEPARATOR.join(titles)}:\n{traceback.format_exc()}'
+        self.errors.append(description)
+        print(description, file=sys.stderr, flush=True)
+
     def save(self, titles: list[str], widget=None) -> None:
         path = self.namer.next_path(titles)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -223,6 +319,7 @@ class ScreenshotSession:
         if not pixmap.save(str(path), 'PNG'):
             raise OSError(f'Could not write the screenshot "{path}"')
         self.saved.append((path, list(titles)))
+        report(f'saved {path}')
 
     def save_pages_of(self, parent_widget, parent_titles: list[str]) -> None:
         """
@@ -239,8 +336,8 @@ class ScreenshotSession:
                     settle(self.qapp, PAGE_SETTLE_SECONDS)
                     self.save(titles)
                     self.save_pages_of(container.widget(index), titles)
-                except Exception:  # One page failing must not hide the others: it is reported at the end
-                    self.errors.append(f'{MANIFEST_TITLE_SEPARATOR.join(titles)}:\n{traceback.format_exc()}')
+                except Exception:  # One page failing must not hide the others
+                    self.record_error(titles)
             container.setCurrentIndex(initial_index)
 
     def write_manifest(self) -> Path:
@@ -251,7 +348,23 @@ class ScreenshotSession:
         return manifest_path
 
 
-def open_application(sample_dir: Path, window_size: tuple[int, int]):
+def widen_control_panel(qapp, window, *, widening_percent: float) -> None:
+    """
+    Do what dragging the right border of the control panel does: the data viewer dock on its right gets narrower and
+    the panel wider. The window keeps its size. Reports the widths, because a dock cannot go below its minimum width.
+    """
+    from PyQt5.QtCore import Qt
+
+    panel_width_before = window.tabWidget.width()
+    dock_width = widened_dock_width(dock_width=window.graphDock.width(), panel_width=panel_width_before,
+                                    widening_percent=widening_percent)
+    window.resizeDocks([window.graphDock], [dock_width], Qt.Horizontal)
+    settle(qapp, PAGE_SETTLE_SECONDS)
+    report(f'Control panel widened from {panel_width_before} to {window.tabWidget.width()} pixels '
+           f'(asked: {widening_percent:g}%)')
+
+
+def open_application(sample_dir: Path, window_size: tuple[int, int], *, panel_widening_percent: float):
     """Start the application like ``ClearMap.gui.app.main`` does (without its event loop), open the experiment"""
     import qdarkstyle
 
@@ -275,8 +388,11 @@ def open_application(sample_dir: Path, window_size: tuple[int, int]):
     close_other_dialogs(qapp, window)
     window.resize(*window_size)
 
+    report(f'Opening the experiment {sample_dir}')
     window._select_experiment_mode(sample_dir)  # Like the "Experiment" button, then picking the folder
     settle(qapp, LOAD_SETTLE_SECONDS)
+    report('Experiment open')
+    widen_control_panel(qapp, window, widening_percent=panel_widening_percent)  # After the load: the tabs are built
     return qapp, window
 
 
@@ -284,20 +400,25 @@ def take_screenshots(qapp, window, namer: ScreenshotNamer, *, whole_window: bool
     """Picture each tab, the pages in each tab and the workspace manager"""
     session = ScreenshotSession(qapp, window if whole_window else window.tabWidget, namer)
     tab_widget = window.tabWidget
+    report('Tabs: ' + ', '.join(tab_widget.tabText(index) for index in range(tab_widget.count())))
     for index in range(tab_widget.count()):
         tab_title = tab_widget.tabText(index)
+        report(f'Picturing the tab "{tab_title}"')
         try:
             tab_widget.setCurrentIndex(index)
             settle(qapp, PAGE_SETTLE_SECONDS)
             session.save([tab_title])
             session.save_pages_of(tab_widget.widget(index), [tab_title])
         except Exception:
-            session.errors.append(f'{tab_title}:\n{traceback.format_exc()}')
+            session.record_error([tab_title])
     tab_widget.setCurrentIndex(0)
 
     workspace_manager = getattr(window, 'assetsManagerDock', None)
     if workspace_manager is not None and workspace_manager.isVisible():
-        session.save(['workspace manager'], widget=workspace_manager)
+        try:
+            session.save(['workspace manager'], widget=workspace_manager)
+        except Exception:
+            session.record_error(['workspace manager'])
     return session
 
 
@@ -306,12 +427,9 @@ def take_screenshots(qapp, window, namer: ScreenshotNamer, *, whole_window: bool
 def main(arguments=None) -> int:
     parsed_arguments = build_argument_parser().parse_args(arguments)
     uncaught_exceptions: list[str] = []
-
-    def record_uncaught_exception(exception_type, exception, exception_traceback):
-        # Without this hook, PyQt aborts the process on an exception in a slot. The run goes on, and fails at the end.
-        uncaught_exceptions.append(''.join(traceback.format_exception(exception_type, exception, exception_traceback)))
-
-    sys.excepthook = record_uncaught_exception
+    sys.excepthook = make_excepthook(uncaught_exceptions)
+    faulthandler.enable()  # The stack of Python at a crash of Qt (a segmentation fault shows nothing otherwise)
+    faulthandler.dump_traceback_later(HANG_REPORT_SECONDS, repeat=True)  # ... and where a run that waits is waiting
 
     with contextlib.ExitStack() as stack:
         if parsed_arguments.work_dir is None:
@@ -321,19 +439,28 @@ def main(arguments=None) -> int:
             work_dir.mkdir(parents=True, exist_ok=True)
         configure_environment(work_dir, use_real_home=parsed_arguments.use_real_home)
 
+        from ClearMap.Utils.exceptions import ClearMapIoException
         from ClearMap.Utils.utilities import ExitCode
 
+        try:
+            out_dir = prepare_output_dir(parsed_arguments.out_dir.expanduser().resolve())
+        except ClearMapIoException as error:
+            print(error, file=sys.stderr)
+            return ExitCode.FAILURE
+
+        report(f'Creating the fake experiment in {work_dir}')
         sample_dir = create_experiment(work_dir)
-        qapp, window = open_application(sample_dir, parsed_arguments.size)
-        namer = ScreenshotNamer(parsed_arguments.out_dir.expanduser().resolve())
+        report('Starting the application (the first start of a new home folder prepares the atlases: this is slow)')
+        qapp, window = open_application(sample_dir, parsed_arguments.size,
+                                         panel_widening_percent=parsed_arguments.panel_widening)
+        namer = ScreenshotNamer(out_dir)
         session = take_screenshots(qapp, window, namer, whole_window=parsed_arguments.whole_window)
         if session.saved:
             manifest_path = session.write_manifest()
             print(f'{len(session.saved)} screenshots in {namer.out_dir} (listed in {manifest_path.name})')
 
-    failures = session.errors + uncaught_exceptions
-    for failure in failures:
-        print(failure, file=sys.stderr)
+    faulthandler.cancel_dump_traceback_later()
+    failures = session.errors + uncaught_exceptions  # All were printed when they happened
     if failures or not session.saved:
         print(f'{len(failures)} failure(s), {len(session.saved)} screenshot(s) saved', file=sys.stderr)
         return ExitCode.FAILURE

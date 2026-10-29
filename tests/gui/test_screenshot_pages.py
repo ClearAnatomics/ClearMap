@@ -86,14 +86,44 @@ class FakeApplication:
         pass
 
 
+class FakeMessageBox:
+    No = 'No'
+    Yes = 'Yes'
+    Ok = 1
+    Cancel = 2
+    Warning = 'Warning'
+    Information = 'Information'
+    Question = 'Question'
+    Critical = 'Critical'
+
+    def __init__(self, icon, buttons, text='', informative_text=''):
+        self._icon, self._buttons, self._text, self._informative_text = icon, buttons, text, informative_text
+
+    def icon(self):
+        return self._icon
+
+    def standardButtons(self):
+        return self._buttons
+
+    def text(self):
+        return self._text
+
+    def informativeText(self):
+        return self._informative_text
+
+
 @pytest.fixture(autouse=True)
 def fake_qt(monkeypatch):
     qt_widgets = types.ModuleType('PyQt5.QtWidgets')
     qt_widgets.QTabWidget = FakeTabWidget
     qt_widgets.QToolBox = FakeToolBox
+    for name in ('QDialog', 'QFileDialog', 'QInputDialog'):  # Fresh classes: the tool replaces their methods
+        setattr(qt_widgets, name, type(name, (), {}))
+    qt_widgets.QMessageBox = type('QMessageBox', (FakeMessageBox,), {})
     monkeypatch.setitem(sys.modules, 'PyQt5', types.ModuleType('PyQt5'))
     monkeypatch.setitem(sys.modules, 'PyQt5.QtWidgets', qt_widgets)
     monkeypatch.setattr(screenshots, 'PAGE_SETTLE_SECONDS', 0)
+    return qt_widgets
 
 
 def make_session(tmp_path, picture_source=None):
@@ -179,6 +209,21 @@ def test_a_page_that_fails_is_reported_and_the_other_pages_are_still_pictured(tm
     assert channels.currentIndex() == 0  # Restored although a page failed
 
 
+def test_a_page_that_fails_is_printed_when_it_fails_not_only_at_the_end(tmp_path, capsys):
+    tab, _ = make_stitching_tab()
+    session = make_session(tmp_path)
+
+    def refuse_every_page(titles, widget=None):
+        raise PermissionError('/data/tmp')
+
+    session.save = refuse_every_page
+    session.save_pages_of(tab, ['Stitching'])
+
+    printed = capsys.readouterr().err
+    assert len(session.errors) > 0
+    assert printed.count("PermissionError: /data/tmp") == len(session.errors)
+
+
 def test_the_manifest_lists_each_file_with_the_titles_it_was_reached_by(tmp_path):
     tab, _ = make_stitching_tab()
     session = make_session(tmp_path)
@@ -189,3 +234,78 @@ def test_the_manifest_lists_each_file_with_the_titles_it_was_reached_by(tmp_path
     assert lines[0] == 'stitching/stitching__cfos.png\tStitching > cfos'
     assert lines[1] == 'stitching/stitching__cfos__rigid.png\tStitching > cfos > Rigid'
     assert len(lines) == 6
+
+
+def test_the_question_asked_while_the_experiment_loads_is_answered_no(fake_qt, capsys):
+    screenshots.forbid_modal_dialogs()
+
+    answer = fake_qt.QMessageBox.question(None, 'Channel data import', 'Import 5 channel(s) into workspace?')
+
+    assert answer == fake_qt.QMessageBox.No
+    assert 'Channel data import' in capsys.readouterr().out
+
+
+def test_a_warning_with_an_ok_button_is_dismissed_with_ok_and_logged(fake_qt, capsys):
+    screenshots.forbid_modal_dialogs()
+    warning = fake_qt.QMessageBox(fake_qt.QMessageBox.Warning, fake_qt.QMessageBox.Ok | fake_qt.QMessageBox.Cancel,
+                                  '<b>Missing configuration file</b>', 'No cells file found, cannot display histograms')
+
+    answer = warning.exec()
+
+    assert answer == fake_qt.QMessageBox.Ok
+    assert 'No cells file found' in capsys.readouterr().out
+
+
+@pytest.mark.parametrize('icon, buttons', [
+    ('Critical', 1),  # An error is not a notice
+    ('Question', 1 | 2),  # A question needs an answer that is not always OK
+    ('Warning', 2),  # No OK to answer
+])
+def test_a_message_box_that_is_not_a_notice_fails_the_run(fake_qt, icon, buttons):
+    screenshots.forbid_modal_dialogs()
+
+    with pytest.raises(RuntimeError, match='modal dialog'):
+        fake_qt.QMessageBox(icon, buttons, 'Text').exec()
+
+
+@pytest.mark.parametrize('open_dialog', [
+    lambda qt: qt.QMessageBox.question(None, 'Convert tiles', 'Convert?'),
+    lambda qt: qt.QMessageBox.warning(None, 'Title', 'Text'),
+    lambda qt: qt.QInputDialog.getText(None, 'Enter the sample ID', 'ID'),
+    lambda qt: qt.QFileDialog.getExistingDirectory(None, 'Choose'),
+    lambda qt: qt.QDialog().exec_(),
+])
+def test_any_other_modal_dialog_fails_the_run_instead_of_waiting_for_an_answer(fake_qt, open_dialog):
+    screenshots.forbid_modal_dialogs()
+
+    with pytest.raises(RuntimeError, match='modal dialog'):
+        open_dialog(fake_qt)
+
+
+class FakeMainWindow:
+    """A window whose dock gives its width to the panel, as the docks of Qt do"""
+
+    def __init__(self, total_width, panel_width):
+        self.total_width = total_width
+        self.tabWidget = types.SimpleNamespace(width=lambda: panel_width)
+        self.dock_width = total_width - panel_width
+        self.graphDock = types.SimpleNamespace(width=lambda: self.dock_width)
+        self.resized_docks = []
+
+    def resizeDocks(self, docks, widths, orientation):
+        self.resized_docks.append((docks, widths, orientation))
+        self.dock_width = widths[0]
+        self.tabWidget = types.SimpleNamespace(width=lambda: self.total_width - self.dock_width)
+
+
+def test_the_control_panel_is_widened_by_shrinking_the_dock_on_its_right(monkeypatch, capsys):
+    qt_core = types.ModuleType('PyQt5.QtCore')
+    qt_core.Qt = types.SimpleNamespace(Horizontal='horizontal')
+    monkeypatch.setitem(sys.modules, 'PyQt5.QtCore', qt_core)
+    window = FakeMainWindow(total_width=1000, panel_width=200)
+
+    screenshots.widen_control_panel(FakeApplication(), window, widening_percent=30)
+
+    assert window.resized_docks == [([window.graphDock], [740], 'horizontal')]
+    assert window.tabWidget.width() == 260
+    assert 'from 200 to 260 pixels' in capsys.readouterr().out
