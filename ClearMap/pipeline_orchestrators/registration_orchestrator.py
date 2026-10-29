@@ -13,7 +13,7 @@ from skimage import transform as sk_transform
 
 from ClearMap import Settings as settings, Settings
 from ClearMap.Alignment import Resampling as resampling, Elastix as elastix
-from ClearMap.Alignment.Annotation import Annotation
+from ClearMap.Alignment.Annotation import Annotation, decompress_atlases
 
 from ClearMap.IO import source_geometry
 from ClearMap.IO.source.backends.tif_backend import TifSource, parse_img_res
@@ -782,7 +782,7 @@ def setup_mini_brain(atlas_base_name, mini_brain_scaling=(5, 5, 5)):  # TODO: sc
     -------
     tuple(scale, downsampled_array)
     """
-    atlas_path = os.path.join(Settings.atlas_folder, f'{atlas_base_name}_annotation.tif')
+    atlas_path = decompress_atlases(atlas_base_name)['annotation']  # not necessarily in the atlas folder
     arr = TifSource(atlas_path).array
     mini_brain = sk_transform.downscale_local_mean(arr, mini_brain_scaling)
     mini_brain.flags.writeable = False  # Shared by the cache

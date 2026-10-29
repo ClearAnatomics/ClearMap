@@ -28,6 +28,7 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import os
 import collections
+import functools
 
 import json
 import warnings
@@ -48,6 +49,7 @@ from ClearMap.Alignment.Resampling import orientation_to_transposition, format_o
 import ClearMap.Utils.HierarchicalDict as hdict
 
 from ClearMap.Alignment.utils import create_label_table
+from ClearMap.Utils.exceptions import AssetNotFoundError
 
 from ClearMap.Visualization import Color as col
 from ClearMap.config.atlas import STRUCTURE_TREE_NAMES_MAP
@@ -57,34 +59,73 @@ from ClearMap.config.atlas import STRUCTURE_TREE_NAMES_MAP
 # ## Atlas Structures
 ###############################################################################
 
-def decompress_atlases(atlas_base_name):  # FIXME: add option to move to a different folder if we can't write to the current one
+ATLAS_COMPONENT_NAMES = ('annotation', 'hemispheres', 'reference', 'distance_to_surface')
+
+ATLAS_CACHE_SUBFOLDER_NAME = 'atlases'
+"""Where, in the cache folder of ClearMap, the atlases are decompressed when they are not next to their archive."""
+
+
+def decompress_atlases(atlas_base_name):
+    """
+    The paths of the files of an atlas, decompressed from the archives shipped with ClearMap when needed.
+
+    A file already decompressed in the atlas folder is used as is. Otherwise it is decompressed (once) in the cache
+    folder, never in the atlas folder, which is read-only on a cluster.
+    """
     paths = {}
-    atlas_component_names = ('annotation', 'hemispheres', 'reference', 'distance_to_surface')
-    for atlas_type in atlas_component_names:
-        f_path = os.path.join(settings.atlas_folder, f'{atlas_base_name}_{atlas_type}.tif')
-        fu.uncompress(f_path, extension='auto')
-        paths[atlas_type] = f_path
+    cache_dir = Path(settings.clearmap_cache_dir) / ATLAS_CACHE_SUBFOLDER_NAME
+    for atlas_type in ATLAS_COMPONENT_NAMES:
+        file_name = f'{atlas_base_name}_{atlas_type}.tif'
+        paths[atlas_type] = str(fu.find_or_build(file_name, source_dir=settings.atlas_folder, cache_dir=cache_dir,
+                                                 build=functools.partial(_decompress_atlas_file, file_name)))
     return paths
+
+
+def _decompress_atlas_file(file_name, destination):
+    for algorithm in fu.COMPRESSION_ALGORITHMS:
+        compressed_path = Path(settings.atlas_folder) / f'{file_name}.{algorithm}'
+        if compressed_path.exists():
+            fu.decompress_file(compressed_path, destination)
+            return
+    raise AssetNotFoundError(f'Neither {file_name} nor a compressed version of it '
+                             f'({", ".join(fu.COMPRESSION_ALGORITHMS)}) is in {settings.atlas_folder}. '
+                             f'Check the atlas name or reinstall ClearMap.')
 
 
 ATLAS_BASE_NAME = 'ABA_25um'  # warning: change if different atlas
 
 
-default_annotation_file, default_hemispheres_file,\
-default_reference_file, default_distance_to_surface_file = decompress_atlases(ATLAS_BASE_NAME).values()
-"""
-Note
-----
-  This file is by default the Allen brain annotated mouse atlas with 25um 
-  isotropic resolution.
+@functools.lru_cache(maxsize=None)
+def get_default_atlas_files():
+    """
+    The files (:func:`decompress_atlases`) of the default atlas, decompressed when first needed.
 
-  Includes the
-    - Default volumetric annotated image file.
-    - Default hemispheres annotated image file
-    - Default reference (grayscale) image file
-    - Corresponding distance to surface file
+    Note
+    ----
+    This is by default the Allen brain annotated mouse atlas with 25um isotropic resolution. It includes the
 
-"""
+    - default volumetric annotated image file,
+    - default hemispheres annotated image file,
+    - default reference (grayscale) image file,
+    - corresponding distance to surface file.
+    """
+    return decompress_atlases(ATLAS_BASE_NAME)
+
+
+DEFAULT_ATLAS_FILE_ATTRIBUTES = {
+    'default_annotation_file': 'annotation',
+    'default_hemispheres_file': 'hemispheres',
+    'default_reference_file': 'reference',
+    'default_distance_to_surface_file': 'distance_to_surface',
+}
+
+
+def __getattr__(name):
+    """``default_annotation_file`` and its siblings are made when first used: they are 1 GB of files to decompress."""
+    if name in DEFAULT_ATLAS_FILE_ATTRIBUTES:
+        return get_default_atlas_files()[DEFAULT_ATLAS_FILE_ATTRIBUTES[name]]
+    raise AttributeError(f'module {__name__!r} has no attribute {name!r}')
+
 
 default_label_file = os.path.join(settings.atlas_folder, 'ABA_annotation.json')
 """Default list of labels and region names in the annotated image.
@@ -318,10 +359,10 @@ class Annotation:
                 label_file_path = self.label_file
         if annotation_file_path is None:
             if self.annotation_file is None:
-                warnings.warn(f'Annotation file not defined, using default: {default_annotation_file}.\n'
+                annotation_file_path = get_default_atlas_files()['annotation']
+                warnings.warn(f'Annotation file not defined, using default: {annotation_file_path}.\n'
                               f'Please note this is deprecated and will be removed in future versions.',
                               DeprecationWarning)
-                annotation_file_path = default_annotation_file
             else:
                 annotation_file_path = self.annotation_file
         if extra_label is None:
@@ -716,11 +757,12 @@ class Annotation:
         }
         specified_paths = {k: v for k, v in file_paths.items() if v}
         if not specified_paths:
-            file_paths['annotation'] = default_annotation_file
-            file_paths['reference'] = default_reference_file
-            file_paths['distance_to_surface'] = default_distance_to_surface_file
+            default_files = get_default_atlas_files()
+            file_paths['annotation'] = default_files['annotation']
+            file_paths['reference'] = default_files['reference']
+            file_paths['distance_to_surface'] = default_files['distance_to_surface']
             if return_hemispheres:
-                file_paths['hemispheres'] = default_hemispheres_file
+                file_paths['hemispheres'] = default_files['hemispheres']
         else:  # infer the other paths
             existing_keys = list(specified_paths.keys())  # TODO: we should check that if > 1 key, they share pattern
             missing_keys = [k for k in file_paths if k not in existing_keys]
