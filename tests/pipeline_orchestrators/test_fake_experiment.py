@@ -19,3 +19,22 @@ def test_fake_experiment_has_the_configs_the_channels_and_the_pair(tmp_path):
     coloc_cfg = ConfigHandler.get_cfg_from_path(sample_dir / 'colocalization.yml')
     assert list(coloc_cfg['channels']) == ['-'.join(CHANNEL_NAMES)]
     assert 'n_processes' in coloc_cfg['performance']  # shared by the section, not per pair
+
+
+def test_fake_experiment_takes_the_data_types_the_sample_id_and_the_folder_name(tmp_path):
+    folders = make_fake_experiment(tmp_path, ('cfos', 'lectin'), data_types={'lectin': 'vessels'},
+                                   sample_id='sample_01', sample_folder_name='my_sample')
+
+    sample_dir = tmp_path / 'my_sample'
+    assert {folder.parent for folder in folders.values()} == {sample_dir}
+    sample_cfg = ConfigHandler.get_cfg_from_path(sample_dir / 'sample.yml')
+    assert sample_cfg['sample_id'] == 'sample_01'
+    assert {name: cfg['data_type'] for name, cfg in sample_cfg['channels'].items()} == {'cfos': 'nuclei',
+                                                                                         'lectin': 'vessels'}
+
+
+def test_fake_experiment_has_no_sample_id_unless_asked(tmp_path):
+    make_fake_experiment(tmp_path)
+
+    sample_cfg = ConfigHandler.get_cfg_from_path(tmp_path / SAMPLE_FOLDER_NAME / 'sample.yml')
+    assert not sample_cfg['sample_id']

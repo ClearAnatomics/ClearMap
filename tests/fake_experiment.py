@@ -27,11 +27,12 @@ RESOLUTION = (1.625, 1.625, 3.0)
 DATA_TYPE = 'nuclei'
 
 
-def make_fake_experiment(root, channel_names=CHANNEL_NAMES, n_planes=N_PLANES, plane_shape_yx=PLANE_SHAPE_YX):
+def make_fake_experiment(root, channel_names=CHANNEL_NAMES, n_planes=N_PLANES, plane_shape_yx=PLANE_SHAPE_YX, *,
+                         data_types=None, sample_id=None, sample_folder_name=SAMPLE_FOLDER_NAME):
     """
-    Create a new experiment (the sample folder is ``root / SAMPLE_FOLDER_NAME``) with one nuclei channel per name,
-    each pointing to a folder of small z-plane tifs in the sample folder. The experiment writes the config files
-    in the sample folder.
+    Create a new experiment (the sample folder is ``root / sample_folder_name``) with one channel per name (a nuclei
+    channel unless ``data_types`` says otherwise), each pointing to a folder of small z-plane tifs in the sample
+    folder. The experiment writes the config files in the sample folder.
 
     Parameters
     ----------
@@ -43,6 +44,12 @@ def make_fake_experiment(root, channel_names=CHANNEL_NAMES, n_planes=N_PLANES, p
         The number of z planes (one tif each).
     plane_shape_yx : tuple[int, int]
         The shape of each plane.
+    data_types : Mapping[str, str] | None
+        The data type of the channels that are not nuclei channels (e.g. ``{'lectin': 'vessels'}``).
+    sample_id : str | None
+        The sample ID to set (the GUI asks for it, in a dialog, when it is empty). Left empty if None.
+    sample_folder_name : str
+        The name of the sample folder in ``root``.
 
     Returns
     -------
@@ -53,7 +60,7 @@ def make_fake_experiment(root, channel_names=CHANNEL_NAMES, n_planes=N_PLANES, p
     from ClearMap.pipeline_orchestrators.experiment_controller import ExperimentController
     from ClearMap.pipeline_orchestrators.sample_info_management import build_sample_manager
 
-    sample_dir = Path(root) / SAMPLE_FOLDER_NAME
+    sample_dir = Path(root) / sample_folder_name
     sample_dir.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(0)
     folders = {}
@@ -70,8 +77,12 @@ def make_fake_experiment(root, channel_names=CHANNEL_NAMES, n_planes=N_PLANES, p
                                       sample_manager=sample_manager, evt_bus=bus)
     experiment.set_experiment_dir(sample_dir)
     experiment.boot_new()  # What "Load default config" does
+    if sample_id is not None:
+        experiment.apply_ui_patch({'sample': {'sample_id': sample_id}})
+    data_types = data_types or {}
     for name, folder in folders.items():  # One edit at a time, like the Channels sub-tab
-        for channel_patch in ({}, {'data_type': DATA_TYPE}, {'path': str(folder)}, {'resolution': list(RESOLUTION)}):
+        data_type = data_types.get(name, DATA_TYPE)
+        for channel_patch in ({}, {'data_type': data_type}, {'path': str(folder)}, {'resolution': list(RESOLUTION)}):
             experiment.apply_ui_patch({'sample': {'channels': {name: channel_patch}}})
     return folders
 
