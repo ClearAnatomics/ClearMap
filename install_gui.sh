@@ -163,26 +163,31 @@ green "Done"
 
 
 if  [[ "$OSTYPE" == "linux-gnu"* ]]; then  # FIXME: or "$OSTYPE" == "msys"
-    green "ClearMap uses neural networks to perform vasculature analysis.
+    # Look before asking: someone without an nVIDIA GPU (or its drivers) is not asked whether to use CUDA.
+    # assert_cuda exits with a status instead of raising, and prints on stdout only what the status already says
+    green "Checking nVIDIA drivers and system CUDA installation"
+    if python -c "$prep_python import ClearMap; \
+                  from ClearMap.Utils.install_utils import PytorchVersionManager; \
+                  PytorchVersionManager.assert_cuda()" > /dev/null; then
+        green "ClearMap uses neural networks to perform vasculature analysis.
       The implementation of these networks relies on proprietary technology
       from nVIDIA called CUDA. To perform vasculature analysis, you will
       need a compatible graphics card and drivers."
-    read -r -p "Do you wish to use this feature ([y]/n)?" answer
-    case "$answer" in
-        [nN][oO]|[nN])
-            yellow "Skipping";
-            USE_TORCH="False";
-            ;;
-        *)
-            # Verify CUDA is functional
-            green "Checking nVIDIA drivers and system CUDA installation";
-            python -c "$prep_python import ClearMap; \
-                       from ClearMap.Utils.install_utils import PytorchVersionManager; \
-                       PytorchVersionManager.assert_cuda()" || exit 1
-            green "OK";
-            USE_TORCH="True";
-            ;;
-    esac
+        read -r -p "Do you wish to use this feature ([y]/n)?" answer
+        case "$answer" in
+            [nN][oO]|[nN])
+                yellow "Skipping";
+                USE_TORCH="False";
+                ;;
+            *)
+                USE_TORCH="True";
+                ;;
+        esac
+    else
+        yellow "No working nVIDIA GPU and drivers were found (nvidia-smi failed), the vasculature analysis
+      (neural networks, CUDA) will not be available. To use it, install the nVIDIA drivers and run this script again."
+        USE_TORCH="False";
+    fi
 else
     USE_TORCH="False";
 fi
