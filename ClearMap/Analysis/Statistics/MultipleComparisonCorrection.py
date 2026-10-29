@@ -88,7 +88,7 @@ def estimate_q_values(p_values, m=None, pi0=None, verbose=False, low_memory=Fals
     verbose : bool
       Print info during execution
     low_memory : bool
-      If true, use low memory version.
+      If true, use low memory version (slower, and overwrites p_values).
 
     Returns
     -------
@@ -150,18 +150,20 @@ def estimate_q_values(p_values, m=None, pi0=None, verbose=False, low_memory=Fals
 
     if low_memory:
         # low memory version, only uses 1 p_values and 1 qv matrices
-        qv = scipy.zeros((len(p_values),))
+        # (the p-values are overwritten, from the largest down)
+        qv = np.zeros((len(p_values),))
         last_p_values = p_values.argmax()
         qv[last_p_values] = (pi0 * p_values[last_p_values] * m) / float(m)
-        p_values[last_p_values] = -scipy.inf
+        p_values[last_p_values] = -np.inf
         prev_qv = last_p_values
         for i in range(int(len(p_values)) - 2, -1, -1):
             cur_max = p_values.argmax()
             qv_i = (pi0 * m * p_values[cur_max] / float(i + 1))
-            p_values[cur_max] = -scipy.inf
+            p_values[cur_max] = -np.inf
             qv_i1 = prev_qv
             qv[cur_max] = min(qv_i, qv_i1)
             prev_qv = qv[cur_max]
+        qv = qv.reshape(original_shape)
 
     else:
         p_ordered = p_values.argsort()
