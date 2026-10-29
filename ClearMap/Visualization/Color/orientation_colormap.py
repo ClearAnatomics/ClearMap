@@ -11,6 +11,8 @@ __copyright__ = 'Copyright © 2022 by Christoph Kirst'
 
 import numpy as np
 
+from ClearMap.Utils.exceptions import ClearMapValueError
+
 WHITE = np.array([1, 1, 1])
 BLACK = np.array([0, 0, 0])
 RED = np.array([1, 0, 0])
@@ -199,20 +201,29 @@ _colormap_cache = None
 
 
 def orientation_colormap_cache(n=200, **kwargs):
+    """
+    The colormap of the orientations: n colors per axis, so an array of shape (n, n, n, 3) indexed by x, y, z.
+
+    It is kept in memory and in the file ``omap_{n}.npy`` next to this module, whose name has the size, so that a file
+    can never be taken for a colormap of another size. The ``omap.npy`` of the former versions is not read.
+    """
     global _colormap_cache
-
-    import os
-    cache_file = os.path.join(os.path.split(__file__)[0], 'omap.npy')
-
-    if _colormap_cache is None:
-        if os.path.isfile(cache_file):
-            _colormap_cache = np.load(cache_file)
 
     if _colormap_cache is not None and n == _colormap_cache.shape[0]:
         return _colormap_cache
 
-    x_lin, y_lin, z_lin = [np.linspace(-1, 1, n + 1) for i in range(3)]
-    x, y, z = np.meshgrid(x_lin, y_lin, z_lin)
+    import os
+    cache_file = os.path.join(os.path.split(__file__)[0], f'omap_{n}.npy')
+
+    if os.path.isfile(cache_file):
+        _colormap_cache = np.load(cache_file)
+        if _colormap_cache.shape[0] != n:
+            raise ClearMapValueError(f'The colormap file {cache_file} is for {_colormap_cache.shape[0]} colors per '
+                                     f'axis, not {n}. Delete it, it is made again when needed.')
+        return _colormap_cache
+
+    x_lin, y_lin, z_lin = [np.linspace(-1, 1, n) for i in range(3)]
+    x, y, z = np.meshgrid(x_lin, y_lin, z_lin, indexing='ij')  # 'xy' (the default) swaps the first two axes
 
     # zero
     zero = np.logical_and(x == 0, np.logical_and(y == 0, z == 0))
