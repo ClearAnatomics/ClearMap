@@ -22,9 +22,6 @@ from enum import IntEnum
 import functools
 from typing import List
 
-import numpy as np
-import psutil
-
 from ClearMap.Utils.exceptions import ClearMapTypeError, ClearMapValueError
 
 
@@ -70,6 +67,7 @@ def runs_on_ui():
 
 class CancelableProcessPoolExecutor(ProcessPoolExecutor):
     def immediate_shutdown(self):
+        import psutil  # Not at the top: the installation script imports this module before psutil is installed
         with self._shutdown_lock:
             self._shutdown_thread = True
             # statuses = [psutil.Process(_proc.pid).status() for _proc in self._processes.values()]
