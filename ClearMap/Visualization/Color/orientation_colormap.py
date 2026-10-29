@@ -9,8 +9,13 @@ __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2022 by Christoph Kirst'
 
 
+import functools
+from pathlib import Path
+
 import numpy as np
 
+import ClearMap.IO.FileUtils as fu
+from ClearMap import Settings as settings
 from ClearMap.Utils.exceptions import ClearMapValueError
 
 WHITE = np.array([1, 1, 1])
@@ -199,29 +204,36 @@ def orientation_color(xyz, normalize=False, deform=None, colors=(COLOR_Z, COLOR_
 
 _colormap_cache = None
 
+COLORMAP_FOLDER = Path(__file__).resolve().parent
+"""The folder of this module, where a colormap file prepared by an installation can be."""
+
 
 def orientation_colormap_cache(n=200, **kwargs):
     """
     The colormap of the orientations: n colors per axis, so an array of shape (n, n, n, 3) indexed by x, y, z.
 
-    It is kept in memory and in the file ``omap_{n}.npy`` next to this module, whose name has the size, so that a file
-    can never be taken for a colormap of another size. The ``omap.npy`` of the former versions is not read.
+    It is kept in memory and in the file ``omap_{n}.npy``, whose name has the size, so that a file can never be taken
+    for a colormap of another size. One prepared next to this module is used as is, else the one in
+    :data:`ClearMap.Settings.clearmap_cache_dir`, else it is made there (never in the folder of the program, which is
+    read-only on a cluster). The ``omap.npy`` of the former versions is not read.
     """
     global _colormap_cache
 
     if _colormap_cache is not None and n == _colormap_cache.shape[0]:
         return _colormap_cache
 
-    import os
-    cache_file = os.path.join(os.path.split(__file__)[0], f'omap_{n}.npy')
+    cache_file = fu.find_or_build(f'omap_{n}.npy', source_dir=COLORMAP_FOLDER, cache_dir=settings.clearmap_cache_dir,
+                                  build=functools.partial(_save_orientation_colormap, n, kwargs))
+    colormap = np.load(cache_file)
+    if colormap.shape[0] != n:
+        raise ClearMapValueError(f'The colormap file {cache_file} is for {colormap.shape[0]} colors per axis, '
+                                 f'not {n}. Delete it, it is made again when needed.')
+    _colormap_cache = colormap
 
-    if os.path.isfile(cache_file):
-        _colormap_cache = np.load(cache_file)
-        if _colormap_cache.shape[0] != n:
-            raise ClearMapValueError(f'The colormap file {cache_file} is for {_colormap_cache.shape[0]} colors per '
-                                     f'axis, not {n}. Delete it, it is made again when needed.')
-        return _colormap_cache
+    return _colormap_cache
 
+
+def _compute_orientation_colormap(n, **kwargs):
     x_lin, y_lin, z_lin = [np.linspace(-1, 1, n) for i in range(3)]
     x, y, z = np.meshgrid(x_lin, y_lin, z_lin, indexing='ij')  # 'xy' (the default) swaps the first two axes
 
@@ -231,13 +243,11 @@ def orientation_colormap_cache(n=200, **kwargs):
 
     xyz = np.array([x, y, z]).transpose((1, 2, 3, 0))
 
-    col = orientation_color(xyz, normalize=True, **kwargs)
+    return orientation_color(xyz, normalize=True, **kwargs)
 
-    _colormap_cache = col
 
-    np.save(cache_file, _colormap_cache)
-
-    return col
+def _save_orientation_colormap(n, kwargs, path):
+    np.save(path, _compute_orientation_colormap(n, **kwargs))
 
 
 def orientation_color_cached(xyz, cache=None):
