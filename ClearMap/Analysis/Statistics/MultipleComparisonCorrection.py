@@ -153,9 +153,9 @@ def estimate_q_values(p_values, m=None, pi0=None, verbose=False, low_memory=Fals
         # (the p-values are overwritten, from the largest down)
         qv = np.zeros((len(p_values),))
         last_p_values = p_values.argmax()
-        qv[last_p_values] = (pi0 * p_values[last_p_values] * m) / float(m)
+        qv[last_p_values] = min(pi0 * m / len(p_values) * p_values[last_p_values], 1.0)  # As the default version
         p_values[last_p_values] = -np.inf
-        prev_qv = last_p_values
+        prev_qv = qv[last_p_values]
         for i in range(int(len(p_values)) - 2, -1, -1):
             cur_max = p_values.argmax()
             qv_i = (pi0 * m * p_values[cur_max] / float(i + 1))
