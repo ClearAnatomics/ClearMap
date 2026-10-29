@@ -16,6 +16,7 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import os
+import functools
 import shutil
 import importlib
 import uuid
@@ -31,7 +32,8 @@ import warnings
 from pathlib import Path
 
 from ClearMap.IO.source.backends import registry
-from ClearMap.Utils.exceptions import ClearMapFileNotFoundError, ClearMapIoException, ClearMapValueError, Severity
+from ClearMap.Utils.exceptions import (ClearMapFileNotFoundError, ClearMapIoException, ClearMapNotImplementedError,
+                                       ClearMapValueError, Severity)
 from ClearMap.Utils.tag_expression import Expression
 
 ##############################################################################
@@ -416,6 +418,74 @@ def _write_bytes(path: str, data: bytes) -> None:
     Path(path).write_bytes(data)
 
 
+COMPRESSION_ALGORITHMS = ('zip', 'bz2', 'gzip', 'lzma')
+
+
+def decompress_file(compressed_path, destination, member=None):
+    """
+    Write the decompressed content of a file in `destination`, streaming (the file is not read in memory).
+
+    Parameters
+    ----------
+    compressed_path : str or pathlib.Path
+        The compressed file. The compression is read from its extension (:data:`COMPRESSION_ALGORITHMS`).
+    destination : str or pathlib.Path
+        Where to write the content.
+    member : str or None
+        For a zip archive, the name of the file in it. Defaults to the name of the archive without ``.zip``.
+    """
+    compressed_path = Path(compressed_path)
+    extension = compressed_path.suffix.lstrip('.')
+    if extension == 'zip':
+        import zipfile
+        with zipfile.ZipFile(compressed_path) as archive, archive.open(member or compressed_path.stem) as source:
+            with open(destination, 'wb') as destination_file:
+                shutil.copyfileobj(source, destination_file)
+    elif extension in COMPRESSION_ALGORITHMS:
+        module = importlib.import_module(extension)
+        with module.open(compressed_path, 'rb') as source, open(destination, 'wb') as destination_file:
+            shutil.copyfileobj(source, destination_file)
+    else:
+        raise ClearMapNotImplementedError(f'Unrecognized compression extension "{compressed_path.suffix}" of '
+                                          f'{compressed_path}, expected one of {COMPRESSION_ALGORITHMS}')
+
+
+def find_or_build(file_name, *, source_dir, cache_dir, build):
+    """
+    The path of a file that ClearMap ships compressed or can compute (a look-up table, an atlas), without writing in
+    the folder of the program unless that is where it already is: that folder is often read-only (a cluster).
+
+    The first of these that exists:
+
+    1. ``source_dir / file_name``: next to the code, as made by an installation that prepared it;
+    2. ``cache_dir / file_name``: made by an earlier run;
+    3. otherwise it is built in `cache_dir`, atomically (see :func:`atomic_write`): runs that start together never see
+       or keep a partial file. They may each build it: the last one to finish wins, with the same content.
+
+    Parameters
+    ----------
+    file_name : str
+        The name of the file.
+    source_dir : str or pathlib.Path
+        The folder of the code, which holds the file when it was prepared and its compressed source otherwise.
+    cache_dir : str or pathlib.Path
+        A writeable folder, created if it does not exist.
+    build : callable
+        ``build(path)`` writes the whole file at `path` (a temporary one, in `cache_dir`).
+
+    Returns
+    -------
+    pathlib.Path
+        The file.
+    """
+    for folder in (Path(source_dir), Path(cache_dir)):
+        if (folder / file_name).exists():
+            return folder / file_name
+    cached_path = Path(cache_dir) / file_name
+    atomic_write(build, cached_path)
+    return cached_path
+
+
 def uncompress(file_path, extension='zip', check=True, verbose=False):
     """
     Unzips a file only if:
@@ -439,13 +509,12 @@ def uncompress(file_path, extension='zip', check=True, verbose=False):
     filename : str or None
         The uncompressed filename or None if failed.
     """
-    compression_algorithms = ('zip', 'bz2', 'gzip', 'lzma')
     file_path = Path(file_path)
-    if file_path.exists() and file_path.suffix in compression_algorithms:
+    if file_path.exists() and file_path.suffix in COMPRESSION_ALGORITHMS:
         return uncompress(file_path.with_suffix(''), extension=file_path.suffix, check=check, verbose=verbose)
     if not file_path.exists() or not check:
         if extension == 'auto':
-            for algo in compression_algorithms:
+            for algo in COMPRESSION_ALGORITHMS:
                 f_path_w_ext = file_path.with_suffix(f'{file_path.suffix}.{algo}')
                 if f_path_w_ext.exists():
                     extension = algo
@@ -460,22 +529,19 @@ def uncompress(file_path, extension='zip', check=True, verbose=False):
             if extension == 'zip':
                 import zipfile
                 try:
-                    with zipfile.ZipFile(compressed_path, 'r') as zipf:
-                        if file_path.suffix in ('.tif', '.nrrd'):
-                            zipf.extract(file_path.name, path=compressed_path.parent)
-                        else:
+                    if file_path.suffix in ('.tif', '.nrrd'):
+                        atomic_write(functools.partial(decompress_file, compressed_path), file_path)
+                    else:  # the archive may hold several files, which all go next to it
+                        with zipfile.ZipFile(compressed_path, 'r') as zipf:
                             zipf.extractall(path=compressed_path.parent)
                     if not file_path.exists():
                         raise FileNotFoundError
                 except Exception as err:  # FIXME: TOO broad
                     print(err)
                     return
-            elif extension in ('bz2', 'gzip', 'lzma'):
-                mod = importlib.import_module(extension)
-                with open(compressed_path, 'rb') as compressed_file:
-                    data = mod.decompress(compressed_file.read())
+            elif extension in COMPRESSION_ALGORITHMS:
                 # Atomic: never leave a truncated file
-                atomic_write_bytes(data, file_path)
+                atomic_write(functools.partial(decompress_file, compressed_path), file_path)
             else:
                 raise NotImplementedError(f'Unrecognized compression extension {extension}')
         else:

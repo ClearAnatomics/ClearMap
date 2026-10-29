@@ -13,7 +13,8 @@ PROBE = ('import json;'
          'from ClearMap import Settings;'
          'from ClearMap.config.config_handler import ConfigHandler, CLEARMAP_CFG_DIR;'
          'print(json.dumps({"settings": str(Settings.clearmap_cfg_dir), "elastix": Settings.elastix_path,'
-         '                  "handler": str(CLEARMAP_CFG_DIR), "global_root": str(ConfigHandler.user_defaults_dir)}))')
+         '                  "handler": str(CLEARMAP_CFG_DIR), "global_root": str(ConfigHandler.user_defaults_dir),'
+         '                  "cache": str(Settings.clearmap_cache_dir)}))')
 
 
 @pytest.fixture
@@ -39,6 +40,7 @@ def test_the_configuration_folder_is_set_by_the_environment_variable(tmp_path, m
 
     assert folders['settings'] == folders['handler'] == folders['global_root'] == str(machine_cfg_dir)
     assert folders['elastix'] == '/elastix/of/the/cfg/dir'
+    assert folders['cache'] == str(machine_cfg_dir / 'cache')
 
 
 def test_the_configuration_folder_is_dot_clearmap_of_the_home_without_the_variable(tmp_path):
@@ -47,6 +49,7 @@ def test_the_configuration_folder_is_dot_clearmap_of_the_home_without_the_variab
     folders = read_configuration_folder(home=home)
 
     assert folders['settings'] == folders['handler'] == folders['global_root'] == str(home / '.clearmap')
+    assert folders['cache'] == str(home / '.clearmap' / 'cache')
 
 
 def test_an_empty_variable_is_the_same_as_none(tmp_path):

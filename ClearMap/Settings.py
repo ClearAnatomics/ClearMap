@@ -77,6 +77,10 @@ On a cluster, the home folder of a job is often read-only or absent, or shared b
 clearmap_cfg_dir = Path(os.environ.get(CFG_DIR_ENV_VAR) or '~/.clearmap').expanduser().absolute()
 """Absolute :class:`~pathlib.Path` of the folder of the user configuration (machine parameters, user defaults, ...)."""
 
+clearmap_cache_dir = clearmap_cfg_dir / 'cache'
+"""Absolute :class:`~pathlib.Path` of the folder for the files that ClearMap derives from its own data (look-up tables, ...)
+when the folder of the program cannot be written."""
+
 
 ###############################################################################
 # ## Paths to external programs and resources
