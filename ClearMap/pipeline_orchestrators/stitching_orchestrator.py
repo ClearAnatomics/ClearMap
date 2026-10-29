@@ -1,3 +1,4 @@
+import itertools
 import platform
 import re
 import warnings
@@ -347,16 +348,35 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
             except FileNotFoundError as err:
                 warnings.warn(f'Could not copy/link/stack {channel=}, files not found; {err}')
 
+    def should_convert_tiles(self, channel) -> bool:
+        """Whether the tiles of channel are to be converted to numpy files (as set for it) and are not yet"""
+        return self.config['channels'][channel].get('use_npy', False) and not self.sample_manager.has_npy(channel)
+
+    def channels_to_stitch(self) -> list[str]:
+        """The channels set to run, each after the channel which gives its layout"""
+        channels_in_stitching_order = itertools.chain.from_iterable(self.get_stitching_order().values())
+        return [channel for channel in channels_in_stitching_order if self.config['channels'][channel]['run']]
+
     def stitch(self):
+        """
+        Stitch what the user asked for: copy or stack the channels that are not tiled, convert the tiles set to be
+        converted, and stitch the channels set to run with the steps of :meth:`steps_of`.
+        """
         if self.stopped:
             return
 
-        # Get the channels in dependency order (based on layout_channel)
-        for stitching_tree in self.get_stitching_order().values():
-            for channel in stitching_tree:
-                self.stitch_channel(channel)
-                if self.stopped:
-                    return
+        for channel in self.sample_manager.channels:
+            if not self.sample_manager.is_tiled(channel):
+                self.copy_or_stack(channel)  # Nothing to stitch, idempotent
+
+        channels = self.channels_to_stitch()
+        for channel in channels:
+            if self.should_convert_tiles(channel):
+                self.convert_tiles_channel(channel)
+        for channel in channels:
+            self.stitch_channel(channel)
+            if self.stopped:
+                return
 
     def steps_of(self, channel) -> list[str]:
         """

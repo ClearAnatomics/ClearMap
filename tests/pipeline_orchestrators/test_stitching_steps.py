@@ -201,3 +201,58 @@ def test_a_channel_with_an_existing_layout_only_stitches(stitching, experiment):
 
     assert stitching.steps_of('main') == ['stitching']
     assert _stitch_and_count(stitching) == stitching.n_steps_to_run(['main', 'derived']) == 2
+
+
+def _stitch_whole_run(worker) -> int:
+    worker.progress_watcher.main_steps = 0
+    worker.stitch()
+    return worker.progress_watcher.main_steps
+
+
+def test_stitch_runs_the_channels_set_to_run_with_the_steps_of_the_plan(stitching, experiment):
+    assert _stitch_whole_run(stitching) == stitching.n_steps_to_run(['main', 'derived']) == 5
+    assert stitching.get('stitched', channel='main').exists
+    assert stitching.get('stitched', channel='derived').exists
+
+
+def test_stitch_does_not_stitch_the_channels_which_are_not_set_to_run(stitching, experiment):
+    experiment.apply_ui_patch({'stitching': {'channels': {'derived': {'run': False}}}})
+
+    assert stitching.channels_to_stitch() == ['main']
+    _stitch_whole_run(stitching)
+    assert stitching.get('stitched', channel='main').exists
+    assert not stitching.get('stitched', channel='derived').exists
+
+
+def test_stitch_reports_a_skipped_rigid_alignment_without_previous_result(stitching, experiment):
+    _set_skip(experiment, rigid=True)
+
+    with pytest.raises(MissingRequirementException, match='no result of a previous run'):
+        stitching.stitch()
+
+
+def test_stitch_converts_the_tiles_set_to_be_converted(stitching, experiment):
+    experiment.apply_ui_patch({'stitching': {'channels': {'main': {'use_npy': True}, 'derived': {'use_npy': False}}}})
+    assert stitching.should_convert_tiles('main')
+    assert not stitching.should_convert_tiles('derived')
+
+    stitching.stitch()
+
+    assert not stitching.should_convert_tiles('main')
+    assert stitching.sample_manager.has_npy('main')
+    assert not stitching.sample_manager.has_npy('derived')
+    assert stitching.get('stitched', channel='main').exists
+
+
+def test_stitch_imports_the_channels_which_are_not_tiled(stitching, experiment, channel_editor, tmp_path):
+    channel_editor.add('prestitched', 'nuclei')
+    folder = tmp_path / RAW_FOLDER_NAME / 'prestitched'
+    folder.mkdir(parents=True)
+    tifffile.imwrite(folder / 'prestitched.ome.tif', np.ones(TILE_SHAPE, np.uint16), metadata=OME)
+    experiment.apply_ui_patch({'sample': {'channels': {'prestitched': {'path': str(folder / 'prestitched.ome.tif')}}}})
+    assert not stitching.sample_manager.is_tiled('prestitched')
+
+    stitching.stitch()
+
+    assert stitching.get('stitched', channel='prestitched').exists
+    assert 'prestitched' not in stitching.channels_to_stitch()
