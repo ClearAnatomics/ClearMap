@@ -207,8 +207,8 @@ class PytorchVersionManager:  # TODO: inherit from condaparser ??
             sys.exit(ExitCode.SUCCESS)
         except subprocess.CalledProcessError as err:
             print('Error, a working installation of NVidia CUDA could not be detected on your computer.'
-                  ' This software is required to run ClearMap.')
-            sys.exit(err.returncode)
+                  f' This software is required to run ClearMap. ("{cmd}" exited with status {err.returncode})')
+            sys.exit(ExitCode.FAILURE)
 
     @property
     def cuda_version(self):

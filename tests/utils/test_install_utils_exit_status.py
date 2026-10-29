@@ -58,3 +58,14 @@ def test_assert_cuda_succeeds_when_nvidia_smi_lists_a_gpu(monkeypatch):
     monkeypatch.setattr(install_utils.subprocess, 'check_output', nvidia_smi_lists_a_gpu)
 
     assert exit_status_of(PytorchVersionManager.assert_cuda) == ExitCode.SUCCESS
+
+
+def nvidia_smi_fails_with_status_9(command, shell):
+    raise install_utils.subprocess.CalledProcessError(returncode=9, cmd=command)
+
+
+def test_assert_cuda_fails_with_the_failure_code_and_reports_the_status_of_nvidia_smi(monkeypatch, capsys):
+    monkeypatch.setattr(install_utils.subprocess, 'check_output', nvidia_smi_fails_with_status_9)
+
+    assert exit_status_of(PytorchVersionManager.assert_cuda) == ExitCode.FAILURE
+    assert 'status 9' in capsys.readouterr().out
