@@ -19,7 +19,9 @@ __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 
-import os
+import functools
+from pathlib import Path
+
 import numpy as np
 import multiprocessing as mp
 
@@ -31,6 +33,7 @@ import ClearMap.ParallelProcessing.DataProcessing.ConvolvePointList as cpl
 import ClearMap.Utils.Timer as tmr
 
 import ClearMap.IO.FileUtils as fu
+from ClearMap import Settings as settings
 from ClearMap.IO import io_ops
 from ClearMap.Utils.utilities import sanitize_n_processes, available_cpu_count
 
@@ -249,43 +252,71 @@ def generate_lookup_table(function = match_index, verbose = True):
 filename = "PK12.npy";
 """Filename for the look up table mapping a cube configuration to the deleatability of the center pixel"""
 
+PK12_FOLDER = Path(__file__).resolve().parent
+"""The folder of this module, where the compressed look up tables are shipped (and possibly prepared ones)."""
+
+
 def initialize_lookup_table(function = match_index, filename = filename):
-  """Initialize the lookup table"""
-  
-  filename = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename);
-  
-  #check if only compressed file exists
-  fu.uncompress(filename)
-  
-  if os.path.exists(filename):
-    return np.load(filename);
-  else:
-    lut = generate_lookup_table(function=function);
-    np.save(filename, lut);
-    return lut;
+  """Load the lookup table, making it first if it is not in the folder of this module nor in the cache folder.
+
+  The table is made from the compressed one shipped with the program if there is one, else computed (slow).
+  It is made in :data:`ClearMap.Settings.clearmap_cache_dir`, never in the folder of the program (read-only on a
+  cluster).
+  """
+
+  def make_table(path):
+    compressed_path = PK12_FOLDER / f'{filename}.zip'
+    if compressed_path.exists():
+      fu.decompress_file(compressed_path, path)
+    else:
+      np.save(path, generate_lookup_table(function=function));
+
+  path = fu.find_or_build(filename, source_dir=PK12_FOLDER, cache_dir=settings.clearmap_cache_dir, build=make_table)
+  return np.load(path);
 
 
 base = t3d.cube_base_2(center=False);
 """Base kernel to multiply with cube to obtain index of cube"""
 
-delete = initialize_lookup_table();
-"""Lookup table mapping cube index to its deleteability"""
-
-keep = np.logical_not(delete);
-"""Lookup table mapping cube index to its non-deleteability"""
-
 
 filename_non_removable = "PK12nr.npy";
 """Filename for the lookup table mapping a cube configuration to the non-removeability of the center pixel"""
 
-non_removable = initialize_lookup_table(filename = filename_non_removable, function = match_non_removable);
-"""Lookup table mapping cube index to its non-removeability"""
-
-consider = np.logical_not(non_removable);
-"""Lookup table mapping cube index to whether it needs to be considered further"""
-
 rotations = t3d.rotations12(base);
 """Rotations of the base cube for the sub-iterations"""
+
+
+# The tables have 2**26 entries: they are loaded when first needed, not when this module is imported.
+
+@functools.lru_cache(maxsize=None)
+def get_delete_table():
+  """Lookup table mapping cube index to its deleteability"""
+  return initialize_lookup_table();
+
+
+@functools.lru_cache(maxsize=None)
+def get_consider_table():
+  """Lookup table mapping cube index to whether it needs to be considered further"""
+  return np.logical_not(get_non_removable_table());
+
+
+@functools.lru_cache(maxsize=None)
+def get_non_removable_table():
+  """Lookup table mapping cube index to its non-removeability"""
+  return initialize_lookup_table(filename = filename_non_removable, function = match_non_removable);
+
+
+def __getattr__(name):
+  """Keep the former module level tables (``delete``, ``keep``, ``non_removable``, ``consider``) available."""
+  if name == 'delete':
+    return get_delete_table();
+  if name == 'keep':
+    return np.logical_not(get_delete_table());
+  if name == 'non_removable':
+    return get_non_removable_table();
+  if name == 'consider':
+    return get_consider_table();
+  raise AttributeError(f'module {__name__!r} has no attribute {name!r}')
 
 
 ###############################################################################
@@ -395,7 +426,7 @@ def skeletonize(binary, points = None, steps = None, removals = False, radii = F
         print('Sub-Iteration %d' % i);
         timer_sub_iter = tmr.Timer();
       
-      remborder = delete[cpl.convolve_3d_points(binary, rotations[i], borderpoints, processes=n_processes)];
+      remborder = get_delete_table()[cpl.convolve_3d_points(binary, rotations[i], borderpoints, processes=n_processes)];
       rempoints = borderpoints[remborder];
       if verbose:
         timer_sub_iter.print_elapsed_time('Matched points: %d' % (len(rempoints),));
@@ -553,7 +584,8 @@ def skeletonize_index(binary, points = None, steps = None, removals = False,
         print('Sub-Iteration %d' % i);
         timer_sub_iter = tmr.Timer();
       
-      remborder = delete[cpl.convolve_3d_indices(binary, rotations[i], borderpoints, processes=n_processes)];
+      remborder = get_delete_table()[cpl.convolve_3d_indices(
+        binary, rotations[i], borderpoints, processes=n_processes)];
       rempoints = borderpoints[remborder];
       if verbose:
         timer_sub_iter.print_elapsed_time('Matched points  : %d' % (len(rempoints),));
@@ -579,7 +611,7 @@ def skeletonize_index(binary, points = None, steps = None, removals = False,
     
     if step % 3 == 0:   
       npts = len(points);
-      points = points[consider[cpl.convolve_3d_indices(binary, base, points, processes=n_processes)]];
+      points = points[get_consider_table()[cpl.convolve_3d_indices(binary, base, points, processes=n_processes)]];
       nnonrem += npts - len(points)
       if verbose:
         print('Non-removable points: %d' % (npts - len(points)));
