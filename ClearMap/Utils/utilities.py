@@ -18,6 +18,7 @@ import re
 import sys
 import warnings
 from concurrent.futures import ProcessPoolExecutor
+from enum import IntEnum
 import functools
 from typing import List
 
@@ -30,6 +31,13 @@ from ClearMap.Utils.exceptions import ClearMapTypeError, ClearMapValueError
 # The environment variables with which Slurm tells a job how many CPUs it may use (the cores of the node are not its own)
 CPU_LIMIT_ENV_VARS = ('SLURM_CPUS_PER_TASK', 'SLURM_CPUS_ON_NODE')
 PROCESSES_EXPECTED = 'None (all the CPUs), n, -n (all but n) or 0 (in the calling process)'
+
+
+class ExitCode(IntEnum):
+    """The exit status of a command line program, which a shell or a job scheduler reads"""
+    SUCCESS = 0
+    FAILURE = 1
+    USAGE_ERROR = 2  # What argparse exits with for a wrong command line
 
 colors = {
     "WHITE": '\033[1;37m',
