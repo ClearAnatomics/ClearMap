@@ -16,6 +16,7 @@ import inspect
 import os
 import re
 import sys
+import threading
 import warnings
 from concurrent.futures import ProcessPoolExecutor
 from enum import IntEnum
@@ -66,6 +67,23 @@ def runs_on_ui():
 
 
 class CancelableProcessPoolExecutor(ProcessPoolExecutor):
+    """
+    A :class:`~concurrent.futures.ProcessPoolExecutor` that can be shut down by another thread than the one using it.
+
+    The GUI cancels a step from its own thread (``stop_process`` calls ``shutdown(cancel_futures=True)``), while the
+    thread running the step leaves its ``with`` block, which calls ``shutdown`` again. The standard
+    ``shutdown`` is not safe against that: both threads close the reader of the result queue and the second one closes
+    a file descriptor that is already closed (``OSError: [Errno 9] Bad file descriptor``) or, worse, already reused.
+    The shutdowns are therefore serialized: the later ones wait for the first and find nothing left to do.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._shutdown_serializer = threading.Lock()
+
+    def shutdown(self, wait=True, *, cancel_futures=False):
+        with self._shutdown_serializer:
+            super().shutdown(wait=wait, cancel_futures=cancel_futures)
+
     def immediate_shutdown(self):
         import psutil  # Not at the top: the installation script imports this module before psutil is installed
         with self._shutdown_lock:
