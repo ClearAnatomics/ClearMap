@@ -223,7 +223,7 @@ __UNDECIDED__: to choose. None: no channel is aligned with the atlas.</string>
          </property>
         </widget>
        </item>
-       <item row="4" column="0" colspan="2">
+       <item row="5" column="0" colspan="2">
         <widget class="QPushButton" name="registrationGoToSampleOrientationPushButton">
          <property name="text">
           <string>Go to sample orientation</string>
