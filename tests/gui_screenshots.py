@@ -1,0 +1,344 @@
+"""Screenshots of the GUI for the documentation, taken offscreen on a fake experiment.
+
+The screenshots of the documentation are of a GUI that no longer exists. This opens the real application without a
+display, on an experiment with one channel of each data type that has a tab (see ``SCREENSHOT_CHANNELS``), and saves a
+picture of every tab and of every page of the tabs, toolboxes and channel pages it contains. Run it again at each
+release, so that the documentation shows the GUI of the release.
+
+Usage, from the root of the repository, in the ClearMap environment::
+
+    python -m tests.gui_screenshots <out_dir> [--work-dir <dir>] [--whole-window] [--size WIDTHxHEIGHT]
+
+The pictures are written to ``<out_dir>/<tab>/<tab>__<page>__<subpage>.png`` and listed, with the titles they were
+reached by, in ``<out_dir>/manifest.tsv``.
+
+* The application runs with a home folder of its own (``<work_dir>/home``): it starts like a new installation, so the
+  pictures show the defaults of a new user, and neither ``~/.clearmap`` nor the machine config of whoever runs this are
+  read or written. ``--use-real-home`` runs it with the real one.
+* ``--work-dir`` (default: a temporary folder) is where the fake experiment is created. The path of the sample folder is
+  visible in the pictures, so pass a folder that looks like the one of a user, e.g. ``/data/clearmap``.
+* Anything that would open a modal dialog fails the run instead of waiting for someone to answer it.
+
+Not covered (yet): the group mode (Group Analysis and Batch Processing tabs), the dialogs and the data viewers.
+"""
+from __future__ import annotations
+
+import argparse
+import contextlib
+import os
+import re
+import sys
+import tempfile
+import time
+import traceback
+import unicodedata
+from pathlib import Path
+
+# The channels of the fake experiment, one per data type that has a tab. Two nuclei channels, because the
+# colocalization tab only exists for two channels to detect.
+SCREENSHOT_CHANNELS = {
+    'cfos': 'nuclei',
+    'arc': 'nuclei',
+    'autofluorescence': 'autofluorescence',
+    'lectin': 'vessels',
+    'mbp': 'myelin',
+}
+SCREENSHOT_SAMPLE_ID = 'sample_01'
+SCREENSHOT_SAMPLE_FOLDER_NAME = 'sample_01'
+
+FILE_NAME_SEPARATOR = '__'
+UNTITLED = 'untitled'
+MANIFEST_NAME = 'manifest.tsv'
+MANIFEST_TITLE_SEPARATOR = ' > '
+
+LOAD_SETTLE_SECONDS = 3.0  # The experiment is loaded through events, and the tabs are built when it is
+PAGE_SETTLE_SECONDS = 0.3  # The pages are built and painted when they are shown
+EVENT_LOOP_STEP_SECONDS = 0.01
+
+DEFAULT_WINDOW_SIZE = '1000x900'
+WINDOW_SIZE_PATTERN = re.compile(r'(\d+)x(\d+)')
+
+
+# ################################################ NAMES (no Qt) ###################################################
+
+def slugify(title: str) -> str:
+    """A title of a tab or of a page (e.g. ``'&Atlas settings'``) as a part of a file name (``'atlas_settings'``)"""
+    ascii_title = unicodedata.normalize('NFKD', title).encode('ascii', 'ignore').decode('ascii')
+    slug = re.sub(r'[^a-z0-9]+', '_', ascii_title.lower()).strip('_')
+    return slug or UNTITLED
+
+
+class ScreenshotNamer:
+    """Gives each screenshot its path in the output folder, from the titles it was reached by (tab, page, ...)"""
+
+    def __init__(self, out_dir):
+        self.out_dir = Path(out_dir)
+        self._used: set[Path] = set()
+
+    def next_path(self, titles) -> Path:
+        """
+        The path of the screenshot reached through ``titles`` (the first one is the tab, which names the folder).
+        Two pages with the same title (or with none) get different paths: the second one ends with ``_2``, and so on.
+        """
+        if not titles:
+            raise ValueError('A screenshot needs at least the title of its tab')
+        slugs = [slugify(title) for title in titles]
+        stem = FILE_NAME_SEPARATOR.join(slugs)
+        path = self.out_dir / slugs[0] / f'{stem}.png'
+        suffix_number = 2
+        while path in self._used:
+            path = self.out_dir / slugs[0] / f'{stem}_{suffix_number}.png'
+            suffix_number += 1
+        self._used.add(path)
+        return path
+
+
+def parse_window_size(text: str) -> tuple[int, int]:
+    """``'1000x900'`` as ``(1000, 900)``"""
+    match = WINDOW_SIZE_PATTERN.fullmatch(text.strip())
+    if match is None:
+        raise argparse.ArgumentTypeError(f'expected WIDTHxHEIGHT (e.g. {DEFAULT_WINDOW_SIZE}), got "{text}"')
+    return int(match.group(1)), int(match.group(2))
+
+
+def build_argument_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog='python -m tests.gui_screenshots', description=__doc__.split('\n\n')[0])
+    parser.add_argument('out_dir', type=Path, help='the folder where the screenshots are written (created if missing)')
+    parser.add_argument('--work-dir', type=Path, default=None,
+                        help='where the fake experiment (and the home folder of the application) are created; '
+                             'default: a temporary folder, removed at the end')
+    parser.add_argument('--whole-window', action='store_true',
+                        help='picture the main window instead of its tab area')
+    parser.add_argument('--size', type=parse_window_size, default=parse_window_size(DEFAULT_WINDOW_SIZE),
+                        help=f'size of the main window in pixels (default {DEFAULT_WINDOW_SIZE})')
+    parser.add_argument('--use-real-home', action='store_true',
+                        help='run with the real home folder (and so the real ~/.clearmap) instead of a new one')
+    return parser
+
+
+# ################################################ ENVIRONMENT ######################################################
+
+def configure_environment(work_dir: Path, *, use_real_home: bool) -> None:
+    """
+    Set what the application reads at import (before ClearMap and Qt are imported): no display, no prompt, and
+    a home folder of its own unless asked otherwise.
+    """
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    os.environ.setdefault('CLEARMAP_HEADLESS', '1')  # No prompt for the temporary folder
+    os.environ.setdefault('CLEARMAP_TMP', str(work_dir / 'tmp'))  # Used when the machine config has no temporary folder
+    if not use_real_home:
+        home = work_dir / 'home'
+        home.mkdir(parents=True, exist_ok=True)
+        os.environ['HOME'] = str(home)  # ConfigHandler, Settings and Qt find their folders from it at import
+
+
+def create_experiment(work_dir: Path) -> Path:
+    """Create the fake experiment in ``work_dir``, return its sample folder"""
+    from tests.fake_experiment import make_fake_experiment
+
+    make_fake_experiment(work_dir, tuple(SCREENSHOT_CHANNELS), data_types=SCREENSHOT_CHANNELS,
+                         sample_id=SCREENSHOT_SAMPLE_ID, sample_folder_name=SCREENSHOT_SAMPLE_FOLDER_NAME)
+    return work_dir / SCREENSHOT_SAMPLE_FOLDER_NAME
+
+
+# ################################################ QT (imported lazily) #############################################
+
+def forbid_modal_dialogs() -> None:
+    """
+    Make every way of opening a modal dialog raise, so that a run that would wait for an answer fails and says where.
+    """
+    from PyQt5.QtWidgets import QDialog, QFileDialog, QInputDialog, QMessageBox
+
+    def refuse(description):
+        def refuse_modal_dialog(*_args, **_kwargs):
+            raise RuntimeError(f'{description} would open a modal dialog, which nobody can answer in this run')
+        return refuse_modal_dialog
+
+    for qt_class, static_methods, instance_methods in (
+            (QDialog, (), ('exec', 'exec_')),
+            (QMessageBox, ('warning', 'information', 'critical', 'question'), ('exec', 'exec_')),
+            (QInputDialog, ('getText', 'getInt', 'getDouble', 'getItem'), ()),
+            (QFileDialog, ('getExistingDirectory', 'getOpenFileName', 'getSaveFileName'), ())):
+        for method_name in static_methods:
+            setattr(qt_class, method_name, staticmethod(refuse(f'{qt_class.__name__}.{method_name}')))
+        for method_name in instance_methods:
+            setattr(qt_class, method_name, refuse(f'{qt_class.__name__}.{method_name}'))
+
+
+def close_other_dialogs(qapp, window) -> None:
+    """Close what the first boot left open (the preferences dialog of a new installation): not part of any picture"""
+    from PyQt5.QtWidgets import QDialog
+
+    for widget in qapp.topLevelWidgets():
+        if widget is not window and isinstance(widget, QDialog) and widget.isVisible():
+            widget.close()
+
+
+def settle(qapp, seconds: float) -> None:
+    """Run the event loop for a while: pages are built and painted, and events are delivered, by the event loop"""
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        qapp.processEvents()
+        time.sleep(EVENT_LOOP_STEP_SECONDS)
+
+
+def _is_page_container(widget) -> bool:
+    from PyQt5.QtWidgets import QTabWidget, QToolBox
+    return isinstance(widget, (QTabWidget, QToolBox))
+
+
+def containers_below(widget) -> list:
+    """The tab widgets and toolboxes in ``widget`` that are not in another one (the ones of the next level)"""
+    from PyQt5.QtWidgets import QTabWidget, QToolBox
+
+    top_level_containers = []
+    for container in widget.findChildren((QTabWidget, QToolBox)):
+        ancestor = container.parentWidget()
+        while ancestor is not None and ancestor is not widget and not _is_page_container(ancestor):
+            ancestor = ancestor.parentWidget()
+        if ancestor is widget or ancestor is None:
+            top_level_containers.append(container)
+    return top_level_containers
+
+
+def page_title(container, index: int) -> str:
+    from PyQt5.QtWidgets import QToolBox
+    return container.itemText(index) if isinstance(container, QToolBox) else container.tabText(index)
+
+
+class ScreenshotSession:
+    """Saves the pictures of the pages of a window, and remembers what it saved (and what failed)"""
+
+    def __init__(self, qapp, picture_source, namer: ScreenshotNamer):
+        self.qapp = qapp
+        self.picture_source = picture_source  # The widget that is pictured each time (the tab area, or the window)
+        self.namer = namer
+        self.saved: list[tuple[Path, list[str]]] = []
+        self.errors: list[str] = []
+
+    def save(self, titles: list[str], widget=None) -> None:
+        path = self.namer.next_path(titles)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        pixmap = (widget if widget is not None else self.picture_source).grab()
+        if not pixmap.save(str(path), 'PNG'):
+            raise OSError(f'Could not write the screenshot "{path}"')
+        self.saved.append((path, list(titles)))
+
+    def save_pages_of(self, parent_widget, parent_titles: list[str]) -> None:
+        """
+        Show each page of each container of ``parent_widget``, picture it, and do the same in the page.
+        The pages of a container are shown one at a time with the other containers as they are, and the container
+        is left on the page it was on.
+        """
+        for container in containers_below(parent_widget):
+            initial_index = container.currentIndex()
+            for index in range(container.count()):
+                titles = parent_titles + [page_title(container, index)]
+                try:
+                    container.setCurrentIndex(index)
+                    settle(self.qapp, PAGE_SETTLE_SECONDS)
+                    self.save(titles)
+                    self.save_pages_of(container.widget(index), titles)
+                except Exception:  # One page failing must not hide the others: it is reported at the end
+                    self.errors.append(f'{MANIFEST_TITLE_SEPARATOR.join(titles)}:\n{traceback.format_exc()}')
+            container.setCurrentIndex(initial_index)
+
+    def write_manifest(self) -> Path:
+        manifest_path = self.namer.out_dir / MANIFEST_NAME
+        lines = [f'{path.relative_to(self.namer.out_dir).as_posix()}\t{MANIFEST_TITLE_SEPARATOR.join(titles)}'
+                 for path, titles in self.saved]
+        manifest_path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+        return manifest_path
+
+
+def open_application(sample_dir: Path, window_size: tuple[int, int]):
+    """Start the application like ``ClearMap.gui.app.main`` does (without its event loop), open the experiment"""
+    import qdarkstyle
+
+    import ClearMap.gui.app as app_module  # WARNING: runs the first boot and shows the splash screen at import
+    from ClearMap.Utils.event_bus import EventBus, GUI_THREAD
+    from ClearMap.gui.event_delivery import GuiThreadDelivery
+    from ClearMap.gui.tab_registry import TabRegistry
+
+    qapp = app_module.app
+    forbid_modal_dialogs()  # After the first boot, which may open the preferences dialog (not modal)
+
+    bus = EventBus()
+    bus.set_delivery(GUI_THREAD, GuiThreadDelivery())
+    experiment, group_controller = app_module.build_business_objects(bus)
+    gui = app_module.GuiController(bus, experiment, TabRegistry(), group_controller)
+
+    qapp.setStyleSheet(qdarkstyle.load_stylesheet(qt_api='pyqt5'))
+    gui.start(qapp, centered=False)
+    window = gui.window
+    app_module.splash.finish(window)
+    close_other_dialogs(qapp, window)
+    window.resize(*window_size)
+
+    window._select_experiment_mode(sample_dir)  # Like the "Experiment" button, then picking the folder
+    settle(qapp, LOAD_SETTLE_SECONDS)
+    return qapp, window
+
+
+def take_screenshots(qapp, window, namer: ScreenshotNamer, *, whole_window: bool) -> ScreenshotSession:
+    """Picture each tab, the pages in each tab and the workspace manager"""
+    session = ScreenshotSession(qapp, window if whole_window else window.tabWidget, namer)
+    tab_widget = window.tabWidget
+    for index in range(tab_widget.count()):
+        tab_title = tab_widget.tabText(index)
+        try:
+            tab_widget.setCurrentIndex(index)
+            settle(qapp, PAGE_SETTLE_SECONDS)
+            session.save([tab_title])
+            session.save_pages_of(tab_widget.widget(index), [tab_title])
+        except Exception:
+            session.errors.append(f'{tab_title}:\n{traceback.format_exc()}')
+    tab_widget.setCurrentIndex(0)
+
+    workspace_manager = getattr(window, 'assetsManagerDock', None)
+    if workspace_manager is not None and workspace_manager.isVisible():
+        session.save(['workspace manager'], widget=workspace_manager)
+    return session
+
+
+# ################################################ MAIN #############################################################
+
+def main(arguments=None) -> int:
+    parsed_arguments = build_argument_parser().parse_args(arguments)
+    uncaught_exceptions: list[str] = []
+
+    def record_uncaught_exception(exception_type, exception, exception_traceback):
+        # Without this hook, PyQt aborts the process on an exception in a slot. The run goes on, and fails at the end.
+        uncaught_exceptions.append(''.join(traceback.format_exception(exception_type, exception, exception_traceback)))
+
+    sys.excepthook = record_uncaught_exception
+
+    with contextlib.ExitStack() as stack:
+        if parsed_arguments.work_dir is None:
+            work_dir = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix='clearmap_screenshots_')))
+        else:
+            work_dir = parsed_arguments.work_dir.expanduser().resolve()
+            work_dir.mkdir(parents=True, exist_ok=True)
+        configure_environment(work_dir, use_real_home=parsed_arguments.use_real_home)
+
+        from ClearMap.Utils.utilities import ExitCode
+
+        sample_dir = create_experiment(work_dir)
+        qapp, window = open_application(sample_dir, parsed_arguments.size)
+        namer = ScreenshotNamer(parsed_arguments.out_dir.expanduser().resolve())
+        session = take_screenshots(qapp, window, namer, whole_window=parsed_arguments.whole_window)
+        if session.saved:
+            manifest_path = session.write_manifest()
+            print(f'{len(session.saved)} screenshots in {namer.out_dir} (listed in {manifest_path.name})')
+
+    failures = session.errors + uncaught_exceptions
+    for failure in failures:
+        print(failure, file=sys.stderr)
+    if failures or not session.saved:
+        print(f'{len(failures)} failure(s), {len(session.saved)} screenshot(s) saved', file=sys.stderr)
+        return ExitCode.FAILURE
+    return ExitCode.SUCCESS
+
+
+if __name__ == '__main__':
+    sys.exit(main())
