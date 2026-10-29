@@ -26,8 +26,12 @@ export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK}"
 export OPENBLAS_NUM_THREADS="${SLURM_CPUS_PER_TASK}"
 export MKL_NUM_THREADS="${SLURM_CPUS_PER_TASK}"
 
-# Temporary files on the local disk of the node when the cluster provides one (see temp_folder of the machine config)
-export CLEARMAP_TMP="${CLEARMAP_TMP:-${TMPDIR:-/tmp}}"
+# Temporary files: hundreds of GB, so the local disk of the node (or a scratch folder), never a default of /tmp.
+# CLEARMAP_TMP, else the TMPDIR of the job when the cluster provides one; ClearMap.run stops without a valid folder
+# (it also reads the temp_folder of the machine config, which the variable overrides)
+CLEARMAP_TMP="${CLEARMAP_TMP:-${TMPDIR:-}}"
+: "${CLEARMAP_TMP:?set CLEARMAP_TMP (or TMPDIR) to a folder of the node with room for hundreds of GB}"
+export CLEARMAP_TMP
 export QT_QPA_PLATFORM=offscreen  # in case something imports Qt: no display on a compute node
 
 source "$(conda info --base)/etc/profile.d/conda.sh"
