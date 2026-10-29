@@ -62,17 +62,19 @@ from ClearMap.pipeline_orchestrators.cell_map import CellDetector
 from ClearMap.Scripts.align_new_api import plot_registration_results
 
 
-def main(src_directory):
+def main(src_directory, show_plots=True):
     orchestrators = init_sample_manager_and_processors(src_directory)
     sample_manager = orchestrators['sample_manager']
     stitcher = orchestrators['stitcher']
     registration_processor = orchestrators['registration_processor']
 
     stitcher.stitch()
-    stitcher.plot_stitching_results(mode='overlay')
+    if show_plots:
+        stitcher.plot_stitching_results(mode='overlay')
 
     registration_processor.register()
-    plot_registration_results(registration_processor, sample_manager.alignment_reference_channel)
+    if show_plots:
+        plot_registration_results(registration_processor, sample_manager.alignment_reference_channel)
 
     for channel in sample_manager.get_channels_by_pipeline('CellMap', as_list=True):
         cell_detector = CellDetector(sample_manager, config_coordinator=sample_manager.cfg_coordinator,
@@ -93,10 +95,12 @@ def main(src_directory):
         cell_detector.run_cell_detection(tuning=False)
         cell_detector.post_process_cells()
         cell_detector.voxelize()
-        cell_detector.plot_voxelized_counts(arrange=True)
+        if show_plots:
+            cell_detector.plot_voxelized_counts(arrange=True)
         print('Cell detection done')
 
-        cell_detector.plot_cells_3d_scatter_w_atlas_colors()
+        if show_plots:
+            cell_detector.plot_cells_3d_scatter_w_atlas_colors()
 
 
 if __name__ == '__main__':

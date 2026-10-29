@@ -79,17 +79,19 @@ from ClearMap.pipeline_orchestrators.tube_map import BinaryVesselProcessor, Vess
 from ClearMap.Scripts.align_new_api import plot_registration_results
 
 
-def main(src_directory):
+def main(src_directory, show_plots=True):
     orchestrators = init_sample_manager_and_processors(src_directory)
     sample_manager = orchestrators['sample_manager']
     stitcher = orchestrators['stitcher']
     registration_processor = orchestrators['registration_processor']
 
     stitcher.stitch()
-    stitcher.plot_stitching_results(mode='overlay')
+    if show_plots:
+        stitcher.plot_stitching_results(mode='overlay')
 
     registration_processor.register()
-    plot_registration_results(registration_processor, sample_manager.alignment_reference_channel)
+    if show_plots:
+        plot_registration_results(registration_processor, sample_manager.alignment_reference_channel)
 
     binary_vessel_processor = BinaryVesselProcessor(sample_manager,
                                                     config_coordinator=sample_manager.cfg_coordinator)
