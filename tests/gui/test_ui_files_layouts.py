@@ -40,3 +40,12 @@ def test_no_two_widgets_of_a_ui_file_are_put_in_the_same_cell_of_a_grid_or_form_
                 for overlap in occupied_twice(layout)]
 
     assert not overlaps, overlaps
+
+
+def test_the_registration_direction_radio_buttons_are_stacked_because_their_texts_name_both_channels():
+    """The texts are "<partner> moves onto <channel>": side by side they run out of the panel on the right"""
+    layout = find_layout('registration_params.ui', 'movingDirectionLayout')
+
+    assert layout.get('class') == 'QVBoxLayout'
+    assert [item[0].get('name') for item in layout.findall('item')] == [
+        'movingOtherRadioButton', 'intrinsicallyAlignedRadioButton', 'movingSelfRadioButton']
