@@ -15,6 +15,7 @@ from packaging.version import Version
 from pathlib import Path
 
 from ClearMap import Settings as clearmap_settings
+from ClearMap.Utils.utilities import ExitCode
 
 try:
     import yaml  # WARNING: Only guaranteed to be here in the tmp env
@@ -203,7 +204,7 @@ class PytorchVersionManager:  # TODO: inherit from condaparser ??
         cmd = 'nvidia-smi -L'
         try:
             subprocess.check_output(cmd, shell=True)
-            sys.exit(0)
+            sys.exit(ExitCode.SUCCESS)
         except subprocess.CalledProcessError as err:
             print('Error, a working installation of NVidia CUDA could not be detected on your computer.'
                   ' This software is required to run ClearMap.')
@@ -226,8 +227,7 @@ class PytorchVersionManager:  # TODO: inherit from condaparser ??
     @staticmethod
     def check_pytorch():
         import torch
-        exit_code = int(not torch.cuda.is_available())
-        sys.exit(exit_code)
+        sys.exit(ExitCode.SUCCESS if torch.cuda.is_available() else ExitCode.FAILURE)
 
     @property
     def pytorch_info(self):

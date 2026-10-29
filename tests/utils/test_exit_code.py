@@ -7,3 +7,4 @@ from ClearMap.Utils.utilities import ExitCode
 
 def test_the_exit_codes_are_the_conventional_numbers():
     assert (ExitCode.SUCCESS, ExitCode.FAILURE, ExitCode.USAGE_ERROR) == (0, 1, 2)
+
