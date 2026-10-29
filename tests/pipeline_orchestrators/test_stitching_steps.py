@@ -256,3 +256,50 @@ def test_stitch_imports_the_channels_which_are_not_tiled(stitching, experiment, 
 
     assert stitching.get('stitched', channel='prestitched').exists
     assert 'prestitched' not in stitching.channels_to_stitch()
+
+
+def test_the_raw_data_of_a_tiled_channel_set_to_use_npy_is_prepared_by_converting_its_tiles(stitching, experiment):
+    experiment.apply_ui_patch({'stitching': {'channels': {'main': {'use_npy': True}}}})
+    assert stitching.needs_raw_data_preparation('main')
+
+    stitching.prepare_channel_raw_data('main')
+
+    assert stitching.sample_manager.has_npy('main')
+    assert not stitching.needs_raw_data_preparation('main')
+    assert stitching.needs_raw_data_preparation('main', force=True)
+
+
+def test_a_tiled_channel_not_set_to_use_npy_needs_no_preparation_it_is_stitched_from_the_tif(stitching, experiment):
+    experiment.apply_ui_patch({'stitching': {'channels': {'main': {'use_npy': False}}}})
+
+    assert not stitching.needs_raw_data_preparation('main')
+    assert not stitching.needs_raw_data_preparation('main', force=True)  # Force re-prepares, it does not set use_npy
+    prepared = stitching.prepare_all_channels_raw_data(force=True)
+
+    assert 'main' not in prepared
+    assert not stitching.sample_manager.has_npy('main')
+
+
+def test_the_button_converts_the_tiles_of_its_channel_whatever_use_npy(stitching, experiment):
+    experiment.apply_ui_patch({'stitching': {'channels': {'main': {'use_npy': False}}}})
+
+    stitching.prepare_channel_raw_data('main')  # Asked for by the user, unlike the preparation of all the channels
+
+    assert stitching.sample_manager.has_npy('main')
+
+
+def test_the_raw_data_of_a_channel_which_is_not_tiled_is_prepared_by_importing_it(stitching, experiment,
+                                                                                  channel_editor, tmp_path):
+    channel_editor.add('prestitched', 'nuclei')
+    path = tmp_path / RAW_FOLDER_NAME / 'prestitched' / 'prestitched.ome.tif'
+    path.parent.mkdir(parents=True)
+    tifffile.imwrite(path, np.ones(TILE_SHAPE, np.uint16), metadata=OME)
+    experiment.apply_ui_patch({'sample': {'channels': {'prestitched': {'path': str(path)}}}})
+    assert stitching.needs_raw_data_preparation('prestitched')
+
+    prepared = stitching.prepare_all_channels_raw_data()
+
+    assert set(prepared) == {'main', 'derived', 'prestitched'}
+    assert stitching.get('stitched', channel='prestitched').exists
+    assert stitching.prepare_all_channels_raw_data() == []
+    assert set(stitching.prepare_all_channels_raw_data(force=True)) == {'main', 'derived', 'prestitched'}

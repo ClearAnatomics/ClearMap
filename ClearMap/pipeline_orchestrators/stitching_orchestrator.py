@@ -268,11 +268,26 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
         self.cfg_coordinator.submit_patch({'stitching': {'channels': {channel: {'rigid': overlaps_patch}}}},
                                           sample_manager=self.sample_manager)
 
+    def needs_raw_data_preparation(self, channel: str, force: bool = False) -> bool:
+        """
+        Whether the working asset of channel (see :meth:`prepare_channel_raw_data`) is missing, or force.
+        A tiled channel has a working asset (the npy tiles) only if it is set to use npy, it can be stitched from tif.
+        """
+        if self.sample_manager.is_tiled(channel):
+            return self.should_convert_tiles(channel, force=force)
+        return force or not self.sample_manager.get('stitched', channel=channel).exists
+
+    def prepare_channel_raw_data(self, channel: str) -> None:
+        """Make the working asset of channel: the npy tiles of a tiled channel, the stitched volume of the others"""
+        if self.sample_manager.is_tiled(channel):
+            self.convert_tiles_channel(channel, _force=True)  # Whatever use_npy says: it is asked for
+        else:
+            self.copy_or_stack(channel)
+
     def prepare_all_channels_raw_data(self, force: bool = False) -> list[str]:
         """
-        Prepare all pipeline-ready channels that don't yet have their working asset.
-        Tiled channels → convert tiles to npy. Non-tiled → stack/copy to stitched volume.
-        Idempotent unless force=True.
+        Prepare all pipeline-ready channels that don't yet have their working asset (see
+        :meth:`prepare_channel_raw_data`). Idempotent unless force=True.
 
         Parameters
         ----------
@@ -290,22 +305,16 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
             return []
 
         prepared = []
-        for ch in self.sample_manager.pipeline_ready_channels:
+        for channel in self.sample_manager.pipeline_ready_channels:
             try:
-                if self.sample_manager.is_tiled(ch):
-                    if force or not self.sample_manager.has_npy(ch):
-                        self.convert_tiles_channel(ch)
-                        prepared.append(ch)
-                else:
-                    stitched = self.sample_manager.get('stitched', channel=ch)
-                    if force or not stitched.exists:
-                        self.copy_or_stack(ch)
-                        prepared.append(ch)
+                if self.needs_raw_data_preparation(channel, force):
+                    self.prepare_channel_raw_data(channel)
+                    prepared.append(channel)
             except (KeyError, FileNotFoundError) as err:
                 # Channel is pipeline-ready (has a data_type) but has no raw
                 # asset in the workspace — e.g. path was left empty for
                 # pre-stitched data.  Skip without crashing.
-                warnings.warn(f'Skipping raw-data preparation for channel {ch!r}: {err}')
+                warnings.warn(f'Skipping raw-data preparation for channel {channel!r}: {err}')
         return prepared
 
     def copy_or_stack(self, channel):
@@ -348,9 +357,11 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
             except FileNotFoundError as err:
                 warnings.warn(f'Could not copy/link/stack {channel=}, files not found; {err}')
 
-    def should_convert_tiles(self, channel) -> bool:
-        """Whether the tiles of channel are to be converted to numpy files (as set for it) and are not yet"""
-        return self.config['channels'][channel].get('use_npy', False) and not self.sample_manager.has_npy(channel)
+    def should_convert_tiles(self, channel, *, force=False) -> bool:
+        """Whether the tiles of channel are to be converted to numpy files: it is set to use them, and they are not
+        there yet (or force)"""
+        use_npy = self.config['channels'][channel].get('use_npy', False)
+        return use_npy and (force or not self.sample_manager.has_npy(channel))
 
     def channels_to_stitch(self) -> list[str]:
         """The channels set to run, each after the channel which gives its layout"""
