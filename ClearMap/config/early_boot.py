@@ -3,7 +3,7 @@ early_boot.py
 --------------
 Run this **FIRST**, before anything else (even logging).
 
-- Reads machine params from ~/.clearmap/machine_params_v<major>_<minor>.cfg
+- Reads machine params (machine_params_v<major>_<minor>.cfg) from the configuration folder (~/.clearmap, or $CLEARMAP_CFG_DIR)
 - Patches tempfile’s default directory ASAP (if configured)
 
 
@@ -23,14 +23,14 @@ from functools import cached_property
 from typing import Optional, TypedDict, Any, Dict, TypeAlias
 
 from ClearMap import __version__
-from ClearMap.config.config_handler import ConfigHandler
+from ClearMap.config.config_handler import ConfigHandler, CLEARMAP_CFG_DIR
 
 from PyQt5.QtWidgets import QFileDialog, QMessageBox, QInputDialog
 
 from ClearMap.config.utils import parse_flat_yaml, set_flat_yaml_value
 from ClearMap.gui.gui_utils_base import ensure_qapp, is_headless
 
-SENTINEL_DIR = pathlib.Path.home() / '.clearmap' / '.first_run_sentinels'
+SENTINEL_DIR = CLEARMAP_CFG_DIR / '.first_run_sentinels'
 
 ConfigValueType: TypeAlias = str | int | float | bool | None
 
@@ -217,7 +217,7 @@ def prompt_machine_params() -> bool:
         class _MiniMainWindow:
             # Minimal surface needed by PreferenceUi
             def __init__(self):
-                self.config_loader = ConfigHandler("~/.clearmap")
+                self.config_loader = ConfigHandler(CLEARMAP_CFG_DIR)
             def file_exists(self, p):
                 from pathlib import Path
                 return Path(p).expanduser().exists()
