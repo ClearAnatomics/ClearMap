@@ -26,6 +26,7 @@ from ClearMap import __version__
 from ClearMap.config.config_handler import ConfigHandler, CLEARMAP_CFG_DIR
 
 from ClearMap.config.utils import parse_flat_yaml, set_flat_yaml_value
+from ClearMap.Utils.exceptions import ClearMapConfigError
 from ClearMap.Utils.utilities import is_headless
 
 SENTINEL_DIR = CLEARMAP_CFG_DIR / '.first_run_sentinels'
@@ -147,31 +148,41 @@ class MachineConfig:
         except Exception:
             return False
 
-    def patch_tmp(self, *, allow_prompt: bool = True) -> str | None:
+    def patch_tmp(self, *, allow_prompt: bool = True) -> str:
         """
-        If temp_folder is set (and not 'null'), ensure it exists, then
-        patch os env TMP/TEMP/TMPDIR and tempfile.tempdir.
-        Returns the resolved folder (or None).
+        Set the temporary folder (the TMP, TEMP and TMPDIR variables, and tempfile.tempdir) to the first valid one of:
+
+        1. the environment variable CLEARMAP_TMP: it belongs to this run (e.g. the node-local folder of a cluster job),
+           so it comes before the machine config, which can be shared by the runs;
+        2. the ``temp_folder`` of the machine config;
+        3. the folder that the user chooses in a dialog (not when headless), which is saved in the machine config.
+
+        Only the folder of the dialog is written in the machine config: the other two are read, never saved. There is
+        no default folder: ClearMap writes hundreds of GB there, and the system one is often small.
+
+        Returns
+        -------
+        str
+            The folder.
+
+        Raises
+        ------
+        ClearMapConfigError
+            If no folder is valid (writeable, with enough free space) and the user cannot or does not choose one.
         """
         self._ensure_cfg_exists()
 
-        # Plan A: machine cfg
-        raw_cfg = self.get('temp_folder', None)
-        if raw_cfg and raw_cfg.strip().lower() != "null":
-            p = pathlib.Path(raw_cfg).expanduser()
-            if self._is_valid_tmp(p):
-                self._patch_temp_dir_cfg(str(p))
-                self._patch_temp_dir_env(str(p))
-                return str(p)
-
-        # Plan B: environment variable
-        raw_env = os.environ.get('CLEARMAP_TMP')
-        if raw_env:
-            p = pathlib.Path(raw_env).expanduser()
-            if self._is_valid_tmp(p):
-                self._patch_temp_dir_cfg(str(p))
-                self._patch_temp_dir_env(str(p))
-                return str(p)
+        rejected = []
+        for source, raw_folder in (('CLEARMAP_TMP', os.environ.get('CLEARMAP_TMP')),
+                                   ('temp_folder of the machine config', self.get('temp_folder', None))):
+            if not raw_folder or raw_folder.strip().lower() == 'null':
+                continue
+            folder = pathlib.Path(raw_folder).expanduser()
+            if self._is_valid_tmp(folder):
+                self._patch_temp_dir_env(str(folder))
+                return str(folder)
+            rejected.append(f'{source} ("{raw_folder}")')
+        rejected_msg = f' Not writeable or too little free space: {", ".join(rejected)}.' if rejected else ''
 
         # Plan C: prompt user
         if allow_prompt and not is_headless():
@@ -180,10 +191,11 @@ class MachineConfig:
                 self._patch_temp_dir_cfg(prompt_result)
                 self._patch_temp_dir_env(prompt_result)
                 return prompt_result
-            else:
-                raise RuntimeError('A valid temporary folder is required. Startup aborted by the user.')
-        else:
-            raise RuntimeError('No valid temporary folder configured (machine config or CLEARMAP_TMP).')
+            raise ClearMapConfigError('A valid temporary folder is required. Startup aborted by the user.')
+        raise ClearMapConfigError(
+            f'No valid temporary folder.{rejected_msg} Set CLEARMAP_TMP, or temp_folder in {self.cfg_path}, to a '
+            f'writeable folder with at least {self.min_temp_folder_gb} GB free (ClearMap writes much more there: '
+            f'use a large, fast disk, not the system /tmp).')
 
     @cached_property
     def verbosity(self) -> str:

@@ -66,7 +66,9 @@ try:
     from ClearMap.config.config_handler import ConfigHandler
     machine_cfg = ConfigHandler.get_cfg_from_path(ConfigHandler.get_global_path('machine'))
     tmp_folder = machine_cfg.get('temp_folder', None)
-    if tmp_folder is not None:
+    # FIXME: a third copy of the rule of MachineConfig.patch_tmp, kept for the scripts that do not run it. The
+    #  CLEARMAP_TMP of the run comes first: without this condition, a shared temp_folder overrode it at import
+    if tmp_folder is not None and not os.environ.get('CLEARMAP_TMP'):
         for var_name in ('TMP', 'TEMP', 'TMPDIR'):
             os.environ[var_name] = tmp_folder
         tempfile.tempdir = None  # Force refresh of tempdir
