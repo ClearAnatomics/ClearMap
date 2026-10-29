@@ -25,10 +25,8 @@ from typing import Optional, TypedDict, Any, Dict, TypeAlias
 from ClearMap import __version__
 from ClearMap.config.config_handler import ConfigHandler, CLEARMAP_CFG_DIR
 
-from PyQt5.QtWidgets import QFileDialog, QMessageBox, QInputDialog
-
 from ClearMap.config.utils import parse_flat_yaml, set_flat_yaml_value
-from ClearMap.gui.gui_utils_base import ensure_qapp, is_headless
+from ClearMap.Utils.utilities import is_headless
 
 SENTINEL_DIR = CLEARMAP_CFG_DIR / '.first_run_sentinels'
 
@@ -83,6 +81,10 @@ class MachineConfig:
         tempfile.tempdir = path_str  # critical: must happen before anything else uses tempfile
 
     def prompt_tmp_folder(self):
+        # Not at the top: a headless run imports this module and must not need Qt (nor a display)
+        from PyQt5.QtWidgets import QFileDialog, QMessageBox, QInputDialog
+        from ClearMap.gui.gui_utils_base import ensure_qapp
+
         app = ensure_qapp()
 
         # Plan A, proper folder using QT directory dialog
@@ -206,6 +208,8 @@ def prompt_machine_params() -> bool:
     Falls back gracefully in headless/CI.
     """
     try:
+        from ClearMap.gui.gui_utils_base import ensure_qapp
+
         app = ensure_qapp()
         if app is None:
             return False  # headless or PyQt not installed

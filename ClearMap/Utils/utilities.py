@@ -14,6 +14,7 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import inspect
 import os
+import platform
 import re
 import sys
 import threading
@@ -64,6 +65,15 @@ def runs_on_pycharm():
 
 def runs_on_ui():
     return 'CLEARMAP_GUI_HOSTED' in os.environ
+
+
+def is_headless() -> bool:
+    # Best-effort heuristics for “don’t prompt”
+    return os.environ.get('CLEARMAP_HEADLESS') == '1' or (
+            platform.system().lower() == 'linux'
+            and not os.environ.get('DISPLAY')
+            and os.environ.get('QT_QPA_PLATFORM', '').lower() not in ('wayland', 'xcb')
+    )
 
 
 class CancelableProcessPoolExecutor(ProcessPoolExecutor):

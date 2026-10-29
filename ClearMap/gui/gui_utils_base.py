@@ -11,7 +11,6 @@ Various utility functions specific to the graphical interface
     Any non-standard-library imports should be done locally inside functions.
 """
 import os
-import platform
 from math import sqrt, ceil, floor
 
 import warnings
@@ -340,12 +339,3 @@ def run_with_responsive_ui(app: QApplication, progress_watcher, func: Callable, 
             return result.get()
     finally:
         progress_watcher.stop_polling()
-
-
-def is_headless() -> bool:
-    # Best-effort heuristics for “don’t prompt”
-    return os.environ.get('CLEARMAP_HEADLESS') == '1' or (
-            platform.system().lower() == 'linux'
-            and not os.environ.get('DISPLAY')
-            and os.environ.get('QT_QPA_PLATFORM', '').lower() not in ('wayland', 'xcb')
-    )
