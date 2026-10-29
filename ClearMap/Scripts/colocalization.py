@@ -26,7 +26,7 @@ import argparse
 from ClearMap.pipeline_orchestrators.cell_map import CellDetector
 from ClearMap.pipeline_orchestrators.colocalization import ColocalizationProcessor
 from ClearMap.pipeline_orchestrators.utils import init_sample_manager_and_processors
-from ClearMap.Scripts.align_new_api import stitch, register, plot_registration_results
+from ClearMap.Scripts.align_new_api import plot_registration_results
 
 
 def check_colocalization_prerequisites(sample_manager, registration_processor):
@@ -116,8 +116,8 @@ def main(src_directory, run_cell_map=True):
               f'configured as cells/nuclei.')
         return
 
-    stitch(stitcher)
-    register(registration_processor)
+    stitcher.stitch()
+    registration_processor.register()
     plot_registration_results(registration_processor, sample_manager.alignment_reference_channel)
 
     if run_cell_map:

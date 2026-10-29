@@ -1,7 +1,7 @@
 from ClearMap.pipeline_orchestrators.tract_map import TractMapProcessor
 from ClearMap.pipeline_orchestrators.utils import init_sample_manager_and_processors
 
-from ClearMap.Scripts.align_new_api import stitch, register, plot_registration_results
+from ClearMap.Scripts.align_new_api import plot_registration_results
 
 
 def main(src_directory):
@@ -11,10 +11,10 @@ def main(src_directory):
     registration_processor = orchestrators['registration_processor']
     cfg_coordinator = sample_manager.cfg_coordinator
 
-    stitch(stitcher)
+    stitcher.stitch()
     # stitcher.plot_stitching_results(mode='overlay')
 
-    register(registration_processor)
+    registration_processor.register()
     plot_registration_results(registration_processor, sample_manager.alignment_reference_channel)
 
     for channel in sample_manager.get_channels_by_pipeline('TractMap', as_list=True):
