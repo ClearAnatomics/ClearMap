@@ -2,8 +2,12 @@
 ``python -m ClearMap.run`` runs a pipeline of an experiment folder headless: no plot (they need a display), a status
 the scheduler can read, and a pipeline imported only when it is run.
 """
+import collections
+import os
+import shutil
 import subprocess
 import sys
+import tempfile
 import types
 
 import pytest
@@ -23,6 +27,24 @@ class RecordingPipelineModule(types.ModuleType):
 
     def main(self, src_directory, show_plots=True):
         self.calls.append((src_directory, show_plots))
+
+
+DiskUsage = collections.namedtuple('DiskUsage', 'total used free')
+ONE_TIB = 1024 ** 4
+
+
+@pytest.fixture(autouse=True)
+def temporary_folder_of_the_run(tmp_path, monkeypatch):
+    """The run needs a temporary folder: this one, with room, and a machine config of the test, not the user's"""
+    folder = tmp_path / 'tmp_of_the_run'
+    monkeypatch.setenv('CLEARMAP_TMP', str(folder))
+    monkeypatch.setenv('CLEARMAP_MACHINE_CFG', str(tmp_path / 'machine.yml'))
+    monkeypatch.setattr(shutil, 'disk_usage', lambda path: DiskUsage(total=ONE_TIB, used=0, free=ONE_TIB))
+    # The run patches the process: monkeypatch puts them back
+    monkeypatch.setattr(tempfile, 'tempdir', tempfile.tempdir)
+    for name in ('TMP', 'TEMP', 'TMPDIR'):
+        monkeypatch.setenv(name, os.environ.get(name, '/tmp'))
+    return folder
 
 
 @pytest.fixture
@@ -69,6 +91,35 @@ def test_a_failing_pipeline_gives_a_status_and_the_traceback(monkeypatch, tmp_pa
     assert 'Traceback' in error_output and 'out of memory' in error_output
 
 
+def test_the_temporary_folder_is_set_before_the_pipeline_is_imported_and_printed(
+        pipeline_module, temporary_folder_of_the_run, tmp_path, monkeypatch, capsys):
+    temporary_folders_at_import = []
+
+    def import_module(name):
+        temporary_folders_at_import.append(tempfile.gettempdir())
+        return pipeline_module
+
+    monkeypatch.setattr(run.importlib, 'import_module', import_module)
+
+    status = run.main([PIPELINE_NAME, str(tmp_path)])
+
+    assert status == ExitCode.SUCCESS
+    assert temporary_folders_at_import == [str(temporary_folder_of_the_run)]
+    assert f'Temporary folder: {temporary_folder_of_the_run} (1024 GB free)' in capsys.readouterr().out
+
+
+@pytest.mark.parametrize('extra_arguments', [[], ['--check-only']])
+def test_without_a_temporary_folder_the_run_stops_before_the_pipeline_and_says_how_to_set_it(
+        extra_arguments, pipeline_module, tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv('CLEARMAP_TMP')
+
+    status = run.main([PIPELINE_NAME, str(tmp_path), *extra_arguments])
+
+    assert status == ExitCode.FAILURE
+    assert pipeline_module.calls == []
+    assert 'CLEARMAP_TMP' in capsys.readouterr().err
+
+
 def test_an_unknown_pipeline_is_a_usage_error(tmp_path):
     with pytest.raises(SystemExit) as exit_info:
         run.main(['no_such_pipeline', str(tmp_path)])
@@ -100,7 +151,9 @@ def test_importing_the_runner_does_not_import_the_pipelines():
 def test_the_process_exits_with_the_status_the_scheduler_reads(arguments, expected_status, tmp_path):
     """The status of the process, not only the value main() returns: a scheduler only sees the former"""
     command = [sys.executable, '-m', 'ClearMap.run'] + [argument.format(folder=tmp_path) for argument in arguments]
+    env = {**os.environ, 'HOME': str(tmp_path), 'CLEARMAP_TMP': str(tmp_path / 'tmp_of_the_run'),
+           'CLEARMAP_MACHINE_CFG': str(tmp_path / 'machine.yml')}
 
-    result = subprocess.run(command, capture_output=True, text=True, check=False)
+    result = subprocess.run(command, capture_output=True, text=True, check=False, env=env)
 
     assert result.returncode == expected_status

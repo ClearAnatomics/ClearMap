@@ -16,6 +16,13 @@ Usage
 The experiment folder holds the configuration of the sample (as for the GUI and the ``*_new_api`` scripts), and the
 results are written in it.  A Slurm job script is in ``ClearMap/Scripts/cluster/clearmap_job.sbatch``.
 
+Temporary folder
+----------------
+ClearMap writes hundreds of GB of temporary files, so the run needs a folder for them: ``CLEARMAP_TMP`` (the folder of
+this job), else the ``temp_folder`` of the machine config. There is no default: without one, or if it is not writeable
+or has too little room, the run stops before it starts (also with ``--check-only``) and says how to set it, instead of
+filling the system ``/tmp``.  The folder and its free space are printed at the start, for the job log.
+
 Exit status
 -----------
 ``ExitCode.SUCCESS`` when the pipeline ran (or, with ``--check-only``, when the experiment folder exists),
@@ -24,10 +31,12 @@ Exit status
 """
 import argparse
 import importlib
+import shutil
 import sys
 import traceback
 from pathlib import Path
 
+from ClearMap.config.early_boot import MachineConfig
 from ClearMap.Utils.exceptions import ClearMapFileNotFoundError
 from ClearMap.Utils.utilities import ExitCode
 
@@ -58,6 +67,23 @@ def check_experiment_folder(experiment_folder):
     return resolved_folder
 
 
+def patch_temporary_folder():
+    """
+    Set the temporary folder of the run (see the module docstring) and print it, with its free space.
+
+    It is done before the pipelines are imported: modules must not read ``tempfile.tempdir`` before it is set.
+
+    Raises
+    ------
+    ClearMapConfigError
+        If there is no valid temporary folder.
+    """
+    temporary_folder = MachineConfig().patch_tmp(allow_prompt=False)  # Nobody to answer on a compute node
+    free_gb = shutil.disk_usage(temporary_folder).free / 1024 ** 3
+    print(f'Temporary folder: {temporary_folder} ({free_gb:.0f} GB free)')
+    return temporary_folder
+
+
 def run_pipeline(pipeline_name, experiment_folder):
     """Run the pipeline without any plot (which would need a display) on the experiment folder."""
     pipeline_module = importlib.import_module(PIPELINE_MODULES[pipeline_name])
@@ -68,6 +94,7 @@ def main(arguments=None):
     parsed_arguments = build_argument_parser().parse_args(arguments)
     try:
         experiment_folder = check_experiment_folder(parsed_arguments.experiment_folder)
+        patch_temporary_folder()
         if parsed_arguments.check_only:
             print(f'{parsed_arguments.pipeline} on {experiment_folder}: ready to run')
             return ExitCode.SUCCESS
