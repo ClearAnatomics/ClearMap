@@ -16,8 +16,8 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
-import os
 import functools
+from pathlib import Path
 
 import numpy as np
 import scipy.ndimage as ndi
@@ -26,6 +26,7 @@ import multiprocessing as mp
 
 from ClearMap.IO.source import Source as source_mod
 import ClearMap.IO.FileUtils as fu
+from ClearMap import Settings as settings
 
 import ClearMap.ImageProcessing.Topology.Topology3d as t3d
 
@@ -309,25 +310,32 @@ smooth_by_configuration_filename = "Smoothing.npy"
 """Filename for the look up table mapping a cube configuration to the smoothing action for the center pixel."""
 
 
+SMOOTHING_FOLDER = Path(__file__).resolve().parent
+"""The folder of this module, where the compressed look up table is shipped (and possibly a prepared one)."""
+
+
 def initialize_lookup_table(function = index_to_smoothing, filename = smooth_by_configuration_filename, verbose = True, processes = None):
-  """Initialize the lookup table"""
-  
-  filename = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
+    """Load the lookup table, making it first if it is not in the folder of this module nor in the cache folder.
 
-  #uncompress if only zip file exists.
-  fu.uncompress(filename)
+    The table is made from the compressed one shipped with the program if there is one, else computed (slow).
+    It is made in :data:`ClearMap.Settings.clearmap_cache_dir`, never in the folder of the program (read-only on a
+    cluster).
+    """
 
-  #load lookup table
-  if os.path.exists(filename):
+    def make_table(path):
+        compressed_path = SMOOTHING_FOLDER / f'{filename}.zip'
+        if compressed_path.exists():
+            fu.decompress_file(compressed_path, path)
+        else:
+            if verbose:
+                print('Smoothing: Look-up table does not exists! Pre-calculating it!')
+            np.save(path, generate_lookup_table(function=function, verbose=verbose, processes=processes))
+
+    path = fu.find_or_build(filename, source_dir=SMOOTHING_FOLDER, cache_dir=settings.clearmap_cache_dir,
+                            build=make_table)
     if verbose:
-      print('Smoothing: Loading look-up table from %s!' % filename)
-    return np.load(filename)
-  else:
-    if verbose:
-      print('Smoothing: Look-up table does not exists! Pre-calculating it!')
-    lut = generate_lookup_table(function = function, verbose=verbose, processes=processes)
-    np.save(filename, lut)
-    return lut
+        print(f'Smoothing: Loading look-up table from {path}')
+    return np.load(path)
 
 
 def smooth_by_configuration_block(source, iterations = 1, verbose = False):
