@@ -25,6 +25,7 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 
 import os
+from pathlib import Path
 
 import configobj
 
@@ -66,11 +67,22 @@ test_data_path = os.path.join(test_path, 'Data')
 """Absolute path to the ClearMap's test data folder."""
 
 
+CFG_DIR_ENV_VAR = 'CLEARMAP_CFG_DIR'
+"""Environment variable that sets the folder of the user configuration (default: ``~/.clearmap``).
+
+On a cluster, the home folder of a job is often read-only or absent, or shared by jobs that need different settings.
+"""
+
+# WARNING: an empty variable means unset: Path('') is the current folder, not an error
+clearmap_cfg_dir = Path(os.environ.get(CFG_DIR_ENV_VAR) or '~/.clearmap').expanduser().absolute()
+"""Absolute :class:`~pathlib.Path` of the folder of the user configuration (machine parameters, user defaults, ...)."""
+
+
 ###############################################################################
 # ## Paths to external programs and resources
 ###############################################################################
 
-cfg_path = os.path.expanduser('~/.clearmap/machine_params_v3_0.cfg')
+cfg_path = str(clearmap_cfg_dir / 'machine_params_v3_0.cfg')
 if os.path.exists(cfg_path):
     config = configobj.ConfigObj(cfg_path, encoding="UTF8", indent_type='    ', unrepr=True, file_error=True)
 else:

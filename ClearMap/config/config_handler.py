@@ -21,6 +21,7 @@ import configobj
 from packaging.version import Version
 
 from ClearMap import __version__
+from ClearMap import Settings as clearmap_settings
 from ClearMap.IO.FileUtils import atomic_replace
 from .utils import _handle_configobj_failed_parse, configobj_to_dict
 from ..Utils.path_utils import clean_path, de_duplicate_path
@@ -33,7 +34,7 @@ VERSION_SUFFIX = f'v{Version(clearmap_version).major}_{Version(clearmap_version)
 
 
 INSTALL_CFG_DIR = Path(inspect.getfile(inspect.currentframe())).parent.absolute()  # Where this file resides (w cfgs)
-CLEARMAP_CFG_DIR = Path('~/.clearmap/').expanduser()
+CLEARMAP_CFG_DIR = clearmap_settings.clearmap_cfg_dir  # ~/.clearmap, unless set by $CLEARMAP_CFG_DIR
 
 
 # Optional YAML dependency
