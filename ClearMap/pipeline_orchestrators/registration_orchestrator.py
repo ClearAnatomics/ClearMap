@@ -472,6 +472,12 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
                 return
         self.update_watcher_main_progress()
 
+    def register(self):
+        """Register the sample to the atlas: set the atlases up, resample the channels, align them"""
+        self.setup_atlases()
+        self.resample_for_registration()  # Both steps return at once if the process was stopped
+        self.align()
+
     @check_stopped
     def align(self, _force=False):
         check_partners_chosen(self.config, self.channels_to_register)  # Before any is aligned, not halfway

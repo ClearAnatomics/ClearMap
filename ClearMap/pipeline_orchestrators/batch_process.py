@@ -42,8 +42,7 @@ def process_sample(folder, align=False, cells=False, vasc=False):
 
     if align:
         stitching_processor.stitch()
-        registration_processor.resample_for_registration()
-        registration_processor.align()
+        registration_processor.register()
     if cells:
         for channel in sample_manager.get_channels_by_pipeline('CellMap', as_list=True):
             cell_detector = CellDetector(sample_manager, channel=channel, registration_processor=registration_processor)
@@ -95,8 +94,7 @@ def voxelize_sample(folder, align=False, cells=False, vasc=False, voxelization_r
 
     if align:
         stitching_processor.stitch()
-        registration_processor.resample_for_registration()
-        registration_processor.align()
+        registration_processor.register()
     if cells:
         for channel in sample_manager.get_channels_by_pipeline('CellMap', as_list=True):
             cell_detector = CellDetector(sample_manager, channel=channel, registration_processor=registration_processor)
