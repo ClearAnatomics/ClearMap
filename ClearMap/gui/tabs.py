@@ -96,7 +96,6 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 
 import functools
-import itertools
 import re
 import warnings
 
@@ -746,26 +745,15 @@ class StitchingTab(PreProcessingTab["StitchingProcessor"]):
     def run_stitching(self) -> None:
         """Run the actual stitching steps based on the values in the config file (set from the UI)."""
         stitcher = self.worker
-        for channel in self.sample_manager.channels:  # Idempotent: nothing done if the stitched asset exists
-            if not self.sample_manager.is_tiled(channel):  # BYPASS stitching, just copy or stack
-                self.wrap_step('Stitching', stitcher.copy_or_stack, step_args=[channel])
-
-        channels_in_stitching_order = list(itertools.chain.from_iterable(stitcher.get_stitching_order().values()))
-        channels = [channel for channel in channels_in_stitching_order if self.params[channel].shared.run]
-        # REFACTOR: stitcher.should_convert_tiles(channel)
-        if any(self.params[channel].shared.use_npy and not self.sample_manager.has_npy(channel)
-               for channel in channels):
+        channels = stitcher.channels_to_stitch()
+        if any(stitcher.should_convert_tiles(channel) for channel in channels):
             self.convert_tiles()  # Before the progress dialog of the stitching: it has its own
-        kwargs = {'n_steps': stitcher.n_steps_to_run(channels), 'abort_func': stitcher.stop_process,
-                  'close_when_done': False}
-        for i, channel in enumerate(channels):
-            try:
-                # Only the first call opens the progress dialog, the others continue its main bar
-                self.wrap_step('Stitching' if i == 0 else '', stitcher.stitch_channel, step_args=[channel], **kwargs)
-            except MissingRequirementException as err:
-                error_msg = str(err).replace('\n', '<br>')
-                self.main_window.print_status_msg(
-                    f'Skipping stitching for {channel} because of missing requirements: {error_msg}')
+        try:
+            self.wrap_step('Stitching', stitcher.stitch, n_steps=stitcher.n_steps_to_run(channels),
+                           abort_func=stitcher.stop_process, close_when_done=False)
+        except MissingRequirementException as err:
+            error_msg = str(err).replace('\n', '<br>')
+            self.main_window.print_status_msg(f'Stopped stitching because of missing requirements: {error_msg}')
 
         self.update_plotable_channels()
         self.main_window.progress_watcher.finish()
