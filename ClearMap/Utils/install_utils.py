@@ -397,6 +397,20 @@ def patch_env(cfg_path, dest_path, use_cuda_torch=True, pip_mode=False, use_spyd
         env_mgr.patch_env_var('TMP', tmp_dir)
 
 
+def ensure_config_folder():
+    """
+    Create the folder of the user configuration (``~/.clearmap``, or ``$CLEARMAP_CFG_DIR``) if it is missing
+
+    Returns
+    -------
+    pathlib.Path
+        The folder, absolute. The installation script asks for it, so that it never repeats the rule of Settings.
+    """
+    folder = clearmap_settings.clearmap_cfg_dir
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder
+
+
 def set_elastix_path(elastix_path):
     import configobj  # Local import to avoid dependency of whole module on configobj
     machine_params_path = str(clearmap_settings.clearmap_cfg_dir / 'machine_params_v3_0.cfg')

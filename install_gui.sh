@@ -127,7 +127,6 @@ esac
 fi
 
 
-config_folder="$HOME/.clearmap"
 prep_python="import os, sys; sys.path.append(os.getcwd()); sys.path.append(os.path.join(os.getcwd(), 'ClearMap'));"
 
 eval "$(conda shell.bash hook)"  # Required to activate conda envs
@@ -228,6 +227,14 @@ if  [[ "$OSTYPE" == "msys"* ]]; then
 fi
 green "Using temp folder: $tmp_dir"
 
+green_n "ClearMap keeps its configuration (machine parameters, user defaults) in a folder of its own.
+Press Enter for the default (~/.clearmap, or the folder of CLEARMAP_CFG_DIR if it is set), or give an other path
+(on a cluster, a folder of the project that the jobs can write to). Default: ~/.clearmap"
+read -r cfg_dir
+if [ -n "$cfg_dir" ]; then
+    export CLEARMAP_CFG_DIR="$cfg_dir"  # Settings reads it (and expands "~"); the folder is created below
+fi
+
 python -c "$prep_python \
 from ClearMap.Utils.install_utils import patch_env; \
 patch_env(os.path.join(os.getcwd(), '$ENV_FILE_PATH'), 'tmp_env_file.yml', use_cuda_torch=$USE_TORCH, pip_mode=$pip_mode, use_spyder=$USE_SPYDER, tmp_dir='$tmp_dir')" || exit 1
@@ -277,11 +284,20 @@ green "Done"
 echo
 echo "========================="
 echo
-# Create config folder if missing
-green "Checking if ClearMap configuration directory exists at \"$config_folder\""
-if [ ! -d "$config_folder" ]; then
-    yellow "Config folder missing, creating it"
-    mkdir "$config_folder" || exit 1
+# Create config folder if missing (~/.clearmap, or $CLEARMAP_CFG_DIR given above: Settings decides, not this script)
+config_folder=$(python -c "$prep_python \
+from ClearMap.Utils.install_utils import ensure_config_folder; \
+print(ensure_config_folder())" | tail -n 1)
+if [ -z "$config_folder" ]; then
+    red "ERROR: could not create the ClearMap configuration directory"
+    exit 1
+fi
+green "ClearMap configuration directory: \"$config_folder\""
+if [ -n "$CLEARMAP_CFG_DIR" ]; then
+    # Absolute path, for the python processes below (they run from $HOME) and for the ones started in this environment:
+    # the folder cannot be a setting of ClearMap, since the machine parameters are read from it
+    export CLEARMAP_CFG_DIR="$config_folder"
+    conda env config vars set "CLEARMAP_CFG_DIR=$config_folder" || exit 1
 fi
 
 # Install or update ClearMap config
