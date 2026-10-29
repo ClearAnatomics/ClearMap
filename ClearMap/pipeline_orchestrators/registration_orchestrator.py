@@ -43,6 +43,7 @@ if TYPE_CHECKING:
 
 LANDMARKS_WEIGHT_MIN = 1 / 20000  # The start of the geometric scale (at 0 percent, which is no landmarks: weight 0)
 LANDMARKS_WEIGHT_MAX = 200  # The weight elastix gives to the landmarks at 100 percent
+DEFAULT_ATLAS_CACHE_FOLDER_NAME = 'atlas_cache'  # In the ClearMap config folder, when the machine config has none
 
 
 def elastix_landmarks_weight(percent: float) -> float:
@@ -558,8 +559,16 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
 
     @property
     def atlas_cache_dir(self) -> Path:
-        """Where reoriented / cropped atlases are stored (machine config 'atlas_cache_folder')."""
-        return Path(self.machine_config['atlas_cache_folder']).expanduser()
+        """
+        Where reoriented / cropped atlases are stored (machine config 'atlas_cache_folder').
+
+        When the setting is empty: the folder "atlas_cache" of the ClearMap config folder, so that it follows
+        ``CLEARMAP_CFG_DIR`` and is not in the home of a user who has no space there.
+        """
+        cache_folder = self.machine_config['atlas_cache_folder']
+        if not cache_folder:
+            return Path(settings.clearmap_cfg_dir) / DEFAULT_ATLAS_CACHE_FOLDER_NAME
+        return Path(cache_folder).expanduser()
 
     @property
     def source_annotator(self) -> Annotation:

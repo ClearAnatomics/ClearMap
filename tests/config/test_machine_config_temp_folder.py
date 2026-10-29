@@ -44,7 +44,7 @@ def test_the_temp_folder_is_set_again_at_each_boot_without_damage(machine_cfg_pa
         MachineConfig()._patch_temp_dir_cfg('/data/tmp')
 
     assert yaml.safe_load(machine_cfg_path.read_text())['temp_folder'] == '/data/tmp'
-    assert MachineConfig().get('atlas_cache_folder') == '~/.clearmap/atlas_cache'
+    assert MachineConfig().get('atlas_cache_folder') is None
     assert MachineConfig().get('particle_plot_z_sphere_radius') == 3
 
 

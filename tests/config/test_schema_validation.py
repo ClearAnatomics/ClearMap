@@ -108,3 +108,20 @@ def test_the_reference_channel_is_a_channel_undecided_or_none(schemas_dir: Path,
     config['reference_channel'] = reference_channel
 
     assert (not list(Validator(schema, registry=schema_registry).iter_errors(config))) is valid
+
+
+@pytest.mark.parametrize('atlas_cache_folder, valid', [(None, True), ('/data/atlases', True), ('', True), (12, False)])
+def test_the_machine_config_validates_with_the_atlas_cache_folder_a_path_or_none(src_dir: Path, schemas_dir: Path,
+                                                                                 schema_registry, atlas_cache_folder,
+                                                                                 valid):
+    schema = _load_schema(schemas_dir / 'machine.schema.yaml')
+    config = _load_yaml(src_dir / 'machine.yml')
+    config['atlas_cache_folder'] = atlas_cache_folder
+
+    assert (not list(Validator(schema, registry=schema_registry).iter_errors(config))) is valid
+
+
+def test_the_machine_config_of_the_package_validates(src_dir: Path, schemas_dir: Path, schema_registry):
+    schema = _load_schema(schemas_dir / 'machine.schema.yaml')
+
+    assert not list(Validator(schema, registry=schema_registry).iter_errors(_load_yaml(src_dir / 'machine.yml')))
