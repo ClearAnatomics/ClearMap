@@ -488,15 +488,11 @@ class SampleInfoTab(ExperimentTab):
         if self._preparation_offered and not force:
             return
 
-        sm = self.sample_manager
+        stitching_worker = self.exp_controller.get_worker('stitching')
         candidates: list[tuple[str, str]] = []  # tuples of channel, btn_title
-        for ch in sm.pipeline_ready_channels:
-            if sm.is_tiled(ch):
-                if force or not sm.has_npy(ch):
-                    candidates.append((ch, 'convert tiles'))
-            else:
-                if force or not sm.get('stitched', channel=ch).exists:
-                    candidates.append((ch, 'stack/import'))
+        for ch in self.sample_manager.pipeline_ready_channels:
+            if stitching_worker.needs_raw_data_preparation(ch, force):
+                candidates.append((ch, 'convert tiles' if self.sample_manager.is_tiled(ch) else 'stack/import'))
 
         self._preparation_offered = True
 
@@ -509,7 +505,6 @@ class SampleInfoTab(ExperimentTab):
                                                     f'{details}\n\nThis prepares raw data for processing.'):
             return
 
-        stitching_worker = self.exp_controller.get_worker('stitching')
         self.wrap_step(f'Preparing {len(candidates)} channel(s)',
                        stitching_worker.prepare_all_channels_raw_data,
                        step_kw_args={'force': force}, n_steps=len(candidates), nested=False)
