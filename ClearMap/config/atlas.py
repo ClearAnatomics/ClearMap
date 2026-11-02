@@ -27,6 +27,9 @@ STRUCTURE_TREE_NAMES_MAP = {
 }
 
 
+ATLAS_COMPONENT_NAMES = ('annotation', 'hemispheres', 'reference', 'distance_to_surface')
+"""The files of an atlas: ``<base name>_<component>.tif``."""
+
 ATLAS_CACHE_SUBFOLDER_NAME = 'atlases'
 """In the cache folder of ClearMap: where the atlases shipped compressed are decompressed."""
 

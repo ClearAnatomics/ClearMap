@@ -53,15 +53,13 @@ from ClearMap.IO.assets_constants import COMPRESSION_ALGORITHMS
 from ClearMap.Utils.exceptions import AssetNotFoundError
 
 from ClearMap.Visualization import Color as col
-from ClearMap.config.atlas import STRUCTURE_TREE_NAMES_MAP, ATLAS_CACHE_SUBFOLDER_NAME, get_decompressed_atlases_dir
+from ClearMap.config.atlas import (STRUCTURE_TREE_NAMES_MAP, ATLAS_COMPONENT_NAMES, ATLAS_CACHE_SUBFOLDER_NAME,
+                                   get_decompressed_atlases_dir)
 
 
 ###############################################################################
 # ## Atlas Structures
 ###############################################################################
-
-ATLAS_COMPONENT_NAMES = ('annotation', 'hemispheres', 'reference', 'distance_to_surface')
-
 
 def decompress_atlases(atlas_base_name):
     """
