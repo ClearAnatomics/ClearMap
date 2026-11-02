@@ -1,23 +1,35 @@
-import os
 import argparse
-import glob
+from pathlib import Path
 
-from tqdm import tqdm
+from ClearMap import Settings as settings
+from ClearMap.config.atlas import DERIVED_ATLAS_NAME_RE, get_atlas_cache_dir, get_decompressed_atlases_dir
+from ClearMap.config.early_boot import MachineConfig
 
-from ClearMap.Settings import atlas_folder
+
+def get_derived_atlas_folders():
+    """The folders that can hold derived atlases: where the former versions wrote them, and where they are now."""
+    return [Path(settings.atlas_folder),
+            get_decompressed_atlases_dir(),  # when no target directory is given, next to the source atlas
+            get_atlas_cache_dir(MachineConfig().get('atlas_cache_folder'))]
+
+
+def find_derived_atlases():
+    return [path for folder in get_derived_atlas_folders() if folder.is_dir()
+            for path in sorted(folder.iterdir()) if DERIVED_ATLAS_NAME_RE.match(path.name)]
 
 
 def clear_atlas_caches(verbose=False):
-    atlas_cached_paths = glob.glob(f'{atlas_folder}{os.sep}ABA_*None*.tif')
+    atlas_cached_paths = find_derived_atlases()
 
     if verbose:
+        from tqdm import tqdm
         print(f'Found {len(atlas_cached_paths)} files, deleting')
 
         for f_path in tqdm(atlas_cached_paths):
-            os.remove(f_path)
+            f_path.unlink()
     else:
         for f_path in atlas_cached_paths:
-            os.remove(f_path)
+            f_path.unlink()
 
 
 def main():

@@ -2,6 +2,7 @@
 A simple configuration module for the atlases. This is parsed by the ClearMap GUI to
 display the available atlases, and says where the atlases are kept.
 """
+import re
 from pathlib import Path
 
 from ClearMap import Settings as settings
@@ -35,6 +36,15 @@ ATLAS_CACHE_SUBFOLDER_NAME = 'atlases'
 
 DEFAULT_ATLAS_CACHE_FOLDER_NAME = 'atlas_cache'
 """In the ClearMap config folder: where the reoriented / cropped atlases are, when the machine config has no folder."""
+
+
+DERIVED_ATLAS_NAME_RE = re.compile(rf'^.+_(?:{"|".join(ATLAS_COMPONENT_NAMES)})_-?\d+_-?\d+_-?\d+_.+\.tif$')
+"""
+The name of an atlas file derived from a shipped one, reoriented or cropped:
+``<base name>_<component>_<x>_<y>_<z>_<slicing>.tif`` (see ``Annotation.get_atlas_filepath``), for any atlas, the ones
+that were added to ClearMap included. The slicing is not matched by what it contains (``None`` is there only when a step
+is not set), but by being there: the shipped files are ``<base name>_<component>.tif``.
+"""
 
 
 def get_decompressed_atlases_dir() -> Path:
