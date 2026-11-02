@@ -494,7 +494,7 @@ def uncompress(file_path, extension='zip', check=True, verbose=False):
     Arguments
     ---------
     file_path : str or pathlib.Path
-        The file path to search for.
+        The file path to search for, or the compressed file itself (its algorithm is then read from its suffix).
     extension : str
         The extension for the compressed file.
     check : bool
@@ -508,8 +508,9 @@ def uncompress(file_path, extension='zip', check=True, verbose=False):
         The uncompressed filename or None if failed.
     """
     file_path = Path(file_path)
-    if file_path.exists() and file_path.suffix in COMPRESSION_ALGORITHMS:
-        return uncompress(file_path.with_suffix(''), extension=file_path.suffix, check=check, verbose=verbose)
+    algorithm = file_path.suffix.lstrip('.')  # the suffix has the dot, the algorithms do not
+    if file_path.exists() and algorithm in COMPRESSION_ALGORITHMS:  # the compressed file itself
+        return uncompress(file_path.with_suffix(''), extension=algorithm, check=check, verbose=verbose)
     if not file_path.exists() or not check:
         if extension == 'auto':
             for algo in COMPRESSION_ALGORITHMS:

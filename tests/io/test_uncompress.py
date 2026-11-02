@@ -96,3 +96,36 @@ def test_the_compression_algorithms_of_the_file_utils_are_the_ones_of_the_assets
     from ClearMap.IO import assets_constants
 
     assert fu.COMPRESSION_ALGORITHMS is assets_constants.COMPRESSION_ALGORITHMS
+
+
+@pytest.mark.parametrize('extension', sorted(OPENERS))
+def test_given_the_compressed_file_itself_the_file_is_decompressed_next_to_it(tmp_path, extension):
+    archive = tmp_path / f'atlas.tif.{extension}'
+    archive.write_bytes(OPENERS[extension](CONTENT))
+
+    path = fu.uncompress(archive)
+
+    assert path == tmp_path / 'atlas.tif'
+    assert path.read_bytes() == CONTENT
+
+
+def test_given_a_zip_of_an_image_itself_the_image_is_decompressed_next_to_it(tmp_path):
+    with zipfile.ZipFile(tmp_path / 'atlas.tif.zip', 'w') as archive:
+        archive.writestr('atlas.tif', CONTENT)
+
+    path = fu.uncompress(tmp_path / 'atlas.tif.zip')
+
+    assert path == tmp_path / 'atlas.tif'
+    assert path.read_bytes() == CONTENT
+
+
+def test_given_the_compressed_file_itself_an_existing_file_is_kept_unless_not_checked(tmp_path):
+    archive = tmp_path / 'atlas.tif.lzma'
+    archive.write_bytes(lzma.compress(CONTENT))
+    (tmp_path / 'atlas.tif').write_bytes(b'prepared')
+
+    fu.uncompress(archive)
+    assert (tmp_path / 'atlas.tif').read_bytes() == b'prepared'
+
+    fu.uncompress(archive, check=False)
+    assert (tmp_path / 'atlas.tif').read_bytes() == CONTENT
