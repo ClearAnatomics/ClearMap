@@ -53,7 +53,7 @@ from ClearMap.IO.assets_constants import COMPRESSION_ALGORITHMS
 from ClearMap.Utils.exceptions import AssetNotFoundError
 
 from ClearMap.Visualization import Color as col
-from ClearMap.config.atlas import STRUCTURE_TREE_NAMES_MAP
+from ClearMap.config.atlas import STRUCTURE_TREE_NAMES_MAP, ATLAS_CACHE_SUBFOLDER_NAME, get_decompressed_atlases_dir
 
 
 ###############################################################################
@@ -61,9 +61,6 @@ from ClearMap.config.atlas import STRUCTURE_TREE_NAMES_MAP
 ###############################################################################
 
 ATLAS_COMPONENT_NAMES = ('annotation', 'hemispheres', 'reference', 'distance_to_surface')
-
-ATLAS_CACHE_SUBFOLDER_NAME = 'atlases'
-"""Where, in the cache folder of ClearMap, the atlases are decompressed when they are not next to their archive."""
 
 
 def decompress_atlases(atlas_base_name):
@@ -74,7 +71,7 @@ def decompress_atlases(atlas_base_name):
     folder, never in the atlas folder, which is read-only on a cluster.
     """
     paths = {}
-    cache_dir = Path(settings.clearmap_cache_dir) / ATLAS_CACHE_SUBFOLDER_NAME
+    cache_dir = get_decompressed_atlases_dir()
     for atlas_type in ATLAS_COMPONENT_NAMES:
         file_name = f'{atlas_base_name}_{atlas_type}.tif'
         paths[atlas_type] = str(fu.find_or_build(file_name, source_dir=settings.atlas_folder, cache_dir=cache_dir,
