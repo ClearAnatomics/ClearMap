@@ -49,6 +49,7 @@ from ClearMap.Alignment.Resampling import orientation_to_transposition, format_o
 import ClearMap.Utils.HierarchicalDict as hdict
 
 from ClearMap.Alignment.utils import create_label_table
+from ClearMap.IO.assets_constants import COMPRESSION_ALGORITHMS
 from ClearMap.Utils.exceptions import AssetNotFoundError
 
 from ClearMap.Visualization import Color as col
@@ -82,13 +83,13 @@ def decompress_atlases(atlas_base_name):
 
 
 def _decompress_atlas_file(file_name, destination):
-    for algorithm in fu.COMPRESSION_ALGORITHMS:
+    for algorithm in COMPRESSION_ALGORITHMS:
         compressed_path = Path(settings.atlas_folder) / f'{file_name}.{algorithm}'
         if compressed_path.exists():
             fu.decompress_file(compressed_path, destination)
             return
     raise AssetNotFoundError(f'Neither {file_name} nor a compressed version of it '
-                             f'({", ".join(fu.COMPRESSION_ALGORITHMS)}) is in {settings.atlas_folder}. '
+                             f'({", ".join(COMPRESSION_ALGORITHMS)}) is in {settings.atlas_folder}. '
                              f'Check the atlas name or reinstall ClearMap.')
 
 

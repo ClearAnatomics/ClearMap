@@ -31,6 +31,7 @@ import warnings
 
 from pathlib import Path
 
+from ClearMap.IO.assets_constants import COMPRESSION_ALGORITHMS
 from ClearMap.IO.source.backends import registry
 from ClearMap.Utils.exceptions import (ClearMapFileNotFoundError, ClearMapIoException, ClearMapNotImplementedError,
                                        ClearMapValueError, Severity)
@@ -416,9 +417,6 @@ def atomic_write_bytes(data: bytes, location) -> None:
 
 def _write_bytes(path: str, data: bytes) -> None:
     Path(path).write_bytes(data)
-
-
-COMPRESSION_ALGORITHMS = ('zip', 'bz2', 'gzip', 'lzma')
 
 
 def decompress_file(compressed_path, destination, member=None):

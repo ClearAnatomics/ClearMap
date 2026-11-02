@@ -90,3 +90,9 @@ def test_a_zip_of_several_files_is_extracted_whole_next_to_it(tmp_path):
 
     assert (tmp_path / 'other.txt').read_bytes() == b'other'
     assert (tmp_path / 'tables.npy').read_bytes() == CONTENT
+
+
+def test_the_compression_algorithms_of_the_file_utils_are_the_ones_of_the_assets():
+    from ClearMap.IO import assets_constants
+
+    assert fu.COMPRESSION_ALGORITHMS is assets_constants.COMPRESSION_ALGORITHMS
