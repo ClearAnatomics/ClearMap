@@ -49,7 +49,6 @@ excluded_pyx = ['_Old', '_Todo', 'StatisticsPointListCode', 'flow', 'Orientation
 
 data_dirs = [
     'ClearMap/External/elastix',
-    'ClearMap/External/geodesic_distance',
     'ClearMap/Resources',
     'ClearMap/ImageProcessing/Skeletonization',   # .npy and .npy.zip
     'ClearMap/ImageProcessing/Binary',  # .npy and .npy.zip
@@ -288,7 +287,7 @@ def main():
         ext_modules = cythonize(extensions, nthreads=N_PROCS, quiet=True, force=FORCE)
 
     packages = find_packages(exclude=('doc', 'tests*', 'pickle_python_2', 'deprecated',
-                                      'ClearMap.External.elastix', 'ClearMap.External.geodesic_distance'))
+                                      'ClearMap.External.elastix'))
     data_files = get_data_files()
 
     setup(
