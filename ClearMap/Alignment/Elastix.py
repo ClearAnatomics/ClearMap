@@ -100,6 +100,10 @@ except ImportError:
 # Initialization and Settings
 ##############################################################################
 
+BIN_POINT_FILE_INTEGER_DTYPE = np.int64
+"""The type of the two integers (index flag, number of points) that start a ``.bin`` point file, the format of the
+patched elastix build shipped with ClearMap."""
+
 elastix_binary = None
 """The elastix executable.
 
@@ -965,17 +969,8 @@ def write_points(filename, points, indices=False, binary=True):
 
     if binary:
         with open(filename, 'wb') as point_file:
-            if get_elastix_version() < Version('5'):
-                dtype = np.int64
-            else:
-                dtype = np.uint64
-            if indices:
-                np.array(1, dtype=dtype).tofile(point_file)
-            else:
-                np.array(0, dtype=dtype).tofile(point_file)
-
-            num_points = np.array(len(points), dtype=np.int64)
-            num_points.tofile(point_file)
+            np.array(1 if indices else 0, dtype=BIN_POINT_FILE_INTEGER_DTYPE).tofile(point_file)
+            np.array(len(points), dtype=BIN_POINT_FILE_INTEGER_DTYPE).tofile(point_file)
 
             points = np.asarray(points, dtype=np.double)
             points.tofile(point_file)
@@ -1010,12 +1005,8 @@ def read_points(filename, indices=False, binary=True):
 
     if binary:
         with open(filename) as f:
-            if get_elastix_version() < Version('5'):
-                dtype = np.int64
-            else:
-                dtype = np.uint64
-            _ = np.fromfile(f, dtype=dtype, count=1)[0]  # Discard the index flag
-            num_points = np.fromfile(f, dtype=dtype, count=1)[0]
+            _ = np.fromfile(f, dtype=BIN_POINT_FILE_INTEGER_DTYPE, count=1)[0]  # Discard the index flag
+            num_points = np.fromfile(f, dtype=BIN_POINT_FILE_INTEGER_DTYPE, count=1)[0]
             if num_points == 0:
                 points = np.zeros((0, 3))
             else:
