@@ -73,6 +73,7 @@ from io import UnsupportedOperation
 from pathlib import Path
 
 import numpy as np
+from packaging.version import InvalidVersion, Version
 
 import ClearMap.Settings as settings
 from ClearMap.Utils.utilities import sanitize_n_processes
@@ -281,16 +282,19 @@ def get_elastix_version():
 
     Returns
     -------
-    version : str
-      The elastix version.
+    version : Version
+      The elastix version, from "elastix version: 5.3.1" (stock releases) or "elastix version: 4.900" (the patched
+      build shipped with ClearMap).
     """
     check_elastix_initialized()
 
     cmd = [elastix_binary, '--version']
-    res = subprocess.check_output(cmd)
-    res = res.decode('utf-8')
-    version = float(res.splitlines()[0].split(':')[-1].strip())
-    return version
+    output = subprocess.check_output(cmd).decode('utf-8')
+    try:
+        return Version(output.splitlines()[0].split(':')[-1].strip())
+    except (IndexError, InvalidVersion) as err:
+        raise ClearMapRuntimeError(f'Could not read the elastix version from the output of "{elastix_binary} '
+                                   f'--version": {output!r}; expected a line like "elastix version: 5.3.1"') from err
 
 
 if 'sphinx' in sys.modules.keys():
@@ -961,7 +965,7 @@ def write_points(filename, points, indices=False, binary=True):
 
     if binary:
         with open(filename, 'wb') as point_file:
-            if get_elastix_version() < 5:
+            if get_elastix_version() < Version('5'):
                 dtype = np.int64
             else:
                 dtype = np.uint64
@@ -1006,7 +1010,7 @@ def read_points(filename, indices=False, binary=True):
 
     if binary:
         with open(filename) as f:
-            if get_elastix_version() < 5:
+            if get_elastix_version() < Version('5'):
                 dtype = np.int64
             else:
                 dtype = np.uint64
