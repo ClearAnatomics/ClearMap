@@ -80,7 +80,7 @@ from ClearMap.Utils.utilities import sanitize_n_processes
 from ClearMap.IO import conversion, io_ops
 from ClearMap.IO.FileUtils import atomic_write
 from ClearMap.IO.source.backends.tif_backend import TifSource
-from ClearMap.Utils.exceptions import ClearMapValueError, ClearMapRuntimeError
+from ClearMap.Utils.exceptions import ClearMapIoException, ClearMapValueError, ClearMapRuntimeError
 
 from ClearMap.IO.elastix_config import ElastixParser
 
@@ -103,6 +103,9 @@ except ImportError:
 BIN_POINT_FILE_INTEGER_DTYPE = np.int64
 """The type of the two integers (index flag, number of points) that start a ``.bin`` point file, the format of the
 patched elastix build shipped with ClearMap."""
+
+BIN_POINT_FILE_HEADER_LENGTH = 2
+"""The number of integers (index flag, number of points) that start a ``.bin`` point file."""
 
 elastix_binary = None
 """The elastix executable.
@@ -987,6 +990,29 @@ def write_points(filename, points, indices=False, binary=True):
     return filename
 
 
+def _check_bin_point_file_header(filename, header):
+    """Raise if the size of a ``.bin`` point file is not the one its header implies.
+
+    The file is the header (index flag, number of points) followed by 3 float64 per point. A header or coordinates
+    of another width break this. A different signedness of the header integers does not: the bytes are the same
+    for every value below 2**63.
+    """
+    point_dtype_size = np.dtype(np.double).itemsize
+    header_size = BIN_POINT_FILE_HEADER_LENGTH * np.dtype(BIN_POINT_FILE_INTEGER_DTYPE).itemsize
+    if len(header) != BIN_POINT_FILE_HEADER_LENGTH:
+        raise ClearMapIoException(f'{filename} is too short to be a .bin point file: expected a header of '
+                                  f'{BIN_POINT_FILE_HEADER_LENGTH} {np.dtype(BIN_POINT_FILE_INTEGER_DTYPE)} integers '
+                                  f'({header_size} bytes), found {len(header)}')
+    index_flag, num_points = (int(value) for value in header)
+    expected_size = header_size + num_points * 3 * point_dtype_size
+    actual_size = Path(filename).stat().st_size
+    if index_flag not in (0, 1) or actual_size != expected_size:
+        raise ClearMapIoException(f'{filename} is not a valid .bin point file: its header reads as index flag '
+                                  f'{index_flag} and {num_points} points, which would make {expected_size} bytes '
+                                  f'(a {np.dtype(BIN_POINT_FILE_INTEGER_DTYPE)} header, float64 coordinates), '
+                                  f'but the file has {actual_size}')
+
+
 def read_points(filename, indices=False, binary=True):
     """Parses the output points from the output file of transformix
 
@@ -1005,13 +1031,10 @@ def read_points(filename, indices=False, binary=True):
 
     if binary:
         with open(filename) as f:
-            _ = np.fromfile(f, dtype=BIN_POINT_FILE_INTEGER_DTYPE, count=1)[0]  # Discard the index flag
-            num_points = np.fromfile(f, dtype=BIN_POINT_FILE_INTEGER_DTYPE, count=1)[0]
-            if num_points == 0:
-                points = np.zeros((0, 3))
-            else:
-                points = np.fromfile(f, dtype=np.double)
-                points = np.reshape(points, (num_points, 3))
+            header = np.fromfile(f, dtype=BIN_POINT_FILE_INTEGER_DTYPE, count=BIN_POINT_FILE_HEADER_LENGTH)
+            _check_bin_point_file_header(filename, header)
+            num_points = int(header[1])
+            points = np.fromfile(f, dtype=np.double).reshape(num_points, 3)
     else:  # text file
         with open(filename) as f:
             lines = f.readlines()
