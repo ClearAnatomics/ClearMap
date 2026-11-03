@@ -320,7 +320,11 @@ class CellDetector(ChannelPipelineOrchestrator):
 
         return coords
 
-    def filter_cells(self, distance_from_surface_px: int = 0):
+    def filter_cells(self):
+        """
+        Keep the detected cells that are within the size and intensity thresholds of the config
+        and, if cell_filtration.distance_from_surface_px is above 0, farther from the surface of the brain than that.
+        """
         thresholds = {
             'source': self.config['cell_filtration']['thresholds']['intensity'],
             'size': self.config['cell_filtration']['thresholds']['size']
@@ -331,12 +335,21 @@ class CellDetector(ChannelPipelineOrchestrator):
                                               f' cannot filter cells. Please run cell detection first.')
         dest_path = self.get_path('cells', channel=self.channel, asset_sub_type='filtered')
         cell_detection.filter_cells(source=src_path, sink=dest_path, thresholds=thresholds)
+        # Absent from the config of the samples made before the distance was a setting: no filtering, as then
+        distance_from_surface_px = self.config['cell_filtration'].get('distance_from_surface_px', 0)
         if distance_from_surface_px > 0:
-            table, filtered_coords = self.get_coords(coord_type='filtered')
-            uncrusted_coords, mask = self.remove_crust(coordinates=filtered_coords,
-                                                       threshold=distance_from_surface_px, return_mask=True)
-            table = table[mask]
-            io_ops.write(dest_path, table)  # Overwrite filtered with uncrusted
+            self._remove_cells_close_to_the_surface(dest_path, distance_from_surface_px)
+
+    def _remove_cells_close_to_the_surface(self, filtered_cells_path, distance_from_surface_px: int):
+        """Overwrite the filtered cells with those farther than distance_from_surface_px (atlas voxels) from the surface"""
+        if not self.registration_processor.was_registered:
+            raise MissingRequirementException(
+                f'The cells of channel "{self.channel}" cannot be filtered by their distance from the surface of the '
+                f'brain: the sample is not registered to the atlas. Register the sample or set the distance to 0.')
+        table, coordinates = self.get_coords(coord_type='filtered')
+        _, farther_than_threshold = self.remove_crust(coordinates=self.transform_coordinates(coordinates),
+                                                      threshold=distance_from_surface_px, return_mask=True)
+        io_ops.write(filtered_cells_path, table[farther_than_threshold])
 
     def run_cell_detection(self, tuning=False, save_maxima=False, save_shape=False, save_as_binary_mask=False):
         self.workspace.debug = tuning  # TODO: use context manager
@@ -566,7 +579,7 @@ class CellDetector(ChannelPipelineOrchestrator):
     def remove_crust(self, coordinates=None, threshold=3, return_mask=False):  # TODO: Add inplace option
         if coordinates is None:
             coordinates = self.get_coords('filtered', aligned=True)
-        distance_to_surface = self.get('atlas', channel=self.channel, asset_sub_type='distance').read()
+        distance_to_surface = self.get('atlas', channel=self.channel, asset_sub_type='distance_to_surface').read()
 
         # Convert coordinates to integer and insure they are within the distance_to_surface array bounds
         int_coordinates = np.floor(coordinates).astype(int)  # TODO: check if floor required
@@ -580,7 +593,9 @@ class CellDetector(ChannelPipelineOrchestrator):
 
         uncrusted_coordinates = valid_coordinates[dist_values > threshold]
         if return_mask:
-            return uncrusted_coordinates, distance_to_surface[tuple(int_coordinates.T)] > threshold
+            farther_than_threshold = np.zeros(len(int_coordinates), dtype=bool)  # Outside the atlas is not in the brain
+            farther_than_threshold[within_atlas] = dist_values > threshold
+            return uncrusted_coordinates, farther_than_threshold
         else:
             return uncrusted_coordinates
 

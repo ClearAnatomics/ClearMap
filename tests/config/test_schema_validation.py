@@ -125,3 +125,17 @@ def test_the_machine_config_of_the_package_validates(src_dir: Path, schemas_dir:
     schema = _load_schema(schemas_dir / 'machine.schema.yaml')
 
     assert not list(Validator(schema, registry=schema_registry).iter_errors(_load_yaml(src_dir / 'machine.yml')))
+
+
+@pytest.mark.parametrize('bad_distance', [-1, 2.5, True, 'near'])
+def test_cell_filter_distance_from_surface_must_be_a_non_negative_integer(src_dir: Path, schemas_dir: Path,
+                                                                          schema_registry, bad_distance):
+    schema = _load_schema(schemas_dir / 'cell_map.schema.yaml')
+    validator = Validator(schema, registry=schema_registry)
+    cfg = _load_yaml(src_dir / 'cell_map.yml')
+    cfg['channels'] = {'cells': deepcopy(cfg['templates']['channel'])}  # The schema is the one of the channels
+    assert not list(validator.iter_errors(cfg))
+
+    cfg['channels']['cells']['cell_filtration']['distance_from_surface_px'] = bad_distance
+
+    assert list(validator.iter_errors(cfg)), f'{bad_distance!r} should not be a valid distance from the surface'

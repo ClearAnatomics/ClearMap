@@ -20,6 +20,7 @@ templates:
       thresholds:
         size: [50, 900]
         intensity: null
+      distance_from_surface_px: 0
     voxelization:
       radii: [5, 5, 5]
       weights: null

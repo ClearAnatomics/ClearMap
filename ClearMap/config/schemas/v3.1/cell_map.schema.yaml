@@ -66,6 +66,7 @@ properties:
                   anyOf:
                     - { $ref: "./typedefs.schema.yaml#/$defs/integerPairNonNegative" }
                     - { type: "null" }
+            distance_from_surface_px: { $ref: "./typedefs.schema.yaml#/$defs/nonNegativeInteger" }
 
         voxelization:
           type: object
