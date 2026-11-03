@@ -14,7 +14,7 @@ import tifffile
 from scipy import ndimage
 
 from ClearMap.Alignment.Stitching import layout_graph_utils, stitching_rigid
-from ClearMap.Utils.exceptions import MissingRequirementException
+from ClearMap.Utils.exceptions import AssetNotFoundError, MissingRequirementException
 
 from .conftest import RAW_FOLDER_NAME
 
@@ -303,3 +303,28 @@ def test_the_raw_data_of_a_channel_which_is_not_tiled_is_prepared_by_importing_i
     assert stitching.get('stitched', channel='prestitched').exists
     assert stitching.prepare_all_channels_raw_data() == []
     assert set(stitching.prepare_all_channels_raw_data(force=True)) == {'main', 'derived', 'prestitched'}
+
+
+def _point_main_to_a_folder_without_tiles(experiment, tmp_path):
+    """A typo in the path of the tiles (P0014): the expression is a tiled one, no file matches it"""
+    path = tmp_path / RAW_FOLDER_NAME / 'typo' / 'main_X<X,2>.ome.tif'
+    experiment.apply_ui_patch({'sample': {'channels': {'main': {'path': str(path)}}},
+                               'stitching': {'channels': {'main': {'use_npy': True}}}})
+
+
+def test_preparing_the_raw_data_of_a_channel_without_tiles_says_so_and_prepares_the_others(stitching, experiment,
+                                                                                          tmp_path):
+    _point_main_to_a_folder_without_tiles(experiment, tmp_path)
+    experiment.apply_ui_patch({'stitching': {'channels': {'derived': {'use_npy': True}}}})
+
+    with pytest.raises(AssetNotFoundError, match='main'):
+        stitching.prepare_all_channels_raw_data()
+
+    assert stitching.sample_manager.has_npy('derived')
+
+
+def test_converting_the_tiles_of_a_channel_without_tiles_says_so(stitching, experiment, tmp_path):
+    _point_main_to_a_folder_without_tiles(experiment, tmp_path)
+
+    with pytest.raises(AssetNotFoundError, match='main'):
+        stitching.prepare_channel_raw_data('main')

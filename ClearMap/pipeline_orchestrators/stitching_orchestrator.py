@@ -17,7 +17,8 @@ from ClearMap.IO import IO as clearmap_io
 from ClearMap.IO.FileUtils import link_or_copy
 from ClearMap.IO.source.backends.tif_backend import parse_ome_info
 
-from ClearMap.Utils.exceptions import MissingRequirementException, ClearMapRuntimeError, MetadataError, NotAnOmeFile
+from ClearMap.Utils.exceptions import (AssetNotFoundError, MissingRequirementException, ClearMapRuntimeError,
+                                       MetadataError, NotAnOmeFile)
 from ClearMap.Utils.tag_expression import Expression
 from ClearMap.Utils.utilities import check_stopped, sanitize_n_processes
 
@@ -96,6 +97,9 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
             n_procs = self.config['performance']['file_conversion']['n_processes']
             n_procs = sanitize_n_processes(n_procs)
             file_list = asset.file_list
+            if not file_list and not asset.variant(extension='.npy').exists:  # Converting nothing does not fail
+                raise AssetNotFoundError(f'No tiles of channel "{channel}" match "{asset.expression}". '
+                                         f'Check the path of the tiles of the channel in the sample tab.')
             if not file_list or Path(file_list[0]).suffix == '.tif':
                 try:
                     asset.convert('.npy', processes=n_procs, workspace=self.workspace, verbose=self.verbose)
@@ -305,16 +309,21 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
             return []
 
         prepared = []
+        missing_files = []
         for channel in self.sample_manager.pipeline_ready_channels:
             try:
                 if self.needs_raw_data_preparation(channel, force):
                     self.prepare_channel_raw_data(channel)
                     prepared.append(channel)
+            except AssetNotFoundError as err:  # A FileNotFoundError, but the files are expected: the user must know
+                missing_files.append(str(err))
             except (KeyError, FileNotFoundError) as err:
                 # Channel is pipeline-ready (has a data_type) but has no raw
                 # asset in the workspace — e.g. path was left empty for
                 # pre-stitched data.  Skip without crashing.
                 warnings.warn(f'Skipping raw-data preparation for channel {channel!r}: {err}')
+        if missing_files:  # Once the other channels are prepared
+            raise AssetNotFoundError('\n'.join(missing_files))
         return prepared
 
     def copy_or_stack(self, channel):
