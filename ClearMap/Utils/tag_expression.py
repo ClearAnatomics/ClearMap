@@ -179,7 +179,7 @@ class Tag:
             else:
                 e += '('
             if self.ttype == TAG_INT or self.ttype is None:
-                e += '\d'
+                e += r'\d'
             else:  # self.ttype == TAG_STR:
                 e += '.'
             if self.width is not None:
