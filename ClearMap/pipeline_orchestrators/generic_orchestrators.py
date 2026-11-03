@@ -794,6 +794,15 @@ class PipelineOrchestrator(OrchestratorBase):
             self.workspace.process = None
             raise CanceledProcessing
 
+    def reset_stopped(self):
+        """
+        Forget a previous :meth:`stop_process`, to be called when a new run starts.
+
+        :attr:`stopped` is only set by :meth:`stop_process`, so without this call every step guarded by
+        :func:`~ClearMap.Utils.utilities.check_stopped` stays skipped after one abort.
+        """
+        self.stopped = False
+
     def run(self):
         """
         Execute the full processing pipeline for this orchestrator.
