@@ -254,10 +254,11 @@ def initialize_elastix(path=None):
     """
     global elastix_binary, elastix_lib, transformix_binary, initialized
 
-    if path is None and settings.elastix_path is not None:
+    if path is None:
         path = settings.elastix_path
-    else:
-        raise ClearMapRuntimeError('Cannot find elastix path!')
+    if path is None:
+        raise ClearMapRuntimeError('Cannot find the elastix path: give it to initialize_elastix(path) or set '
+                                   'elastix_path in the machine parameters')
 
     elastix_binary = search_elx_bin(path, 'elastix')
     transformix_binary = search_elx_bin(path, 'transformix')
