@@ -26,6 +26,11 @@ data from cleared tissues.
 > channel-centred workspace, colocalization analysis, and improved GUI.
 > Install by running `./install_gui.sh` and launch with `clearmap-ui`.
 
+> [!IMPORTANT]
+> **Smaller, more frequent releases.** 3.1 comes after a long wait. From here on, ClearMap is released in smaller
+> steps (3.2, 3.3, ...), each adding one theme (see [CHANGELOG.rst](CHANGELOG.rst)), so new releases will come
+> more often and fixes will not wait for a big one.
+
 
 ## 3.1 — What's new
 
