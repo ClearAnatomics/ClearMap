@@ -100,6 +100,9 @@ except ImportError:
 # Initialization and Settings
 ##############################################################################
 
+TRANSFORMIX_WORKING_DIRECTORY_PREFIX = 'clearmap_transformix_'
+"""The prefix of the private folders, in the temp folder, that hold the input and output of one transformix run."""
+
 BIN_POINT_FILE_INTEGER_DTYPE = np.int64
 """The type of the two integers (index flag, number of points) that start a ``.bin`` point file, the format of the
 patched elastix build shipped with ClearMap."""
@@ -754,6 +757,18 @@ def check_spaces(*paths):
             raise ClearMapValueError(f'Could not run elastix with path containing spaces: {p}')
 
 
+def _remove_working_directory(directory):
+    """Delete the private folder of one transformix run, and refuse any other folder.
+
+    Those folders are created by :func:`tempfile.mkdtemp` with the prefix :const:`TRANSFORMIX_WORKING_DIRECTORY_PREFIX`.
+    """
+    directory = Path(directory)
+    if not directory.name.startswith(TRANSFORMIX_WORKING_DIRECTORY_PREFIX):
+        raise ClearMapRuntimeError(f'Refusing to delete "{directory}": it is not a transformix working folder, '
+                                   f'its name does not start with "{TRANSFORMIX_WORKING_DIRECTORY_PREFIX}"')
+    shutil.rmtree(directory)
+
+
 def transform(source, sink='transformix', transform_parameter_file=None, transform_directory=None,
               result_directory=None):
     """Transform a raw data set to reference using the elastix alignment results.
@@ -787,20 +802,23 @@ def transform(source, sink='transformix', transform_parameter_file=None, transfo
     """
     check_elastix_initialized()
 
+    # A private folder for this run: jobs and processes may call transformix at the same time
+    working_directory = tempfile.mkdtemp(prefix=TRANSFORMIX_WORKING_DIRECTORY_PREFIX)
+
     # image
     source = io_ops.open_ro(source)
     if isinstance(source, TifSource):
         img_name = source.location
         delete_image = None
     else:
-        img_name = os.path.join(tempfile.gettempdir(), 'elastix_input.tif')
+        img_name = os.path.join(working_directory, 'elastix_input.tif')
         io_ops.write(img_name, source)
         delete_image = img_name
 
     # result directory
     delete_result_directory = None
     if result_directory is None:
-        result_dirname = os.path.join(tempfile.gettempdir(), 'elastix_output')
+        result_dirname = working_directory
         delete_result_directory = result_dirname
     else:
         result_dirname = result_directory
@@ -826,6 +844,8 @@ def transform(source, sink='transformix', transform_parameter_file=None, transfo
     # read data and clean up
     if delete_image is not None:
         os.remove(delete_image)
+    if result_dirname != working_directory:  # it only held the input image
+        _remove_working_directory(working_directory)
 
     if sink == 'transformix':
         return result_data_file(result_dirname)
@@ -839,7 +859,7 @@ def transform(source, sink='transformix', transform_parameter_file=None, transfo
         raise ClearMapRuntimeError('transform_data: sink not valid!')
 
     if delete_result_directory is not None:
-        shutil.rmtree(delete_result_directory)
+        _remove_working_directory(delete_result_directory)
 
     return result
 
@@ -873,10 +893,10 @@ def deformation_field(sink='transformix', transform_parameter_file=None, transfo
     """
     check_elastix_initialized()
 
-    # result directory
+    # result directory, private to this run: jobs and processes may call transformix at the same time
     delete_result_directory = None
     if result_directory is None:
-        result_dirname = os.path.join(tempfile.gettempdir(), 'elastix_output')
+        result_dirname = tempfile.mkdtemp(prefix=TRANSFORMIX_WORKING_DIRECTORY_PREFIX)
         delete_result_directory = result_dirname
     else:
         result_dirname = result_directory
@@ -911,7 +931,7 @@ def deformation_field(sink='transformix', transform_parameter_file=None, transfo
         raise ClearMapRuntimeError('deformation_field: sink not valid!')
 
     if delete_result_directory is not None:
-        shutil.rmtree(delete_result_directory)
+        _remove_working_directory(delete_result_directory)
 
     return result
 
@@ -1089,10 +1109,13 @@ def transform_points(source, sink=None, transform_parameter_file=None, transform
     """
     check_elastix_initialized()
 
+    # A private folder for this run: jobs and processes may call transformix at the same time
+    working_directory = tempfile.mkdtemp(prefix=TRANSFORMIX_WORKING_DIRECTORY_PREFIX)
+
     # input point file
     if temp_file is None:
         extension = "bin" if binary else "txt"
-        temp_file = os.path.join(tempfile.gettempdir(), f'elastix_input.{extension}')
+        temp_file = os.path.join(working_directory, f'elastix_input.{extension}')
 
     delete_point_file = None
     if isinstance(source, str):
@@ -1109,11 +1132,12 @@ def transform_points(source, sink=None, transform_parameter_file=None, transform
         delete_point_file = temp_file
         write_points(point_file, source, indices=indices, binary=binary)
     else:
+        _remove_working_directory(working_directory)  # nothing was written to it yet
         raise ClearMapRuntimeError(f'transform_points: source not string or array but "{type(source)}"!')
 
     # result directory
     if result_directory is None:
-        out_dirname = os.path.join(tempfile.gettempdir(), 'elastix_output')
+        out_dirname = working_directory
         delete_result_directory = out_dirname
     else:
         out_dirname = result_directory
@@ -1142,6 +1166,8 @@ def transform_points(source, sink=None, transform_parameter_file=None, transform
     # read data and clean up
     if delete_point_file is not None:
         os.remove(delete_point_file)
+    if out_dirname != working_directory:  # it only held the input point file
+        _remove_working_directory(working_directory)
 
     # read data / file
     extension = 'bin' if binary else 'txt'
@@ -1152,7 +1178,7 @@ def transform_points(source, sink=None, transform_parameter_file=None, transform
         transformed_points = read_points(os.path.join(out_dirname, output_file), indices=indices, binary=binary)
 
     if delete_result_directory:
-        shutil.rmtree(delete_result_directory)
+        _remove_working_directory(delete_result_directory)
 
     return io_ops.write(sink, transformed_points)
 

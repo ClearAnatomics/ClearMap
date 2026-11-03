@@ -222,10 +222,9 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         )
 
         for results_dir in results_directories:
-            # We copy the files to temporary directories to avoid conflicts during parallel processing
-            with (tempfile.TemporaryDirectory(suffix='_elastix_output') as temp_dir,
-                  tempfile.TemporaryDirectory(suffix='_elastix_params') as temp_params_dir,
-                  tempfile.NamedTemporaryFile(suffix='_elastix_input.bin', delete=False) as temp_file):
+            # We copy the parameter files to a temporary directory to avoid conflicts during parallel processing
+            # (transform_points keeps its input and output points in a folder of its own)
+            with tempfile.TemporaryDirectory(suffix='_elastix_params') as temp_params_dir:
 
 
                 # Copy the params files to avoid a race condition because they get edited by each process
@@ -242,11 +241,7 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
                 coords = elastix.transform_points(
                     coords, sink=None,
                     transform_directory=temp_params_dir,
-                    result_directory=temp_dir,
-                    temp_file=temp_file.name,
                     binary=True, indices=False)
-
-                Path(temp_file.name).unlink(missing_ok=True)
 
         return coords
 
