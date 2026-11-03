@@ -110,6 +110,10 @@ patched elastix build shipped with ClearMap."""
 BIN_POINT_FILE_HEADER_LENGTH = 2
 """The number of integers (index flag, number of points) that start a ``.bin`` point file."""
 
+ELASTIX_EXECUTABLE_FOLDERS = ('bin', '')
+"""The folders of an elastix installation that hold the executables, relative to its root: ``bin`` in the Linux
+and macOS releases, the root itself in the Windows release."""
+
 elastix_binary = None
 """The elastix executable.
 
@@ -220,6 +224,8 @@ def set_elastix_library_path(elastix_lib_path=None):
       If None :const:`ClearMap.Settings.elastix_path` is used.
     """
     os_name = platform.system().lower()
+    if os_name.startswith('windows'):
+        return  # Windows looks for the DLLs in the folder of the executable first: there is no variable to set
     if os_name.startswith('linux'):
         lib_var_name = 'LD_LIBRARY_PATH'
     elif os_name.startswith('darwin'):
@@ -272,20 +278,22 @@ def initialize_elastix(path=None):
 
 
 def search_elx_lib(path):
-    for sub_dir in ('lib', 'bin'):
-        lib_path = os.path.join(path, sub_dir)
-        if os.path.exists(lib_path):
-            return lib_path
+    for sub_dir in ('lib', 'bin', ''):
+        lib_path = Path(path) / sub_dir
+        if lib_path.exists():
+            return str(lib_path)
     else:
         raise ClearMapRuntimeError(f'Cannot find elastix libs in {lib_path} set path in Settings.py accordingly!')
 
 
 def search_elx_bin(path, bin_type):
-    elx = os.path.join(path, 'bin', bin_type)
-    if os.path.exists(elx):
-        return elx
-    else:
-        raise ClearMapRuntimeError(f'Cannot find elastix binary {elx}, set path in Settings.py accordingly!')
+    file_name = f'{bin_type}.exe' if platform.system() == 'Windows' else bin_type
+    candidates = [Path(path) / folder / file_name for folder in ELASTIX_EXECUTABLE_FOLDERS]
+    for elx in candidates:
+        if elx.exists():
+            return str(elx)
+    raise ClearMapRuntimeError(f'Cannot find elastix binary {file_name} in {" or ".join(map(str, candidates))}, '
+                               f'set path in Settings.py accordingly!')
 
 
 def get_elastix_version():
