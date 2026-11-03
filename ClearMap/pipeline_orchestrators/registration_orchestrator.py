@@ -487,7 +487,6 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
                 self.update_watcher_main_progress()
         except CanceledProcessing:
             print('Alignment canceled')
-        self.stopped = False
         self.publish(RegistrationStatusChanged())
 
     def align_channel(self, channel):
