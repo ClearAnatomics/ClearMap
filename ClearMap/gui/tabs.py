@@ -172,6 +172,13 @@ from ClearMap.pipeline_orchestrators.tube_map import BinaryVesselProcessorSteps
 
 INSUFFICIENT_V_RAM_TITLE = 'Insufficient VRAM'
 
+# The cell parameter of the histograms of the cell filters, from top to bottom, with the names (in cell_map_params.ui)
+# of the label and the controls of the filter it shows. The histogram goes above them.
+CELL_FILTER_HISTOGRAM_WIDGETS = {
+    'size': ('cellFilterSizeLabel', 'cellFilterThresholdSizeDoublet'),
+    'source': ('cellFilterIntensityLabel', 'cellFilterThresholdIntensityDoublet'),
+}
+
 
 def ui_task_progress(title_fn: Callable, steps_fn: Callable) -> Callable:
     """
@@ -1227,9 +1234,11 @@ class CellCounterTab(PostProcessingTab["CellDetector"]):
     def __plot_histogram(self, channel: str, cells_df: 'pd.DataFrame',
                          key: str, histogram: pg.PlotWidget | None) -> pg.PlotWidget:
         histogram = self.setup_cell_param_histogram(cells_df, histogram, key)
-        layout = self.get_channel_ui(channel).cellDetectionThresholdsLayout
-        hist_idx = 0 if key == 'size' else 1
-        ensure_inline_histogram(histogram, hist_idx, layout)
+        page = self.get_channel_ui(channel)
+        label_name, controls_name = CELL_FILTER_HISTOGRAM_WIDGETS[key]
+        position = list(CELL_FILTER_HISTOGRAM_WIDGETS).index(key)
+        ensure_inline_histogram(histogram, label=getattr(page, label_name), controls=getattr(page, controls_name),
+                                row=2 * position, layout=page.cellDetectionThresholdsLayout)
         return histogram
 
     def run_tuning_cell_detection(self, channel: str) -> None:

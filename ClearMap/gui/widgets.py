@@ -2192,26 +2192,31 @@ class LandmarksWeightsPanel(QFrame):
 
 
 # Helper for the cell counter histograms. TODO: make more generic
-def ensure_inline_histogram(histogram: PlotWidget | QWidget, hist_idx: int, layout: QLayout):
-    widgets = [layout.itemAt(i).widget() for i in range(layout.count())]
-    n_plotted_histograms = len([w for w in widgets if isinstance(w, PlotWidget)])
-    if n_plotted_histograms < 2:  # Histograms not yet added
-        label, _ = get_widget(layout, widget_type=QLabel, index=hist_idx)
-        controls, _ = get_widget(layout, key='Doublet', index=hist_idx)
+def ensure_inline_histogram(histogram: PlotWidget | QWidget, *, label: QWidget, controls: QWidget,
+                            row: int, layout: QGridLayout) -> PlotWidget | QWidget:
+    """
+    Put histogram in layout, spanning the row row, and move label and controls to the row below it
+    (histogram above the label and controls of the parameter it shows). Does nothing if the histogram is
+    already in the layout.
 
-        graph_width = label.width() + controls.width()
-        graph_height = 50
-        histogram.resize(graph_width, graph_height)
-        histogram.setMaximumSize(graph_width, graph_height)
+    The caller names the label and controls: the position of a widget in the layout changes whenever the
+    .ui file is edited, which put the histogram of a parameter over the controls of another.
+    The rows row and row + 1 must be free in the layout.
+    """
+    if layout.indexOf(histogram) >= 0:
+        return histogram
 
-        row = 2 * n_plotted_histograms
+    graph_width = label.width() + controls.width()
+    graph_height = 50
+    histogram.resize(graph_width, graph_height)
+    histogram.setMaximumSize(graph_width, graph_height)
 
-        layout.addWidget(histogram, row,    0, 1, 3)
-        layout.addWidget(label,     row+1,  0, 1, 1)
-        layout.addWidget(controls,  row+1,  1, 1, 2)
+    layout.addWidget(histogram, row,     0, 1, 3)
+    layout.addWidget(label,     row + 1, 0, 1, 1)
+    layout.addWidget(controls,  row + 1, 1, 1, 2)
 
-        container = layout.parent().parent().parent().parent()
-        container.setMinimumHeight(container.parent().height() - container.height() + layout.parent().height())
+    container = layout.parent().parent().parent().parent()
+    container.setMinimumHeight(container.parent().height() - container.height() + layout.parent().height())
 
     return histogram
 

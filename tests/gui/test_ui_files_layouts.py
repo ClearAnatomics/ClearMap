@@ -49,3 +49,29 @@ def test_the_registration_direction_radio_buttons_are_stacked_because_their_text
     assert layout.get('class') == 'QVBoxLayout'
     assert [item[0].get('name') for item in layout.findall('item')] == [
         'movingOtherRadioButton', 'intrinsicallyAlignedRadioButton', 'movingSelfRadioButton']
+
+
+def test_the_cell_filter_rows_are_below_the_four_rows_of_the_inline_histograms():
+    """
+    At runtime the histograms of size and intensity are put in rows 0 and 2 of the grid, each with its label and
+    controls in the row below: the other rows of the grid must start under them or they draw over each other.
+    """
+    layout = find_layout('cell_map_params.ui', 'cellDetectionThresholdsLayout')
+    histogram_rows = 4
+    filter_widgets = {'cellFilterSizeLabel', 'cellFilterThresholdSizeDoublet',
+                      'cellFilterIntensityLabel', 'cellFilterThresholdIntensityDoublet'}
+
+    items = {item[0].get('name'): int(item.get('row')) for item in layout.findall('item')}
+
+    assert filter_widgets <= set(items), f'missing: {sorted(filter_widgets - set(items))}'
+    assert {name: row for name, row in items.items() if name not in filter_widgets and row < histogram_rows} == {}
+
+
+def test_the_cell_filter_widgets_the_tab_puts_histograms_above_are_in_the_ui_file():
+    from ClearMap.gui.tabs import CELL_FILTER_HISTOGRAM_WIDGETS
+
+    layout = find_layout('cell_map_params.ui', 'cellDetectionThresholdsLayout')
+    names = {item[0].get('name') for item in layout.findall('item')}
+
+    wanted = {name for widgets in CELL_FILTER_HISTOGRAM_WIDGETS.values() for name in widgets}
+    assert wanted <= names, sorted(wanted - names)

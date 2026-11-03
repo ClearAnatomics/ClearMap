@@ -606,13 +606,13 @@
            </widget>
           </item>
           <item row="1" column="0">
-           <widget class="QLabel" name="label_19">
+           <widget class="QLabel" name="cellFilterIntensityLabel">
             <property name="text">
              <string>Intensity</string>
             </property>
            </widget>
           </item>
-          <item row="2" column="0">
+          <item row="4" column="0">
            <widget class="QLabel" name="distanceFromSurfaceLabel">
             <property name="text">
              <string>Distance from surface</string>
@@ -672,13 +672,13 @@
            </widget>
           </item>
           <item row="0" column="0">
-           <widget class="QLabel" name="label_7">
+           <widget class="QLabel" name="cellFilterSizeLabel">
             <property name="text">
              <string>Size (voxels)</string>
             </property>
            </widget>
           </item>
-          <item row="2" column="1">
+          <item row="4" column="1">
            <widget class="QFrame" name="distanceFromSurfaceFrame">
             <property name="frameShape">
              <enum>QFrame::StyledPanel</enum>
