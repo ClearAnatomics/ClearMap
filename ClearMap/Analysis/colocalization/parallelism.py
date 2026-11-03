@@ -76,7 +76,6 @@ def compare(
     if not isinstance(df_1, pd.DataFrame):
         df_1 = pd.read_feather(df_1)
 
-    processes = n
     if not ((processes is None) or (isinstance(processes, int) and processes >= 1)):
         raise ValueError("The passed processes argument must be a positive integer or None.")
 
