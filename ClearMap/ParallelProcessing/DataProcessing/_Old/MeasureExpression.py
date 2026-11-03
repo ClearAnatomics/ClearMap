@@ -64,7 +64,7 @@ def measure_max(source, points, search, radii, sink = None, processes = None, ve
   
   #print(source1d.dtype, points.dtype, search.dtype, type(value), sink.dtype);
   #print(source1d.shape, points.shape, sink.shape)
-  print source1d, points, search, radii, sink
+  print(source1d, points, search, radii, sink)
   code.measure_max(source1d, points, search, radii, sink, processes);
   
   ap._finalize_processing(verbose=verbose, function='measure_max', timer=timer);

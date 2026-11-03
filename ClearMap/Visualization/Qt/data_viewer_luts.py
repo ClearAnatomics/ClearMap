@@ -2,7 +2,8 @@ import functools as ft
 
 import numpy as np
 import pyqtgraph as pg
-from PyQt5.QtCore import QSize
+from PyQt5 import QtCore
+from PyQt5.QtCore import QSize, QObject
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import QGridLayout, QPushButton, QSizePolicy, QWidget
 
@@ -141,3 +142,103 @@ class LUT(QWidget):
             return np.nanpercentile(data.astype(np.uint8), percentiles)
         else:
             return np.nanpercentile(data, percentiles)
+
+
+class HighLowLUT(QObject):
+    """
+    Adds a 2nd ImageItem *on top* of an existing one.
+    The overlay keeps its own (fixed) 0‑to‑dtype range, so two absolute
+    thresholds never move when the user changes the greyscale levels of
+    the underlying slice.
+    """
+
+    _WHITE = (255, 255, 255, 255)
+    _BLACK = (0, 0, 0, 255)
+    _TRANSPARENT = (0, 0, 0, 0)
+    _EPS = 1e-6
+
+    def __init__(self, *, view_box: pg.ViewBox,
+                 base_item: pg.ImageItem,
+                 hist_item: pg.HistogramLUTItem,
+                 low: float, high: float,
+                 dtype_min: int, dtype_max: int,
+                 n_pts: str = 'max',
+                 low_color: tuple[int] = (0, 0, 255, 255),
+                 high_color: tuple[int, int, int, int] = (255, 0, 0, 255)
+                 ):
+        """
+        view_box   : pg.ViewBox that holds the two ImageItems
+        base_item  : the greyscale ImageItem already in the viewer
+        hist_item  : its HistogramLUTItem (levels widget) — we listen to its
+                     region so we repaint when the user changes brightness
+        low, high  : absolute thresholds (spin‑boxes)
+        dtype_min/max : full representable range, e.g. 0 / 65535 for uint16
+        n_pts     : number of colours in the LUT (or 'max' for max size (i.e. 65535 for uint16))
+        """
+        if n_pts == 'max':
+            n_pts = dtype_max - 1
+        super().__init__(base_item)
+        self.base = base_item
+        self.low, self.high = float(low), float(high)
+        self.dtype_min, self.dtype_max = float(dtype_min), float(dtype_max)
+        self.n_pts = int(n_pts)
+        self.low_color = low_color
+        self.high_color = high_color
+
+        # ------------------------------------------------------------------
+        # second ImageItem that shares the SAME ndarray slice
+        # ------------------------------------------------------------------
+        self.top = pg.ImageItem(axisOrder="col-major")
+        self.top.setCompositionMode(pg.QtGui.QPainter.CompositionMode_Plus)
+        view_box.addItem(self.top)
+
+        # The overlay uses exactly the same 2‑D array object the base layer
+        # points to, so scrolling & zooming stay in sync automatically.
+        self.top.setImage(self.base.image,
+                          levels = (self.dtype_min, self.dtype_max),
+                          autoLevels=False)
+        # ---------------------------------------------------------------
+        #  Keep the overlay in sync every time the base slice is updated
+        # ---------------------------------------------------------------
+        if hasattr(self.base, "sigImageChanged"):        # pg ≥ 0.11
+            self.base.sigImageChanged.connect(self._sync_image)
+        else:                                            # pg ≤ 0.10
+            self.base.imageChanged.connect(self._sync_image)
+        # Update whenever thresholds or brightness window changes
+        hist_item.region.sigRegionChanged.connect(self._rebuild)
+        self._rebuild()
+
+    def _sync_image(self, *_) -> None:
+        """Copy the *current* ndarray of the greyscale layer into the
+        overlay so colours always refer to the right slice."""
+        self.top.setImage(self.base.image,
+                          levels=(self.dtype_min, self.dtype_max),
+                          autoLevels=False)
+
+    # ---------------- attach spin‑boxes here ------------------------------
+    def set_low (self, v):  self.low  = float(v); self._rebuild()
+    def set_high(self, v):  self.high = float(v); self._rebuild()
+
+    # ---------------------------------------------------------------------
+    def _rebuild(self):
+        lo, hi = sorted((self.low, self.high))
+        rng    = self.dtype_max - self.dtype_min
+
+        # positions in 0..1 of absolute thresholds (fixed range!)
+        p_lo = (lo - self.dtype_min) / rng
+        p_hi = (hi - self.dtype_min) / rng
+        p_lo = np.clip(p_lo, 0., 1.);  p_hi = np.clip(p_hi, 0., 1.)
+        if p_hi - p_lo < 1e-6:
+            p_hi = min(p_lo + 1e-6, 1.0)
+
+        pos  = [0.0, p_lo, p_lo + self._EPS,
+                      p_hi - self._EPS, p_hi, 1.0]
+        cols = [self.low_color, self.low_color,
+                self._BLACK, self._WHITE,
+                # self._TRANSPARENT, self._TRANSPARENT,
+                self.high_color, self.high_color]
+
+        cmap = pg.ColorMap(pos, cols, mode='byte')
+        lut  = cmap.getLookupTable(0.0, 1.0, self.n_pts, alpha=True)
+
+        self.top.setLookupTable(lut, update=True)

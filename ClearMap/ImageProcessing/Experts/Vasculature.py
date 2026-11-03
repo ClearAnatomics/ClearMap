@@ -9,20 +9,21 @@ This module provides the basic routines for processing vasculature data.
 The routines are used in the :mod:`ClearMap.Scripts.TubeMap` pipeline.
 """
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__ = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
-__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+__download__ = 'https://github.com/ClearAnatomics/ClearMap'
   
 import gc
-import tempfile as tmpf
+import warnings
+from pathlib import Path
 
 import numpy as np
 import scipy.ndimage as ndi
 import skimage.filters as skif
 
-import ClearMap.IO.IO as io
-from ClearMap.Utils.exceptions import MissingRequirementException
+from ClearMap.IO import FileUtils as file_utils
+from ClearMap.IO import source_initialization, io_ops, source_geometry
 
 import ClearMap.ParallelProcessing.BlockProcessing as bp
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
@@ -35,8 +36,7 @@ import ClearMap.ImageProcessing.Binary.Filling as bf
 import ClearMap.ImageProcessing.Binary.Smoothing as bs
 
 import ClearMap.Utils.Timer as tmr
-from ClearMap.ImageProcessing.Experts.utils import initialize_sinks, equalize, wrap_step, print_params
-from ClearMap.Utils.utilities import check_enough_temp_space, get_free_temp_space
+from ClearMap.ImageProcessing.Experts.utils import initialize_sinks, run_step, print_params
 
 ###############################################################################
 # ## Generic parameter
@@ -74,7 +74,7 @@ BINARY_STATUS = {n: 2**k for k, n in enumerate(BINARY_NAMES)}
 default_binarization_parameter = dict(
     # initial clipping and mask generation
     clip=dict(clip_range=(400, 60000),
-              save=False),
+              save=None),
 
     # lightsheet correction
     lightsheet=dict(percentile=0.25,
@@ -84,16 +84,16 @@ default_binarization_parameter = dict(
                                     step=(2, 2, 1),
                                     interpolate=1),
                     lightsheet_vs_background=2,
-                    save=False),
+                    save=None),
 
     # median
     median=dict(selem=((3,)*3),
-                save=False),
+                save=None),
 
     # deconvolution
     deconvolve=dict(sigma=10,
                     threshold=750,
-                    save=False),
+                    save=None),
 
     # equalization
     equalize=dict(percentile=(0.4, 0.975),
@@ -101,13 +101,13 @@ default_binarization_parameter = dict(
                   spacing=(50, 50, 5),
                   interpolate=1,
                   threshold=1.1,
-                  save=False),
+                  save=None),
 
     # adaptive threshold
     adaptive=dict(selem=(250, 250, 3),
                   spacing=(50, 50, 3),
                   interpolate=1,
-                  save=False),
+                  save=None),
 
     # tubeness
     vesselize=dict(background=dict(selem=('disk', (30, 30, 1)),
@@ -115,7 +115,7 @@ default_binarization_parameter = dict(
                    tubeness=dict(sigma=1.0,
                                  gamma12=0.0),
                    threshold=120,
-                   save=False),
+                   save=None),
 
     # fill
     fill=None,
@@ -133,8 +133,8 @@ See :func:`binarize` for details."""
 
 default_binarization_processing_parameter = dict(
     size_max=40,
-    size_min=5,
-    overlap=0,
+    size_min=6,
+    overlap=5,  # has to be < size_min
     axes=[2],
     optimization=True,
     optimization_fix='all',
@@ -151,9 +151,6 @@ default_postprocessing_parameter = dict(
 
     # binary filling
     fill=True,
-
-    # temporary file
-    temporary_filename=None
 )                   
 """Parameter for the postprocessing step of the binarized data.
 See :func:`postprocess` for details."""
@@ -471,8 +468,8 @@ def binarize(source, sink=None, binarization_parameter=default_binarization_para
     """
 
     # initialize sink
-    shape = io.shape(source)
-    order = io.order(source)
+    shape = source_geometry.shape(source)
+    order = source_geometry.order(source)
     sink, sink_buffer = ap.initialize_sink(sink=sink, shape=shape, order=order, dtype=bool)  # , memory='shared')
 
     # initialize addition output sinks
@@ -509,7 +506,7 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
     # initialize binary status for inspection
     binary_status = parameter.get('binary_status')
     if binary_status:
-        binary_status = io.as_source(binary_status)
+        binary_status = io_ops.open_ro(binary_status)
         binary_status = binary_status[base_slicing]
 
     default_step_params = {'parameter': parameter, 'steps_to_measure': {}, 'prefix': prefix,
@@ -527,7 +524,7 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
         not_low = np.logical_not(low)
 
         if save:
-            save = io.as_source(save)
+            save = source_initialization.initialize(save)  # edit or create
             save[base_slicing] = clipped[valid_slicing]
 
         if binary_status is not None:
@@ -545,13 +542,13 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
     # active arrays: clipped, mask, not_low
 
     # lightsheet correction
-    corrected = wrap_step('lightsheet', clipped, lc.correct_lightsheet, remove_previous_result=True,
-                          extra_kwargs={'mask': mask, 'max_bin': max_bin}, **default_step_params)
+    corrected = run_step('lightsheet', clipped, lc.correct_lightsheet, remove_previous_result=True,
+                         extra_kwargs={'mask': mask, 'max_bin': max_bin}, **default_step_params)
     # active arrays: corrected, mask, not_low
 
     # median filter
-    median = wrap_step('median', corrected, rnk.median, remove_previous_result=True,
-                       extra_kwargs={'max_bin': max_bin, 'mask': not_low}, **default_step_params)
+    median = run_step('median', corrected, rnk.median, remove_previous_result=True,
+                      extra_kwargs={'max_bin': max_bin, 'mask': not_low}, **default_step_params)
     del not_low
     # active arrays: median, mask
 
@@ -571,7 +568,7 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
         del binarized
 
         if save:
-            save = io.as_source(save)
+            save = source_initialization.initialize(save)  # edit or create
             save[base_slicing] = deconvolved[valid_slicing]
 
         if verbose:
@@ -596,8 +593,8 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
 
     # adaptive
     parameter_adaptive = parameter.get('adaptive')
-    adaptive = wrap_step('adaptive', deconvolved, threshold_adaptive, remove_previous_result=False,
-                         **default_step_params)
+    adaptive = run_step('adaptive', deconvolved, threshold_adaptive, remove_previous_result=False,
+                        **default_step_params)
     if parameter_adaptive:
         binary_adaptive = deconvolved > adaptive
 
@@ -625,7 +622,7 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
         equalized = equalize(median, mask=mask, **parameter_equalize)
 
         if save:
-            save = io.as_source(save)
+            save = source_initialization.initialize(save)  # edit or create
             save[base_slicing] = equalized[valid_slicing]
 
         if verbose:
@@ -672,7 +669,7 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
             del background
 
             if save:
-                save = io.as_source(save)
+                save = source_initialization.initialize(save)  # edit or create
                 save[base_slicing] = tubeness[valid_slicing]
         else:
             tubeness = equalized
@@ -682,7 +679,7 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
 
         save = parameter_vesselization.get('save')
         if save:
-            save = io.as_source(save)
+            save = source_initialization.initialize(save)  #  edit or create
             save[base_slicing] = tubeness[valid_slicing]
 
         if verbose:
@@ -731,8 +728,8 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
     # smooth binary
     if parameter.get('smooth'):  # WARNING: otherwise removes sink if no smoothing
         parameter['smooth']['save'] = False
-        smoothed = wrap_step('smooth', sink, bs.smooth_by_configuration, remove_previous_result=False,
-                             extra_kwargs={'sink': None, 'processes': 1}, **default_step_params)
+        smoothed = run_step('smooth', sink, bs.smooth_by_configuration, remove_previous_result=False,
+                            extra_kwargs={'sink': None, 'processes': 1}, **default_step_params)
         sink[valid_slicing] = smoothed[valid_slicing]
         del smoothed
 
@@ -767,10 +764,6 @@ def postprocess(source, sink=None, postprocessing_parameter=default_postprocessi
     verbose : bool
         If True, print progress output.
 
-    Returns
-    -------
-    sink : Source
-        The result of the binarization.
 
     Notes
     -----
@@ -795,60 +788,60 @@ def postprocess(source, sink=None, postprocessing_parameter=default_postprocessi
     fill : bool or None
         If True, fill holes in the binary data.
     """
+    postprocessing_parameter = postprocessing_parameter.copy()
+    run_binary_filling = postprocessing_parameter.get('fill', False)
+    parameter_smooth = postprocessing_parameter.get('smooth')
 
-    source = io.as_source(source)
+    if not run_binary_filling and not parameter_smooth:
+        warnings.warn('No postprocessing steps defined, skipping postprocessing.')
+        return
+
+    source = io_ops.open_ro(source)
     sink = ap.initialize_sink(sink, shape=source.shape, dtype=source.dtype, order=source.order, return_buffer=False)
 
     if verbose:
         timer = tmr.Timer()
         print('Binary post processing: initialized.')
 
-    postprocessing_parameter = postprocessing_parameter.copy()
-    run_binary_filling = postprocessing_parameter.get('fill', False)
-    parameter_smooth = postprocessing_parameter.get('smooth')
-
     # smoothing
     if parameter_smooth:
-        fill_source, tmp_f_path, save = apply_smoothing(source, sink, processing_parameter, postprocessing_parameter,
-                                                        processes, verbose)
+        keep_smoothed = parameter_smooth.get('save', False)
+        fill_source, tmp_f_path = apply_smoothing(source, sink, parameter_smooth, processing_parameter,
+                                                  processes, verbose)
     else:
         fill_source = source
-        save = False
+        keep_smoothed = False
 
     if run_binary_filling:
         bf.fill(fill_source, sink=sink, processes=processes, verbose=verbose)
-        if parameter_smooth and not save:
-            io.delete_file(tmp_f_path)
+        if parameter_smooth and not keep_smoothed:  # FIXME: should be in a finaly block
+            file_utils.delete_file(tmp_f_path)
 
     if verbose:
         timer.print_elapsed_time('Binary post processing')
 
     gc.collect()
 
-
-def apply_smoothing(source, sink, processing_parameter, postprocessing_parameter, processes=None, verbose=True):
-    parameter_smooth = postprocessing_parameter.pop('smooth', None)
-    if postprocessing_parameter.get('fill'):
-        save = parameter_smooth.pop('save', False)
-        # initialize temporary files if needed
-        if not check_enough_temp_space():
-            raise MissingRequirementException(f'Free space in temporary directory is insufficient, required 200 GB, '
-                                              f'got {get_free_temp_space() // (2**30)} GB'
-                                              f'Please free some space or use a different temporary directory.'
-                                              f'You can set the "TMP" environment variable to a directory of your choice')
-        tmp_f_path = save if save else postprocessing_parameter['temporary_filename']
-        tmp_f_path = tmp_f_path if tmp_f_path else tmpf.mktemp(prefix='TubeMap_Vasculature_postprocessing',
-                                                               suffix='.npy')
-        sink_smooth = ap.initialize_sink(tmp_f_path, shape=source.shape, dtype=source.dtype,
-                                         order=source.order, return_buffer=False)
+def apply_smoothing(source, sink, parameter_smooth, processing_parameter, processes=None, verbose=True):
+    """
+    When iterations > 1 the intermediate file is written as a sibling of
+    the source in the experiment directory.
+    The caller owns the returned path and decides whether to delete it via
+    BinaryVesselProcessorSteps.consume_and_cleanup().
+    """
+    if parameter_smooth.get('iterations', 1) > 1:
+        source_path = Path(source.location)
+        tmp_f_path = str(source_path.parent / f'{source_path.stem}_smooth_tmp.npy')
+        Path(tmp_f_path).unlink(missing_ok=True)  # Left by a previous run, maybe of another dtype: it is overwritten
+        tmp_sink = ap.initialize_sink(tmp_f_path, shape=source.shape, dtype=bool,  # What the smoothing writes
+                                      order=source.order, return_buffer=False)
     else:
-        sink_smooth = sink
-        save = False
         tmp_f_path = ''
-    # run smoothing
-    fill_source = bs.smooth_by_configuration(source, sink=sink_smooth, processing_parameter=processing_parameter,
-                                             processes=processes, verbose=verbose, **parameter_smooth)
-    return fill_source, tmp_f_path, save
+        tmp_sink = sink
+
+    smoothed = bs.smooth_by_configuration(source, sink=tmp_sink, processing_parameter=processing_parameter,
+                                          processes=processes, verbose=verbose, **parameter_smooth)
+    return smoothed, tmp_f_path
 
 
 ###############################################################################
@@ -860,17 +853,17 @@ def clip(source, clip_range=(300, 60000), norm=MAX_BIN, dtype=DTYPE):
 
     clipped = np.array(source[:], dtype=float)
 
-    low = clipped < clip_low
-    clipped[low] = clip_low
+    low_mask = clipped < clip_low
+    clipped[low_mask] = clip_low
 
-    high = clipped >= clip_high
-    clipped[high] = clip_high
+    high_mask = clipped >= clip_high
+    clipped[high_mask] = clip_high
 
-    mask = np.logical_not(np.logical_or(low, high))
+    mask = np.logical_not(np.logical_or(low_mask, high_mask))
     clipped -= clip_low
     clipped *= float(norm-1) / (clip_high - clip_low)
     clipped = np.asarray(clipped, dtype=dtype)
-    return clipped, mask, high, low
+    return clipped, mask, high_mask, low_mask
 
 
 def deconvolve(source, binarized, sigma=10):
@@ -898,10 +891,22 @@ def threshold_isodata(source):
 
 def threshold_adaptive(source, function=threshold_isodata, selem=(100, 100, 3), spacing=(25, 25, 3),
                        interpolate=1, mask=None, step=None):
-    source = io.as_source(source)[:]
+    source = io_ops.read(source)[:]
     threshold = ls.apply_local_function(source, function=function, mask=mask, dtype=float,
                                         selem=selem, spacing=spacing, interpolate=interpolate, step=step)
     return threshold
+
+
+def equalize(source, percentile=(0.5, 0.95), max_value=1.5, selem=(200, 200, 5), spacing=(50, 50, 5),
+             interpolate=1, mask=None):
+    equalized = ls.local_percentile(source, percentile=percentile, mask=mask, dtype=float,
+                                    selem=selem, spacing=spacing, interpolate=interpolate)
+    normalize = 1/np.maximum(equalized[..., 0], 1)
+    maxima = equalized[..., 1]
+    ids = maxima * normalize > max_value
+    normalize[ids] = max_value / maxima[ids]
+    equalized = np.array(source, dtype=float) * normalize
+    return equalized
 
 
 def tubify(source, sigma=1.0, gamma12=1.0, gamma23=1.0, alpha=0.25):
@@ -952,7 +957,7 @@ def binary_statistics(source):
     statistics : dict
        A dict with entires {description : count}.
     """
-    status, counts = np.unique(io.as_source(source)[:], return_counts=True)
+    status, counts = np.unique(io_ops.read(source)[:], return_counts=True)
     return {status_to_description(s): c for s, c in zip(status, counts)}
 
 
@@ -987,8 +992,8 @@ def _test():
     binary = vasc.binarize(source, sink=sink, binarization_parameter=bpar, processing_parameter=ppar)
     p3d.plot([source, binary])
 
-    import ClearMap.IO.IO as io
-    io.delete_file(sink)
+    from ClearMap.IO import FileUtils as file_utils
+    file_utils.delete_file(sink)
 
     pppar = vasc.default_postprocessing_parameter.copy()
     pppar['smooth']['iterations'] = 3

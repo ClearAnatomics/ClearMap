@@ -13,7 +13,7 @@ Result image is 8-/16-bit or double with respect to the input image and the
 rank filter operation.
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__license__   = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
@@ -126,7 +126,7 @@ def mean_percentile(source, selem=None, sink=None, mask=None, percentiles=(0,1),
     The filtered array.
   """
   return rnk._apply_code(code.mean, code.mean_masked, sink_dtype = float,
-                         source=source, selem=selem, sink=sink, mask=mask, parameter_float=percentiles **kwargs);
+                         source=source, selem=selem, sink=sink, mask=mask, parameter_float=percentiles, **kwargs);
 
 
 
@@ -158,7 +158,7 @@ def subtract_mean_percentile(source, selem=None, sink=None, mask=None, percentil
     The filtered array.
   """
   return rnk._apply_code(code.subtract_mean, code.subtract_mean_masked,
-                         source=source, selem=selem, sink=sink, mask=mask, parameter_float=percentiles **kwargs);
+                         source=source, selem=selem, sink=sink, mask=mask, parameter_float=percentiles, **kwargs);
 
 
 
@@ -334,7 +334,7 @@ def sum_above_percentile(source, selem=None, sink=None, mask=None, percentile = 
     The filtered array.
   """
   return rnk._apply_code(code.sum_above, code.sum_above_masked,
-                        source=source, selem=selem, sink=sink, mask=mask, parameter_float=[percentile], **kwargs);
+                        source=source, selem=selem, sink=sink, mask=mask, parameter_float=percentile, **kwargs);
 
 
 
@@ -370,7 +370,4 @@ def threshold_percentile(source, selem=None, sink=None, mask=None, percentile=0,
     The filtered array.
   """
   return rnk._apply_code(code.threshold, code.threshold_masked,
-                        source=source, selem=selem, sink=sink, mask=mask, parameter_float=[percentile], **kwargs);
-
-
-    
+                        source=source, selem=selem, sink=sink, mask=mask, parameter_float=percentile, **kwargs)

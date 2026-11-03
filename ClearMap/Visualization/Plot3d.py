@@ -10,7 +10,7 @@ Note
 This module collects functions from various backends for use with ClearMap.
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__license__   = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
@@ -21,14 +21,14 @@ __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 ###############################################################################
 
 from ClearMap.Visualization.Vispy.Plot3d import *           #analysis:ignore
-from ClearMap.Visualization.Vispy.PlotGraph3d import *      #analysis:ignore
+from ClearMap.Visualization.Vispy.plot_graph_3d import *      #analysis:ignore
 
 
 ###############################################################################
 ### Qt plotting
 ###############################################################################
 
-from ClearMap.Visualization.Qt.Plot3d import plot           #analysis:ignore
+from ClearMap.Visualization.Qt.Plot3d import plot, bring_to_front, close, arrange_plots  #analysis:ignore
 
 
 ###############################################################################

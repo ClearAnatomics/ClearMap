@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 
-def get_all_structs(dfs):
+def get_all_region_ids(dfs):
     """
     Get all the structures that are in any of the dataframes
 
@@ -16,10 +16,10 @@ def get_all_structs(dfs):
     -------
 
     """
-    structs = pd.Series()
+    region_ids = pd.Series()
     for df in dfs:
-        structs = pd.concat((structs, df['id']))
-    return np.sort(structs.unique())
+        region_ids = pd.concat((region_ids, df['id']))
+    return np.sort(region_ids.unique())
 
 ########################### Label table creation
 
@@ -80,7 +80,7 @@ def create_label_table(fpath, save=False, from_cached=False):
     """
     Parameters
     ----------
-    fpath: str
+    fpath: str | Path
         Path to a JSON file similar to the one downloaded from 'http://api.brain-map.org/api/v2/structure_graph_download/1.json'
 
     Returns
@@ -88,7 +88,7 @@ def create_label_table(fpath, save=False, from_cached=False):
     df: pd.DataFrame
         dataframe holding informations on the labels ()
     """
-
+    fpath = str(fpath)
     assert fpath.endswith('.json')
 
     if from_cached:

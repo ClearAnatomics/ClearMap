@@ -20,8 +20,9 @@ __copyright__ = 'Copyright (c) 2019 by Christoph Kirst, The Rockefeller Universi
 import tempfile
 import numpy as np
 
-import ClearMap.IO.IO as io
+from ClearMap.IO import FileUtils as file_utils
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
+from ClearMap.IO import io_ops, source_geometry
 
 ###############################################################################
 ### Neighbourhoods
@@ -179,7 +180,7 @@ def index_from_binary(source, sink = None, method = 'shared', dtype = 'uint32', 
       if method == 'shared':
         _, sink_buffer, sink_shape, sink_strides = ap.initialize_sink(sink=None, as_1d=True, shape=source_shape, dtype=buffer_dtype, order=source_order,  return_shape=True, return_strides=True);
       else:
-        location = tempfile.mktemp() + '.npy';
+        location = tempfile.mktemp(suffix='.npy')
         _, sink_buffer, sink_shape, sink_strides = ap.initialize_sink(sink=location, as_1d=True, shape=tuple(source_shape), dtype=buffer_dtype, order=source_order,  return_shape=True, return_strides=True);
         delete_files.append(location);
     
@@ -192,7 +193,7 @@ def index_from_binary(source, sink = None, method = 'shared', dtype = 'uint32', 
     source_buffer = sink_buffer;
     
   for f in delete_files:
-    io.delete_file(f);
+    file_utils.delete_file(f);
     
   ap.finalize_processing(verbose=verbose, function='index_from_binary', timer=timer);
   
@@ -528,10 +529,10 @@ def _test():
   import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
   ap.write('test.npy', x)
   
-  y = io.as_source('test.npy')
-  z = io.create('resuly.npy', shape=y.shape, order='C', dtype='uint32');
+  z = io_ops.create('resuly.npy', shape=source_geometry.shape('test.npy'), order='C', dtype='uint32')
   
-  cProfile.runctx("c =top.index_from_binary(y, method='!shared', sink=z, verbose=True, processes=None)", globals(), locals(), "Profile.prof")
+  cProfile.runctx("c =top.index_from_binary(y, method='!shared', sink=z, verbose=True, processes=None)",
+                  globals(), locals(), "Profile.prof")
   
   s = pstats.Stats("Profile.prof")
   s.strip_dirs().sort_stats("time").print_stats()

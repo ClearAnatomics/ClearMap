@@ -25,7 +25,7 @@ Type            Descrition
 =============== =====================================
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__license__   = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
@@ -58,7 +58,7 @@ def filter_kernel(ftype = 'Gaussian', shape = (5,5), radius = None, sigma = None
   
   Returns
   -------
-  krenel : array
+  kernel : array
     Filter kernel.
   """    
   
@@ -89,7 +89,7 @@ def filter_kernel_2d(ftype = 'Gaussian', shape = (5,5), sigma = None, sigma2 = N
   
   Returns
   -------
-  krenel : array
+  kernel : array
     Filter kernel.
   """    
   
@@ -228,7 +228,7 @@ def filter_kernel_3d(ftype = 'Gaussian', shape = (5,5,5), sigma = None, sigma2 =
   
   Returns
   -------
-  krenel : array
+  kernel : array
     Filter kernel.
   """   
   

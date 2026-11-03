@@ -1,121 +1,129 @@
-Introduction
-============
-This package pertains to the graphical interface (henceforth referred to as GUI). It is built using
-PyQt5 and currently creates a frontend to the CellMap script. Support for TubeMap is planned in the future.
+gui
+===
 
-This module uses new versions of the *scripts* that are still located in ClearMap/Scripts
-(sample_preparation.py and cell_map.py) that were rewritten using object-oriented programming.
+This package implements the ClearMap Graphical User Interface, built on PyQt5.
+It provides a frontend to all ClearMap pipelines — CellMap, TubeMap, TractMap,
+Colocalization, and group-level statistics — without requiring any scripting.
 
-The behaviour of the code is controlled through configuration files that can be found under ClearMap/config
-Please see installation_ for instruction on placing these configuration files in the right location.
-Should the user prefer to do so, the aforementioned scripts can be run using these configuration files without
-the need for the GUI. In the future, this functionality will for the basis of a batch mode
-allowing to start the analysis of several samples at once without further user intervention.
+The GUI backend is provided by the pipeline workers in
+:mod:`ClearMap.pipeline_orchestrators`. The GUI can also be bypassed entirely
+for scripted or batch workflows; see :mod:`ClearMap.Scripts` for entry points.
+
+Configuration is managed through YAML files under ``~/.clearmap/`` and in
+the experiment directory. These files are created automatically on first run
+and are best edited through the **Preferences** dialog or the per-pipeline
+tabs in the GUI.
+
 
 Installation
 ============
-To install the GUI you need to follow these steps:
 
-1. Download the ClearMap source code
+.. code-block:: bash
 
-  .. code-block:: bash
-
-    $ cd /path/to/where/you/should/download
-    $ git clone https://github.com/ChristophKirst/ClearMap2.git
-    $ cd ClearMap2
-
-2. Select the **dev** branch
-
-  .. code-block:: bash
-
-    $ git checkout dev
-
-3. Make the install script executable
-
-  .. code-block:: bash
-
-    $ chmod u+x install_gui.sh
-
-4. Start the install and answer the prompts
-
-  .. code-block:: bash
-
-    $ ./install_gui.sh <environment_file.yml>  # If the environment file is not supplied it will use python 3.7
+    git clone https://github.com/ClearAnatomics/ClearMap.git
+    cd ClearMap
+    chmod +x install_gui.sh
+    ./install_gui.sh
 
 
-Using the interface
-===================
+Running
+=======
 
-The interface as mentioned above uses configuration files. Some files are
-system-wide, i.e. they pertain to all experiments, like the 
-**~/.clearmap/machine_params.cfg** file which selects the start folder, the
-number of CPU cores for each step ...
-Others are experiment specific. 
+.. code-block:: bash
 
-For each experiment folder, 3 files should be present at the root of the 
-experiment directory: 
+    conda activate ClearMap3.1
+    clearmap-ui
 
-  **sample_params.cfg**
-    Controls the variables pertaining to the sample. Essentially, these are the
-    acquisition metadata
-   
-  **processing_params.cfg**
-    Controls the variables pertaining to the stitching and the alignment
- 
-  **cell_map_params.cfg**
-    Controls the behaviour of the cell detection (size of the filter kernels,
-    of the expected cells ...)
-    
-  
-
-When selecting the folder as the first step after starting the interface below,
-if these 3 files are not present, the program will offer to install them for you
-from the defaults located in ~/.clearmap, thereby offering you a way to customise
-the default settings for all experiments.
-
-To use the interface, simply run:
-
-  .. code-block:: bash
-
-    $ conda activate ClearMapUi
-    $ clearmap-gui
+The GUI will guide you and create the required config files with sensible defaults that
+you can edit through the widgets
 
 Structure
 =========
 
-run_gui
-    The main module used to start the Graphical User Interface
+app
+    Main window and application entry point.  Owns the
+    ``ExperimentController`` and ``GuiController`` and wires together
+    all tabs and dialogs.
 
 tabs
-    The module containing the classes for the tabs representing different steps in the analysis
-    (usually matched by a processor in ClearMap/processors)
+    Concrete tab classes for each pipeline step (Sample info, Stitching,
+    Registration, CellMap, TubeMap, TractMap, Colocalization, Group analysis,
+    Batch processing).
+
+tabs_interfaces
+    Abstract base classes for tabs (``GenericTab``, ``ExperimentTab``,
+    ``PipelineTab``, ``PreProcessingTab``, ``PostProcessingTab``,
+    ``BatchTab``).
 
 params
-    The parameters for the GUI of the different tabs. These are linked to the pertaining config files.
+    Parameter-link objects that bind GUI widgets to YAML config values for
+    each pipeline section.
+
+params_interfaces
+    Core UI–config binding machinery: ``UiParameter``, ``ParamLink``,
+    ``VectorLink``, ``WidgetOps``, and related helpers.
+
+params_mixins
+    Reusable mixin behaviours for parameter classes (e.g. ortho-viewer
+    slicing).
 
 widgets
-    Custom widgets for the graphical interface.
+    Custom Qt widgets (``Scatter3D``, ``ExtendableTabWidget``,
+    ``BlockProcessingWidget``, ``NProcessesWidget``, progress watcher, etc.).
+
+pipeline_model
+    Data model for the configurable binarization pipeline widget
+    (``LinearPipeline``, ``PipelineStep``).
+
+pipeline_widgets
+    Qt widget that renders a ``LinearPipeline`` and lets the user reorder
+    and toggle steps.
 
 dialogs
-    Custom dialogs (e.g. prompts, warnings ...) for the GUI
+    Custom dialogs (prompts, warnings, file drop, landmark selector, resource-type-to-folder
+    editor, about box, etc.).
 
-widget_monkey_patch_callbacks
-    These are functions that will be bound as methods to the graphical widgets based on type and name
-    to enhance their abilities.
+dialog_helpers
+    Utility functions for common dialogs (directory picker, progress bars,
+    splash screen, popups).
+
+preferences
+    Preferences UI and its ``PreferenceUi`` controller.
 
 gui_logging
-    A special widget used for normal and error logging. This is crucial to track progress.
+    ``Printer`` widget for normal and error logging to the in-app text area
+    and log files. This is currently used as a hack to track progress.
 
-pyuic_utils
-    A customised version of the PyQt5 module of the same name to patch the classes built from
-    the **.ui** files.
+gui_utils_base
+    Low-level Qt helpers (widget replacement, layout utilities, grid
+    computation, etc.).
+
+gui_utils_images
+    Image conversion utilities for GUI display (numpy → QPixmap, etc.).
 
 style
-    As the name indicates (defines e.g. colors)
+    Colour constants and stylesheet fragments used throughout the GUI.
+
+tab_registry
+    ``TabRegistry``: determines which tabs are valid given the current
+    sample state and app mode.
+
+widget_monkeypatch_callbacks
+    Functions bound at runtime to compound Qt widgets (doublets, triplets,
+    etc.) to give them a uniform value-changed interface.
+
+pyuic_utils
+    Customised ``pyuic5`` loader that patches parent classes of generated *.ui*
+    files.
+
+event_bus integration
+    The GUI communicates with backend workers through typed events
+    on the ``EventBus`` (see :mod:`ClearMap.Utils.event_bus`).
+
 
 Bugs
 ====
 
-Please report bugs on the `github issue tracker`_ using the **GUI** label.
+Please report bugs on the `GitHub issue tracker`_ using the **GUI** label.
 
-.. _github issue tracker: https://github.com/ChristophKirst/ClearMap2/issues
+.. _GitHub issue tracker: https://github.com/ClearAnatomics/ClearMap/issues

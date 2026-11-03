@@ -1,0 +1,517 @@
+import functools
+import platform
+import re
+import shutil
+import tempfile
+import warnings
+from multiprocessing.managers import BaseManager
+from pathlib import Path
+from typing import Optional
+
+import numpy as np
+import pandas as pd
+
+from ClearMap.IO import io_ops, source_geometry
+from ClearMap.IO.source.backends.mmp_backend import MMPSource
+from ClearMap.IO.workspace2 import Workspace2
+
+from ClearMap.Utils.exceptions import MissingRequirementException
+from ClearMap.Utils.utilities import sanitize_n_processes
+
+from ClearMap.config.config_coordinator import ConfigCoordinator
+
+from ClearMap.pipeline_orchestrators.generic_orchestrators import ChannelPipelineOrchestrator
+from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
+
+from ClearMap.Alignment import Elastix as elastix
+from ClearMap.Alignment.Resampling import resample_points
+
+from ClearMap.ParallelProcessing.DataProcessing import ArrayProcessing as array_processing
+from ClearMap.ParallelProcessing import BlockProcessing as block_processing
+
+from ClearMap.ImageProcessing.Experts import Vasculature as vasculature
+
+from ClearMap.Analysis.Measurements.Voxelization import voxelize
+
+USE_BINARY_POINTS_FILE = not platform.system().lower().startswith('darwin')  # i.e. binary is available in elastix
+
+
+# WARNING: this has to be top level to be pickleable (because of the way multiprocessing works)
+def label_points_wrapper(annotator, coords):
+    return np.expand_dims(annotator.label_points(coords), axis=-1)  # Add empty dim to match shape of coords
+
+
+class TractMapProcessor(ChannelPipelineOrchestrator):
+
+    pipeline = 'TractMap'
+    config_name = 'tract_map'
+
+    block_re = ('Processing block', re.compile(r'.*?Processing block \d+/\d+.*?\selapsed time:\s\d+:\d+:\d+\.\d+'))
+    where_re = ('Where', re.compile(r'.*?Where: processing \d+/\d+.*?\selapsed time:\s\d+:\d+:\d+\.\d+'))
+    label_re = ('Labeling', re.compile(r'.*?Label: processing \d+/\d+.*?\selapsed time:\s\d+:\d+:\d+\.\d+'))
+
+    def __init__(self, sample_manager: Optional[SampleManager] = None,
+                 config_coordinator: Optional[ConfigCoordinator] = None,
+                 channel: str = '', registration_processor=None):
+        super().__init__(config_coordinator)
+        self.sample_manager = sample_manager
+        self.registration_processor = registration_processor
+        self.channel = channel
+        self.workspace: Optional[Workspace2] = None
+        self.save_intermediate_binarization_results = True
+        self.uniques = None
+        self.uniq_counts = None
+        self.sampling = 1
+
+        if channel is None:
+            raise ValueError(f'No channel specified. Please provide a channel name '
+                             f'that matches the one in the sample_params file.')
+        self.setup(sample_manager, channel, registration_processor)
+
+    def setup(self, sample_manager=None, channel_name=None, registration_processor=None):
+        """
+        Register the channel in the workspace once the sample is ready for it (see sample_ready).
+        Idempotent: what is not given (sample manager, channel, registration processor) is the one
+        already set, so that it can be called again without argument, e.g. by setup_if_needed.
+        """
+        self.sample_manager = sample_manager if sample_manager else self.sample_manager
+
+        self.channel = channel_name if channel_name is not None else self.channel
+        self.registration_processor = registration_processor if registration_processor is not None else self.registration_processor
+
+        if self.sample_ready:
+            self.workspace = self.sample_manager.workspace
+            self.register_in_workspace()
+            self._setup_done = True
+        else:
+            self._setup_done = False
+            warnings.warn(f'SampleManager not set up yet. Setting TractMapProcessor up defered.')
+
+    def create_test_dataset(self, slicing):
+        self.workspace.create_debug('stitched', channel=self.channel, slicing=slicing)
+        self.update_watcher_main_progress()
+
+    def compute_clip_range(self, pixel_percents=(70, 99.999)):
+        self._compute_uniques()
+        percents = np.asarray(pixel_percents, dtype=float)
+        target_idx = np.rint(percents / 100.0 * (self._n_pixels - 1)).astype(int)
+
+        clip_vals = self.uniques[np.searchsorted(self._cum_counts, target_idx, side="left")]
+
+        return tuple(clip_vals)  # e.g. (low, high)
+
+    def _compute_uniques(self):
+        sampling = self.config['binarization']['decimation_ratio']
+        if self.uniques is None or sampling != self.sampling:
+            self.sampling = sampling
+
+            self.prepare_watcher_for_substep(0, None, 'compute histogram', False)
+
+            array = self.get('stitched', channel=self.channel).open_ro()
+            uniques, counts = np.unique(array[::sampling, ::sampling, ::sampling], return_counts=True)
+            self.uniques = uniques
+            self.uniq_counts = counts
+
+            self._cum_counts = np.cumsum(self.uniq_counts)
+            self._n_pixels = int(self._cum_counts[-1])
+
+    def intensities_to_percentiles(self, low_intensity, high_intensity):
+        """
+        Convert two intensity thresholds to their percentile ranks (0‒100],
+        using the same *nearest-rank* convention as `compute_clip_range`.
+
+        Parameters
+        ----------
+        low_intensity, high_intensity : scalar
+            Intensity values (e.g. gray levels) whose positions in the global
+            histogram are required.
+
+        Returns
+        -------
+        list[float]
+            [low_percentile, high_percentile]
+        """
+        self._compute_uniques()
+        # For each intensity, count how many pixels are ≤ that value ----
+        # With side='right' we include pixels that are exactly equal to the queried intensity
+        # idx of the last ≤ value
+        idx = np.searchsorted(self.uniques, (low_intensity, high_intensity), side='right') - 1
+
+        # Handle values below the smallest unique (idx == -1 → 0 pixels)
+        idx = np.clip(idx, -1, self._cum_counts.size - 1)
+
+        # Number of pixels ≤ each threshold
+        counts = np.where(idx >= 0, self._cum_counts[idx], 0)
+
+        percentiles = counts * 100.0 / self._n_pixels
+        return percentiles.tolist()
+
+    ####################
+
+    def _estimate_n_blocks(self, step: str) -> int:
+        """Estimate number of processing blocks for a step."""
+        try:
+            perf = self.config['performance'][step]['block_processing']
+            source = self.get('stitched', channel=self.channel)
+            dim_size = source.shape()[2]
+            size_max = perf.get('size_max', 100)
+            overlap = perf.get('overlap', 10)
+            return max(1, int(np.ceil((dim_size - size_max) / (size_max - overlap) + 1)))
+        except Exception:
+            return 100  # safe fallback
+
+    def binarize(self, clip_low, clip_high):
+        n_blocks = self._estimate_n_blocks('binarize')
+        self.prepare_watcher_for_substep(n_blocks, self.block_re, 'Binarization', increment_main=True)
+
+        binarization_parameter = vasculature.default_binarization_parameter.copy()
+
+        binarization_parameter['clip']['clip_range'] = (clip_low, clip_high)
+        binarization_parameter['equalize'] = None
+        if self.save_intermediate_binarization_results:
+            if binarization_parameter['equalize'] is not None:
+                binarization_parameter['equalize']['save'] = str(
+                    self.get_path('binary', channel=self.channel, asset_sub_type='equalize')
+                )
+            # binarization_parameter['vesselize']['save'] = str(
+            #     self.get_path('binary', channel=self.channel, asset_sub_type='vesselize')
+            # )
+            # binarization_parameter['median']['save'] = str(
+            #     self.get_path('binary', channel=self.channel, asset_sub_type='median')
+            # )
+        binarization_parameter['vesselize']['threshold'] = 1
+        binarization_parameter['vesselize']['tubeness']['sigma'] = 1
+        binarization_parameter['deconvolve'] = None
+        binarization_parameter['adaptive'] = None
+
+        perf_cfg = self.cfg_coordinator.get_config_view(self.config_name)['performance']
+        processing_parameter = vasculature.default_binarization_processing_parameter.copy()
+        processing_parameter.update(processes=sanitize_n_processes(perf_cfg['binarization']['n_processes']),
+                                    as_memory=False, verbose=True)
+
+        vasculature.binarize(self.get_path('stitched', channel=self.channel),
+                      self.get_path('binary', channel=self.channel),
+                      binarization_parameter=binarization_parameter,
+                      processing_parameter=processing_parameter)
+        print('TractMap binarization finished')
+        self.update_watcher_main_progress()
+
+    def mask_to_coordinates(self, as_memmap=False):
+        self.prepare_watcher_for_substep(1, self.where_re, 'Extracting coordinates', increment_main=True)
+
+        mask = str(self.get_path('binary', channel=self.channel))
+        output_asset = self.get('binary', asset_sub_type='pixels_raw', channel=self.channel)
+        if output_asset.exists:
+            output_asset.delete()
+        if as_memmap:
+            perf_cfg = self.cfg_coordinator.get_config_view(self.config_name)['performance']
+            return array_processing.where(mask, output_asset.path,
+                                          processes=sanitize_n_processes(perf_cfg['where']['n_processes']),
+                                          verbose=True)
+            self.update_watcher_main_progress()
+            print('TractMap coordinates extraction finished')
+        else:
+            raise NotImplementedError('Output to file not implemented yet')
+
+    @staticmethod
+    def transformation(coords, source_shape, resampled_shape, results_directories):
+        coords = resample_points(
+            coords, sink=None, orientation=None,
+            source_shape=source_shape,
+            sink_shape=resampled_shape
+        )
+
+        for results_dir in results_directories:
+            # We copy the parameter files to a temporary directory to avoid conflicts during parallel processing
+            # (transform_points keeps its input and output points in a folder of its own)
+            with tempfile.TemporaryDirectory(suffix='_elastix_params') as temp_params_dir:
+
+
+                # Copy the params files to avoid a race condition because they get edited by each process
+                file_names = list(results_dir.glob('TransformParameters.*.txt'))
+                if not file_names:
+                    raise FileNotFoundError(f'No parameter files found in {results_dir}')
+                # print(f'Copying {file_names} to {temp_params_dir}')
+                for f_name in file_names:
+                    f_name = Path(f_name).relative_to(results_dir)
+                    f_path = results_dir / f_name
+                    dest_path = Path(temp_params_dir) / f_name
+                    shutil.copyfile(f_path, dest_path)
+
+                coords = elastix.transform_points(
+                    coords, sink=None,
+                    transform_directory=temp_params_dir,
+                    binary=True, indices=False)
+
+        return coords
+
+    def parallel_transform(self, processes=-1):
+        n_blocks = self._estimate_n_blocks('transform')
+        self.prepare_watcher_for_substep(n_blocks, self.block_re, 'Transforming coordinates', increment_main=True)
+
+        coords = self.get('binary', channel=self.channel, asset_sub_type='pixels_raw').open_ro()
+        coordinates_transformed_path = self.get_path('binary', asset_sub_type='coordinates_transformed', channel=self.channel)
+        coordinates_transformed_path.unlink(missing_ok=True)
+        transformed_coords = array_processing.initialize_sink(coordinates_transformed_path,
+            dtype='float64', shape=coords.shape, return_buffer=False
+        )
+
+        target_channel = 'atlas'  # FIXME: add control for target channel
+        status_bcp = self.workspace.debug
+        self.workspace.debug = False
+        resampled_shape = self.sample_manager.resampled_shape(channel=self.channel)
+        self.workspace.debug = status_bcp
+        if resampled_shape is None:
+            # FIXME: in this case compute from scale differences
+            raise ValueError(f'Resampled shape not found for channel {self.channel}')
+
+        results_directories = self.registration_processor.get_transform_directories(self.channel,
+                                                                                    stop_channel=target_channel)
+
+        debug_bcp = self.workspace.debug
+        self.workspace.debug = False
+        source_shape = self.sample_manager.stitched_shape(channel=self.channel)
+        self.workspace.debug = debug_bcp
+        transfo = functools.partial(TractMapProcessor.transformation,
+                                    source_shape=source_shape,
+                                    resampled_shape=resampled_shape,
+                                    results_directories=results_directories
+                                    )
+        transfo.__name__ = 'parallel_transform'
+
+        perf_cfg = self.cfg_coordinator.get_config_view(self.config_name)['performance']['transform']['block_processing']
+        processes = sanitize_n_processes(processes)
+        if processes != 1:  # explicit single thread
+            processes = sanitize_n_processes(perf_cfg['n_processes'])  # FIXME: decide
+
+        if processes == 1:
+            transformed_coords[:, :] = transfo(coords)
+        else:
+            block_processing.process(transfo, coords, transformed_coords,
+                                     axes=[0], processes=processes,
+                                     size_min=perf_cfg['size_min'],
+                                     size_max=perf_cfg['size_max'],
+                                     verbose=True)
+        self.update_watcher_main_progress()
+        print('TractMap coordinates transformed')
+        return transformed_coords
+
+    def label(self):
+        n_blocks = self._estimate_n_blocks('label')
+        self.prepare_watcher_for_substep(n_blocks, self.label_re, 'Labeling coordinates', increment_main=True)
+
+        class AnnotationProxy:
+            def __init__(self, annotator):
+                self._annotator = annotator
+
+            def label_points(self, coords):
+                return self._annotator.label_points(coords)
+
+        class AnnotationManager(BaseManager):
+            pass
+
+        AnnotationManager.register('Annotation', AnnotationProxy)  # added 3.11 shutdown_timeout
+
+        coordinates_transformed = self.get('binary', channel=self.channel,
+                                           asset_sub_type='coordinates_transformed').open_ro()
+        labels = array_processing.initialize_sink(self.get_path('binary', channel=self.channel,
+                                                                asset_sub_type='labels'),
+                                 dtype='int64', shape=(coordinates_transformed.shape[0], 1),
+                                 return_buffer=False)
+
+        with AnnotationManager() as manager:
+            annotator = manager.Annotation(self.registration_processor.annotator_of(self.channel))
+            labeling_fn = functools.partial(label_points_wrapper, annotator)
+            labeling_fn.__name__ = 'label_points'  # for block_processing prints
+            perf_cfg = self.cfg_coordinator.get_config_view(self.config_name)['performance']['label']['block_processing']
+            block_processing.process(labeling_fn, coordinates_transformed, labels,
+                                     axes=[0], processes=sanitize_n_processes(perf_cfg['n_processes']),
+                                     size_min=perf_cfg['size_min'], size_max=perf_cfg['size_max'],
+                                     verbose=True)
+        self.update_watcher_main_progress()
+        print('TractMap coordinates labeled')
+        return labels
+
+    def shift_coordinates(self):
+        """Shift the coordinates by the cropping amount to get the values in whole sample reference frame"""
+        coords_asset = self.get('binary', asset_sub_type='pixels_raw', channel=self.channel)
+        coordinates = coords_asset.edit()
+        for i in range(3):
+            shift = self.config['test_set_slicing'][f'dim_{i}'][0]
+            coordinates[:, i] += shift
+        if not isinstance(coordinates, (np.memmap, MMPSource)):
+            io_ops.write(coords_asset.path, coordinates)
+        print('TractMap coordinates shifted')
+
+    def run_pipeline(self, tuning=False):
+        self.workspace.debug = tuning
+
+        self.binarize(*self.config['binarization']['clip_range'])
+        self.mask_to_coordinates(as_memmap=USE_BINARY_POINTS_FILE)
+
+        if tuning:
+            self.shift_coordinates()
+
+        self.parallel_transform()
+        self.label()
+        self.voxelize()
+
+        self.export_df(asset_sub_type=None)
+
+        self.workspace.debug = False
+
+    def export_df(self, asset_sub_type=None):
+        self.prepare_watcher_for_substep(1, self.block_re, 'Exporting', increment_main=True)
+
+        ratio = self.config['display']['decimation_ratio']
+        decimated_coordinates_raw = self.get(
+            'binary', channel=self.channel, asset_sub_type='pixels_raw').open_ro()[::ratio, :]
+
+        decimated_coordinates_transformed = self.get(
+            'binary', channel=self.channel,
+            asset_sub_type='coordinates_transformed').open_ro()[::ratio, :]
+
+        decimated_labels = self.get('binary', channel=self.channel,
+                                    asset_sub_type='labels').open_ro()[::ratio, :]
+
+        # Build the DataFrame
+        df = pd.DataFrame({'id': decimated_labels[:, 0]})
+        for i, l in enumerate('xyz'):
+            df[l] = decimated_coordinates_raw[:, i]
+
+        for i, l in enumerate('xyz'):
+            df[f'{l}t'] = decimated_coordinates_transformed[:, i]
+
+        unique_ids = np.sort(np.unique(decimated_labels))
+        annotator = self.registration_processor.annotator_of(self.channel)
+        color_map = {id_: annotator.find(id_, key='id')['rgb'] for id_ in unique_ids}
+        color_map[0] = np.array((1, 0, 0))  # default to red
+        df['color'] = df['id'].map(color_map)
+
+        df.to_feather(self.get_path('tract_voxels', channel=self.channel,
+                                    asset_sub_type=asset_sub_type, extension='.feather'))
+        self.update_watcher_main_progress()
+        print('TractMap DF exported')
+        return df
+
+    def voxelize(self):
+        self.prepare_watcher_for_substep(1, self.block_re, 'Voxelization', increment_main=True)
+
+        voxelization_parameter = dict(
+            shape=source_geometry.shape(self.registration_processor.annotator_of(self.channel).annotation_file),
+            dtype=None,
+            weights=None,
+            method='sphere',
+            radius=self.config['voxelization']['radii'],
+            kernel=None,
+            processes=None,
+            verbose=True
+        )
+        coords_src = self.get('binary', asset_sub_type='coordinates_transformed', channel=self.channel).open_ro()
+        density_f_path = self.get_path('density', channel=self.channel, asset_sub_type='counts')
+        voxelize(coords_src, sink=density_f_path, **voxelization_parameter)
+        self.update_watcher_main_progress()
+        print('TractMap voxelization finished')
+
+    def plot_binarization_levels(self, low_spin_box, high_spin_box):  # TODO: default=None and create dialog if missing
+        from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
+        asset = self.get('stitched', channel=self.channel)
+        if not asset.exists:  # FIXME: could compute
+            raise MissingRequirementException(f'plot_binarization_levels missing file: {asset} {asset.path} not found')
+
+        dv = q_plot_3d.plot(asset.path, title=f'Binarization levels', arrange=False)[0]
+        dv._add_hi_lo_lut(low_spin_box, high_spin_box)
+        return [dv]
+        # dvs = q_plot_3d.plot([[asset.path, asset.path]], title=f'Binarization levels', arrange=False)
+        # dvs[0]._add_hi_lo_lut(low_spin_box, high_spin_box)
+        # return dvs
+
+    def plot_binary(self, debug=False):
+        from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
+
+        ws_debug_backup = self.workspace.debug
+        self.workspace.debug = debug
+        binary_asset = self.get('binary', channel=self.channel)
+        if not binary_asset.exists:
+            raise MissingRequirementException(f'plot_binary missing file: {binary_asset.path} not found')
+        stitched_asset = self.get('stitched', channel=self.channel)
+        if stitched_asset.exists:
+            to_plot = [[binary_asset.path, stitched_asset.path]]
+        else:
+            to_plot = binary_asset.path
+        dv = q_plot_3d.plot(to_plot, title=f'Binary mask', arrange=False)[0]
+        self.workspace.debug = ws_debug_backup
+        return [dv]
+
+    def plot_tracts_3d_scatter_w_atlas_colors(self, raw=False, coordinates_from_debug=False, plot_onto_debug=False, parent=None):
+        import pyqtgraph as pg
+        from matplotlib.colors import to_hex
+        from ClearMap.Visualization.Qt.widgets import Scatter3D
+        from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
+
+        asset_properties = {'channel': self.channel}
+        if raw:
+            asset_properties['asset_type'] = 'stitched'  # FIXME: select based on range
+            # asset_properties['asset_type'] = 'resampled'
+        else:
+            if self.registration_processor.was_registered:
+                asset_properties['asset_type'] = 'atlas'
+                asset_properties['asset_sub_type'] = 'reference'
+            else:
+                asset_properties['asset_type'] = 'resampled'
+
+        ws_debug_backup = self.workspace.debug
+        self.workspace.debug = plot_onto_debug
+        asset = self.get(**asset_properties)
+        asset_path = asset.path
+
+        self.workspace.debug = coordinates_from_debug
+        df_path = self.get_path('tract_voxels', channel=self.channel, extension='.feather')
+        self.workspace.debug = ws_debug_backup
+        if not asset_path.exists() or not df_path.exists():
+            raise MissingRequirementException(f'plot_3d_scatter_w_atlas_colors missing files:'
+                                              f'image: {asset_path} {"not" if not asset_path.exists() else ""} found'
+                                              f'tract voxels data frame {"not" if not df_path.exists() else ""} found')
+        # FIXME: correct scaling for anisotropic if raw
+        dv = q_plot_3d.plot(asset_path, title=f'{asset_properties["asset_type"].title()} and tracts coordinates',
+                           arrange=False, lut='white', parent=parent)[0]
+
+        scatter = pg.ScatterPlotItem()
+
+        dv.view.addItem(scatter)
+        dv.scatter = scatter
+
+        df = pd.read_feather(df_path)
+
+        if raw:
+            coordinates = df[['x', 'y', 'z']].values.astype(int)
+            # coordinates = coordinates * np.array(self.sample_manager.config['resolutions']['raw'])
+            # coordinates = coordinates.astype(int)  # required to match integer z  # FIXME: correct scaling for anisotropic
+        else:
+            coordinates = df[['xt', 'yt', 'zt']].values.astype(int)  # required to match integer z
+            dv.atlas = self.get('atlas', channel=self.channel, asset_sub_type='annotation').read()
+            dv.structure_names = self.registration_processor.annotator_of(self.channel).get_names_map()
+        if 'hemisphere' in df.columns:
+            hemispheres = df['hemisphere']
+        else:
+            hemispheres = None
+
+        unique_ids = np.sort(np.unique(df['id']))
+        annotator = self.registration_processor.annotator_of(self.channel)
+        # color_map = {id_: annotator.find(id_, key='id')['rgb'] for id_ in unique_ids}
+        color_map = {id_: annotator.convert_label(id_, key='id', value='color_hex_triplet') for id_ in unique_ids}
+        color_map[0] = np.array(to_hex((1, 0, 0)))  # default to red
+        df['color'] = df['id'].map(color_map)
+        dv.scatter_coords = Scatter3D(coordinates, colors=df['color'].to_list(),
+                                      hemispheres=hemispheres, z_radius=0)  # plotting adjacent is too slow for tracts
+        dv.refresh()
+        return [dv]
+
+    def plot_voxelized_counts(self):
+        from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
+
+        asset = self.get('density', channel=self.channel, asset_sub_type='counts')
+        if not asset.exists:
+            raise MissingRequirementException(f'plot_voxelized_counts missing file: {asset.path} not found')
+        dv = q_plot_3d.plot(asset.path, title=f'Voxelized counts', arrange=False, lut='flame')[0]
+        return [dv]

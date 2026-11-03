@@ -5,37 +5,27 @@ Filling
 Parallel binary filling on arbitraily sized images.
 """
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__ = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
-__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+__download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import os
-import multiprocessing as mp
 import gc
-import pyximport
 
 import numpy as np
 
-
-old_get_distutils_extension = pyximport.pyximport.get_distutils_extension
-
-
-def new_get_distutils_extension(modname, pyxfilename, language_level=None):
-    extension_mod, setup_args = old_get_distutils_extension(modname, pyxfilename, language_level)
-    extension_mod.language = 'c++'
-    return extension_mod, setup_args
-
-
-pyximport.pyximport.get_distutils_extension = new_get_distutils_extension
+import pyximport
 
 pyximport.install(setup_args={"include_dirs": [np.get_include(), os.path.dirname(os.path.abspath(__file__))]},
                   reload_support=True)
 
 from . import FillingCode as code
 
-import ClearMap.IO.IO as io
+from ClearMap.IO import source_geometry
+from ClearMap.Utils.utilities import sanitize_n_processes
 import ClearMap.Utils.Timer as tmr
+import ClearMap.Utils.array_checks as ac
 
 
 #%%############################################################################
@@ -47,11 +37,13 @@ def fill(source, sink=None, seeds=None, processes=None, verbose=False):
 
     Arguments
     ---------
-    source : array
+    source: np.ndarray
         Input source.
-    sink : array or None
-        If None, a new array is allocated.
-    seeds
+    sink: np.ndarray or None
+        If None, a new array is allocated in memory.
+    seeds : array or None
+        An array of seed points for the fill operation.
+        If None, the border indices of the source are used as seeds.
     processes: int or None
         How many CPU cores to use, None defaults to max
     verbose: bool
@@ -69,22 +61,21 @@ def fill(source, sink=None, seeds=None, processes=None, verbose=False):
         print('Binary filling: initialized!', flush=True)
         timer = tmr.Timer()
 
+    # The flat source, temp and sink arrays must share the same memory layout, as flat indices and
+    # strides computed from one are used on the others: work on a contiguous source.
+    order = source_geometry.order(source)  # keep the layout of contiguous sources
+    if order not in ('C', 'F'):  # non contiguous: copy to ClearMap's default (Fortran) order
+        order = 'F'
+    source = np.asarray(source, order=order)  # copy only if not contiguous (read-only is fine)
+
     # create temporary shared array
-    order = io.order(source)
     temp = np.empty(source.shape, dtype='int8', order=order)
 
-    source_flat = source.reshape(-1, order='A')
-    temp_flat = temp.reshape(-1, order='A')
+    source_flat = ac.as_uint8_flags(source.reshape(-1, order=order), name='source')  # non zero is foreground
+    temp_flat = temp.reshape(-1, order=order)
 
-    if source_flat.dtype == bool:
-        source_flat = source_flat.view(dtype='uint8')
+    processes = sanitize_n_processes(processes)
 
-    if processes is None:
-        processes = mp.cpu_count()
-    elif isinstance(processes, str) and processes == 'serial':
-        processes = 1
-    if not isinstance(processes, int):
-        raise ValueError(f'Processes must be one of None, int or "serial", got {processes}')
     if verbose:
         print(f'\tBinary filling: Using {processes} processes', flush=True)
         print('\tBinary filling: temporary arrays created', flush=True)
@@ -98,9 +89,13 @@ def fill(source, sink=None, seeds=None, processes=None, verbose=False):
     if seeds is None:
         seeds = border_indices(source)
     else:
-        seeds = np.where(seeds.reshape(-1, order=order))[0]
+        seeds = np.asarray(seeds)
+        if seeds.shape != source.shape:
+            raise ValueError(f'The seeds shape {seeds.shape!r} does not match the source shape {source.shape!r}!')
+        (seeds, ) = np.where(seeds.reshape(-1, order=order))
+    seeds = ac.as_index_array(seeds, name='seeds', ndim=1)
 
-    strides = np.array(io.element_strides(source))
+    strides = ac.as_index_array(source_geometry.element_strides(temp), name='strides', ndim=1)
 
     code.label_temp(temp_flat, strides, seeds, processes=processes)
     if verbose:
@@ -108,12 +103,13 @@ def fill(source, sink=None, seeds=None, processes=None, verbose=False):
 
     if sink is None:
         sink = np.empty(source.shape, dtype=bool, order=order)
-    sink_flat = sink.reshape(-1, order=order)
+    if sink.shape != source.shape:
+        raise ValueError(f'The sink shape {sink.shape!r} does not match the source shape {source.shape!r}!')
+    sink_flat = ac.check_dtype(ac.bool_as_uint8(sink.reshape(-1, order=order)), (np.uint8,), name='sink')
+    if not np.shares_memory(sink_flat, sink):  # the result would be written to a copy
+        raise ValueError(f'The sink must be {order}-contiguous like the source!')
 
-    if sink_flat.dtype == 'bool':
-        sink_flat = sink_flat.view(dtype='uint8')
-
-    code.fill(source_flat, temp_flat, sink_flat, processes=processes, verbose=True)
+    code.fill(source_flat, temp_flat, sink_flat, processes=processes, verbose=verbose)
 
     if verbose:
         timer.print_elapsed_time('Binary filling')
@@ -129,7 +125,7 @@ def border_indices(source):
 
     ndim = source.ndim
     shape = source.shape
-    strides = io.element_strides(source)
+    strides = source_geometry.element_strides(source)
 
     border = []
     for d in range(ndim):
@@ -139,7 +135,7 @@ def border_indices(source):
             where = np.where(np.logical_not(source[sl]))
             n = len(where[0])
             if n > 0:
-                indices = np.zeros(n, dtype=int)
+                indices = np.zeros(n, dtype=np.intp)
                 l = 0
                 for k in range(ndim):
                     if k == d:
@@ -148,7 +144,8 @@ def border_indices(source):
                         indices += strides[k] * (where[l] + offsets[k])
                         l += 1
                 border.append(indices)
-    return np.concatenate(border)
+    empty_array = np.zeros(0, dtype=np.intp)
+    return np.concatenate(border) if border else empty_array
 
 
 def _test():

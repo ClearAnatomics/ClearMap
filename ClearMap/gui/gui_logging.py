@@ -5,7 +5,9 @@ gui_logging
 
 Defines the Printer class used to log to file and to the GUI widgets from simple prints
 """
+import re
 import sys
+import traceback
 from datetime import datetime
 from io import UnsupportedOperation
 
@@ -19,10 +21,30 @@ __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
-__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+__download__ = 'https://github.com/ClearAnatomics/ClearMap'
+
+import pygments
+from pygments.formatters.html import HtmlFormatter
+from pygments.lexers.python import PythonTracebackLexer  # noqa
+
+from qdarkstyle import DarkPalette
+
+from ClearMap.gui.style import WARNING_YELLOW
+_ANSI_RE = re.compile(
+    r'(?:'
+    r'\x1b\[[0-9;]*[A-Za-z]'           # CSI sequence  ESC [ ... X
+    r'|\x1b\][^\x07\x1b\x9c]*'         # OSC open      ESC ] ...
+      r'(?:\x07|\x1b\\|\x9c)'          #   ... terminated by BEL, ST, or 0x9C
+    r'|\x1b[PX^_][^\x1b\x9c]*'         # DCS / SOS / PM / APC
+      r'(?:\x1b\\|\x9c)'               #   ... terminated
+    r'|\x1b[@-Z\\-_]'                  # Fe sequences  ESC + one byte
+    r'|[\x80-\x9f]'                    # C1 control bytes (includes 0x9C)
+    r')'
+)
 
 
 class Printer(QWidget):
+    #: Triggered on ``write``
     text_updated = QtCore.pyqtSignal(str)
     original_std_out = sys.stdout
     original_std_err = sys.stderr
@@ -33,7 +55,12 @@ class Printer(QWidget):
         self.n_lines = 0
         self.color = color
         self.type = logger_type
+        # if logger_type == 'error':
+        #     self.setup_except_hook()
+        print(f'Logger initialized with type: {logger_type}, redirects: {redirects}, log path: {log_path}')
         self.redirects = redirects
+        self._original_stream = None  # stored before redirect
+        self._line_buf = ''
 
         self.set_file(log_path, open_mode)
 
@@ -45,7 +72,18 @@ class Printer(QWidget):
     def __del__(self):
         self.close_file()
 
+    @staticmethod
+    def _strip_ansi(text: str) -> str:
+        return _ANSI_RE.sub('', text)
+
     def close_file(self):
+        # Flush any buffered partial line
+        if self._line_buf:
+            if self.file is not None:
+                self.file.write(self._line_buf + '\n')
+                self.file.flush()
+            self.text_updated.emit(self.colourise(self._line_buf))
+            self._line_buf = ''
         try:
             self.file.close()
         except AttributeError:
@@ -53,37 +91,87 @@ class Printer(QWidget):
         self.__unset_redirects()
 
     def set_file(self, log_path, open_mode='a'):
-        self.close_file()
+        self.close_file()  # flushes _line_buf via close_file
+        self._line_buf = ''  # reset for new file
         if log_path:
             self.file = open(log_path, open_mode)
             self.n_lines = 0
             self.__set_redirects()
 
+    def setup_except_hook(self):
+        def except_hook(exc_type, exc_value, exc_tb):
+            lexer = PythonTracebackLexer()
+            default_style = 'native'
+            style = 'nord-darker' if 'nord-darker' in pygments.styles.get_all_styles() else default_style
+            formatter = HtmlFormatter(full=True, style=style, linenos='table', wrapcode=True, noclasses=True)
+            formatter.style.background_color = DarkPalette.COLOR_BACKGROUND_1
+            raw_traceback = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+            formatted_traceback = pygments.highlight(raw_traceback, lexer, formatter)
+            self.write(formatted_traceback)
+            if isinstance(exc_type(), Warning):
+                self.warning_disclaimer()
+
+        sys.excepthook = except_hook
+
     def __set_redirects(self):
         if self.redirects == 'stdout':
+            self._original_stream = self.original_std_out
+            self.encoding = sys.stdout.encoding
             sys.stdout = self
         elif self.redirects == 'stderr':
+            self._original_stream = self.original_std_err
+            self.encoding = sys.stderr.encoding
             sys.stderr = self
 
     def __unset_redirects(self):
         if self.redirects == 'stdout':
-            sys.stdout = self.original_std_out
+            sys.stdout = self._original_stream or self.original_std_out
         elif self.redirects == 'stderr':
-            sys.stderr = self.original_std_err
+            sys.stderr = self._original_stream or self.original_std_err
+        self._original_stream = None
 
-    def write(self, msg):
-        if self.file is not None:
-            if self.type in ('error', 'progress'):
-                self.file.write(f'{datetime.now().strftime("%y-%m-%d %H:%M:%S")}: ')
-            self.file.write(msg+'\n')
-            self.file.flush()
-        self.text_updated.emit(self.colourise(msg))
+    def write(self, msg: str):
+        # Console: pass through verbatim
+        if self.redirects and self._original_stream is not None:
+            try:
+                self._original_stream.write(msg)
+                self._original_stream.flush()
+            except (ValueError, OSError):
+                pass  # stream closed
+        # Now strip before the rest
+        clean = self._strip_ansi(msg)
+
+        # Buffer until we have complete lines
+        self._line_buf += clean
+        if '\n' not in self._line_buf:
+            return  # wait for more
+
+        # Split into complete lines + leftover
+        *lines, self._line_buf = self._line_buf.split('\n')
+
+        for line in lines:
+            if not line and not lines:  # skip empty from trailing \n
+                continue
+
+            # File
+            if self.file is not None:
+                if self.type in ('error', 'progress'):
+                    self.file.write(f'{datetime.now().strftime("%y-%m-%d %H:%M:%S")}: ')
+                self.file.write(line + '\n')
+                self.file.flush()
+
+            # GUI
+            self.text_updated.emit(self.colourise(line))
 
     def flush(self):
         try:
             self.file.flush()
         except AttributeError:
             pass
+
+    def warning_disclaimer(self):
+        self.write(f'<strong><p style="color:{WARNING_YELLOW}">'
+                   f'THIS IS A WARNING AND CAN NORMALLY BE SAFELY IGNORED</p></strong>')
 
     def fileno(self):
         if self.file is not None:

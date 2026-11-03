@@ -8,17 +8,17 @@ Collection of routines to detect maxima in scalar images.
 Used for finding cells or intensity peaks.
 """
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__ = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
-__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+__download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import numpy as np
 
 import scipy.ndimage.measurements as ndm
 import scipy.ndimage.filters as ndf
 
-import ClearMap.ImageProcessing.GreyReconstruction as gr
+import ClearMap.ImageProcessing.grey_reconstruction as gr
 
 import ClearMap.Utils.Timer as tmr
 import ClearMap.Utils.HierarchicalDict as hdict
@@ -42,12 +42,13 @@ def h_max_transform(source, h_max):
     Returns
     -------
     transformed : array
-        H-max transformed image if h is not None.
+        H-max transformed image if h is not None (as float32 for an integer image).
     """
     if h_max is None:
         return source
-    else:
-        return gr.reconstruct(source - h_max, source)
+    # In an unsigned type, source - h_max wraps around below h_max: work in float (exact for 8 and 16-bit images)
+    values = source if np.issubdtype(source.dtype, np.floating) else source.astype(np.float32)
+    return gr.reconstruct(values - h_max, values)
 
 
 def local_max(source, shape=5):
@@ -193,7 +194,7 @@ def find_center_of_maxima(source, maxima=None, label=None, verbose=False):
         n_label = label.max()
 
     if n_label > 0:
-        centers = np.array(ndm.center_of_mass(source, label, index=np.arange(1, n_label)))
+        centers = np.array(ndm.center_of_mass(source, label, index=np.arange(1, n_label + 1)))  # Labels 1 to n
     else:
         centers = np.zeros((0, source.ndim))
 
@@ -201,3 +202,28 @@ def find_center_of_maxima(source, maxima=None, label=None, verbose=False):
         timer.print_elapsed_time(f'Center of Maxima: {centers.shape[0]} maxima detected')
 
     return centers
+
+def label_representatives(A:np.ndarray,eliminate_zero_label=True)->tuple[np.ndarray,...]:
+    """Return the multi-index of one element per non empty labeled region.
+        The 0 labeled region is ignored by default and can be included optionally.
+
+    Parameters
+    ----------
+    A : np.ndarray
+        The labeled regions
+    eliminate_zero_label : bool, optional
+        If the representative for the 0 label is to be eliminated, 
+        by default True
+
+    Returns
+    -------
+    tuple[np.ndarray,...]
+        The multi indices of one representative point per region, the ith 
+        coordinate of the kth point is the kth entry of the ith array in 
+        the tuple.
+    """
+    labels,indices = np.unique(A,return_index=True)
+    if eliminate_zero_label:
+        indices = indices[np.where(labels)]
+    multi_indices = np.unravel_index(indices,A.shape)
+    return multi_indices

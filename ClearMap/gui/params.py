@@ -1,214 +1,871 @@
-# -*- coding: utf-8 -*-
 """
 params
 ======
 
 All the classes that define parameters or group thereof for the tabs of the graphical interface
 """
-import os
+import functools
 import string
-from itertools import permutations
-from typing import List
+import warnings
+from typing import Callable, Iterable, List, Mapping, Optional
 
 import numpy as np
 
-from ClearMap.config.atlas import ATLAS_NAMES_MAP
-from ClearMap.gui.gui_utils import create_clearmap_widget, clear_layout
+from PyQt5.QtCore import Qt, QTimer, QSignalBlocker
+from PyQt5.QtWidgets import (QToolBox, QCheckBox, QLabel, QHBoxLayout, QVBoxLayout,
+                             QSpinBox, QLineEdit, QDoubleSpinBox, QRadioButton, QFrame, QDialog, QButtonGroup,
+                             QMessageBox)
 
-from ClearMap.gui.dialogs import get_directory_dlg
-from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtWidgets import QInputDialog, QToolBox, QCheckBox
+from ClearMap.Analysis.graphs.graph_filters import GraphFilter, combined_filters_name
+from ClearMap.IO.FileUtils import FileRenameError, Rename, apply_renames
+from ClearMap.IO.channel_file_renaming import ChannelRenamePlan
+from ClearMap.Analysis.graphs.graph_weights import GraphWeight
+from ClearMap.config.atlas import ATLAS_NAMES_MAP
+from ClearMap.config.compound_keys import channel_file_name_token
+from ClearMap.config.config_coordinator import refuse_renames_onto_existing_channels
+from ClearMap.config.registration_channels import (ALIGN_WITH_NOTHING, ALIGN_WITH_UNDECIDED, ATLAS,
+                                                   INTRINSICALLY_ALIGNED, MOVING_OTHER, MOVING_SELF,
+                                                   NOT_SELECTED_FOR_REGISTRATION, REFERENCE_UNDECIDED,
+                                                   REGISTRATION_DIRECTIONS,
+                                                   partner_change, registration_direction)
+from ClearMap.Utils.exceptions import ChannelNameTakenError, ClearMapConfigError, ClearMapValueError
+from ClearMap.Utils.utilities import snake_to_title, trim_or_pad
+from ClearMap.config.config_adjusters.dict_ops import set_item_recursive
+from ClearMap.config.config_adjusters.patch_ops import REPLACE
+from ClearMap.config.orientation import validate_orientation, DEFAULT_ORIENTATION
+from ClearMap.Utils.event_bus import Publishes, EventBus
+from ClearMap.Utils.events import (UiChannelRenamed, UiCropChanged, UiOrientationChanged, UiRequestPlotAtlas,
+                                   UiPrepareRawDataForClearMap, UiRequestPlotMiniBrain, UiChannelsChanged,
+                                   UiLayoutChannelChanged, UiUseExistingLayoutChanged, UiAlignWithChanged,
+                                   UiRequestLandmarksDialog, UiAtlasIdChanged, UiAtlasStructureTreeIdChanged,
+                                   UiVesselGraphFiltersChanged, UiBatchResultsFolderChanged, UiBatchGroupsChanged)
+
+from .dialogs import VerifyRenamingDialog
+from .exception_handler import handle_exception
+from .gui_utils_base import replace_widget
+from .params_mixins import OrthoviewerSlicingMixin
+from .pipeline_model import BINARIZATION_STEPS, PipelineStep, LinearPipeline
+from .pipeline_widgets import LinearPipelineWidget
+from .widget_monkeypatch_callbacks import recursive_patch_compound_boxes
+from .params_interfaces import (ParamLink, UiParameter, ChannelUiParameter, UiParameterCollection,
+                                ChannelsUiParameterCollection, VectorLink, invert, param_setter, param_handler,
+                                list_widget_setter, list_widget_getter, _linear_pipeline_connector)
+from .widgets import LandmarksWeightsPanel, ComparisonsModel, ComparisonsWidgetAdapter, Pair, GroupsWidgetAdapter, \
+    FileDropListWidget
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
-__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+__download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
-from ClearMap.gui.params_interfaces import ParamLink, UiParameter, UiParameterCollection
-
-
-class ParamsOrientationError(ValueError):
-    pass
+NO_PARTNER_TEXT = 'None'  # The item of the align_with combo box for a channel which is not registered (config: None)
+UNDEFINED_LAYOUT_CHANNEL_TEXT = 'undefined'  # The item of the layout channel combo box when none is chosen (config: None)
 
 
-class AlignmentParams(UiParameterCollection):
-    def __init__(self, tab, src_folder=None):
-        super().__init__(tab, src_folder)
-        self.stitching_general = GeneralStitchingParams(tab, src_folder)
-        self.stitching_rigid = RigidStitchingParams(tab, src_folder)
-        self.stitching_wobbly = WobblyStitchingParams(tab, src_folder)
-        self.registration = RegistrationParams(tab, src_folder)
+def align_with_choices(other_channels: Iterable[str]) -> list[str]:
+    """
+    The texts of the align_with combo box of a channel: not chosen yet (the token itself), not registered, the atlas,
+    the other channels. Texts only: None would be an empty item, which no partner is.
+    """
+    return [ALIGN_WITH_UNDECIDED, NO_PARTNER_TEXT, ATLAS, *other_channels]
 
-    def fix_cfg_file(self, f_path):
-        # cfg = ConfigLoader.get_cfg_from_path(f_path)
-        pipeline_name, ok = QInputDialog.getItem(self.tab, 'Please select pipeline type',
-                                                 'Pipeline name:', ['CellMap', 'TubeMap', 'Both'], 0, False)
-        if not ok:
-            raise ValueError('Missing sample ID')
-        self.config['pipeline_name'] = pipeline_name
-        # WARNING: needs to be self.config
-        #  to be sure that we are up to date
-        #  (otherwise write but potentially no reload)
-        self.write_config()
+
+def align_with_to_ui(align_with: str | None) -> str:
+    """The text of the align_with combo box for the partner of the config: None (not registered) is an explicit item"""
+    return NO_PARTNER_TEXT if align_with is ALIGN_WITH_NOTHING else align_with
+
+
+def align_with_from_ui(text: str) -> str | None:
+    """The partner of the config for the text of the align_with combo box (the combo box getter gives None for it)"""
+    return ALIGN_WITH_NOTHING if text == NO_PARTNER_TEXT else text
+
+
+def reference_channel_choices(channels: Iterable[str]) -> list[str]:
+    """
+    The texts of the reference channel combo box: not chosen yet (the token itself), none ('None': no channel is
+    aligned with the atlas), the channels. Translated as the partner of a channel (align_with_to_ui and _from_ui).
+    """
+    return [REFERENCE_UNDECIDED, NO_PARTNER_TEXT, *channels]
+
+
+def layout_channel_to_ui(layout_channel: str | None) -> str:
+    """The text of the layout channel combo box for the layout channel of the config (None: none is chosen)"""
+    return layout_channel or UNDEFINED_LAYOUT_CHANNEL_TEXT
+
+
+def layout_channel_from_ui(text: str | None) -> str | None:
+    """The layout channel of the config for the text of the layout channel combo box: None if none is chosen"""
+    return None if text == UNDEFINED_LAYOUT_CHANNEL_TEXT else text
+
+
+class NProcessesParams(UiParameter):
+    """
+    Minimal helper for performance.<step>.n_processes
+    """
+    n_processes: int
+
+    def __init__(self, tab, *, cfg_path: list[str],
+                 event_bus: EventBus, get_view=None, apply_patch=None):
+        self.cfg_path = list(cfg_path)
+        super().__init__(tab, event_bus=event_bus,
+                         get_view=get_view, apply_patch=apply_patch)
+
+    def build_params_dict(self):
+        return {'n_processes': ParamLink(self.cfg_path, self.tab.nProcessesSpinBox),}
 
     @property
-    def params(self):
-        return self.stitching_general, self.stitching_rigid, self.stitching_wobbly, self.registration
+    def cfg_subtree(self):
+        # parent: e.g. ['tract_map', 'performance', 'binarization']
+        return self.cfg_path[:-1]
+
+
+class BlockProcessingParams(UiParameter):
+    """
+    Generic block-processing parameters (n_processes + size_min / size_max / overlap).
+
+    You can attach this to any 'block_processing' subtree by passing cfg_prefix.
+    tab is expected to be the BlockProcessingParamsWidget for that step.
+    """
+
+    n_processes: int
+    size_min: int | None
+    size_max: int | None
+    overlap: int | None
+
+    def __init__(self, tab, *, cfg_prefix: list[str],
+                 event_bus: EventBus, get_view=None, apply_patch=None):
+        self.cfg_prefix = list(cfg_prefix)
+        super().__init__(tab, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
+
+
+    def build_params_dict(self):
+        def path(*tail):
+            return self.cfg_prefix + list(tail)
+
+        return {
+            'n_processes': ParamLink(path('n_processes'), self.tab.nProcessesSpinBox),
+            'size_min': ParamLink(path('size_min'), self.tab.sizeMinSpinBox,
+                                  disabled_value=None, ui_sentinel=-1, enforce_sentinel_min=True),
+            'size_max': ParamLink(path('size_max'), self.tab.sizeMaxSpinBox,
+                                  disabled_value=None, ui_sentinel=-1, enforce_sentinel_min=True),
+            'overlap': ParamLink(path('overlap'), self.tab.overlapSpinBox,
+                                 disabled_value=None, ui_sentinel=-1, enforce_sentinel_min=True),
+        }
 
     @property
-    def all_stitching_params(self):
-        return self.stitching_general, self.stitching_rigid, self.stitching_wobbly
-
-    @property
-    def pipeline_name(self):
-        return self.config['pipeline_name']
-
-    @pipeline_name.setter
-    def pipeline_name(self, name):
-        self.config['pipeline_name'] = name
-
-    # @property
-    # def pipeline_is_cell_map(self):
-    #     return self.pipeline_name.lower().replace('_', '') == 'cellmap'
-    #
-    # @property
-    # def pipeline_is_tube_map(self):
-    #     return self.pipeline_name.lower().replace('_', '') == 'tubemap'
-    #
-    # @property
-    # def pipeline_is_both(self):
-    #     return self.pipeline_name.lower().replace('_', '') == 'both'
+    def cfg_subtree(self):
+        return self.cfg_prefix[:-1]
 
 
-class SampleParameters(UiParameter):
-    sample_id: str
-    use_id_as_prefix: bool
-    tile_extension: str
-    raw_path: str
-    autofluo_path: str
-    arteries_path: str
-    raw_resolution: List[float]
-    arteries_resolution: List[float]
-    autofluorescence_resolution: List[float]
+class SampleChannelParameters(ChannelUiParameter):
+    publishes = Publishes(UiOrientationChanged, UiCropChanged)
+
+    geometry_settings_from: str
+    data_type: str
+    extension: str
+    path: str
+    resolution: List[float]
+    wavelength: Optional[int]
+    comments: str
     slice_x: List[int]
     slice_y: List[int]
     slice_z: List[int]
-    orientation: List[int]
 
-    def __init__(self, tab, src_folder=None):
-        super().__init__(tab, src_folder)
-        self.params_dict = {
-            'sample_id': ['sample_id'],
-            'use_id_as_prefix': ParamLink(['use_id_as_prefix'], self.tab.useIdAsPrefixCheckBox),
-            'tile_extension': ParamLink(['src_paths', 'tile_extension'], self.tab.tileExtensionLineEdit),
-            'raw_path': ['src_paths', 'raw'],
-            'autofluo_path': ParamLink(['src_paths', 'autofluorescence'], self.tab.autofluoPathOptionalPlainTextEdit),
-            'arteries_path': ParamLink(['src_paths', 'arteries'], self.tab.arteriesPathOptionalPlainTextEdit),
-            'raw_resolution': ParamLink(['resolutions', 'raw'], self.tab.rawResolutionTriplet),
-            'arteries_resolution': ParamLink(['resolutions', 'arteries'], self.tab.arteriesResolutionTriplet),
-            'autofluorescence_resolution': ParamLink(['resolutions', 'autofluorescence'], self.tab.autofluorescenceResolutionTriplet),
-            'slice_x': ParamLink(['slice_x'], self.tab.sliceXDoublet),
-            'slice_y': ParamLink(['slice_y'], self.tab.sliceYDoublet),
-            'slice_z': ParamLink(['slice_z'], self.tab.sliceZDoublet),
-            'orientation': ['orientation']  # WARNING: Finish by orientation in case invalid,
+    def __init__(self, tab, channel_name, *, event_bus: EventBus, get_view=None, apply_patch=None):
+        super().__init__(tab, channel_name, event_bus=event_bus, name_widget_name='nameLineEdit',
+                         get_view=get_view, apply_patch=apply_patch)
+
+    def build_params_dict(self):
+        return {
+            'geometry_settings_from': ParamLink(None, self.tab.sampleChannelGeometryChannelComboBox),
+            'data_type': ParamLink(['data_type'], self.tab.dataTypeComboBox),
+            'extension': ParamLink(['extension'], self.tab.extensionComboBox),
+            'path': ParamLink(['path'], self.tab.pathPlainTextEdit,
+                              notify_apply=self._update_convert_button_label),
+            'resolution': VectorLink(['resolution'], self.tab.resolutionTriplet,
+                                     disabled_value=None, ui_sentinel=-1,
+                                     default_on_enable=[1.0, 1.0, 1.0],
+                                     enforce_sentinel_min=True),
+            'wavelength': ParamLink(['wavelength'], self.tab.wavelengthSpinBox,
+                                    disabled_value=None, ui_sentinel=-1, enforce_sentinel_min=True),
+            'comments': ParamLink(['comments'], self.tab.commentsPlainTextEdit),
+            'slice_x': ParamLink(['slicing', 'x'], self.tab.sliceXDoublet,
+                                 notify_apply=self._publish_crop_changed),
+            'slice_y': ParamLink(['slicing', 'y'], self.tab.sliceYDoublet,
+                                 notify_apply=self._publish_crop_changed),
+            'slice_z': ParamLink(['slicing', 'z'], self.tab.sliceZDoublet,
+                                 notify_apply=self._publish_crop_changed),
+            'orientation': ['orientation']  #  Last in case of validation issues
         }
-        self.connect()
-        if self.sample_id:
-            self.handle_sample_id_changed(self.sample_id)
-
-    def connect(self):
-        self.tab.sampleIdTxt.editingFinished.connect(self.handle_sample_id_changed)
-
-        self.tab.rawPath.textChanged.connect(self.handle_raw_path_changed)
-
-        self.tab.orient_x.currentTextChanged.connect(self.handle_orientation_changed)
-        self.tab.orient_y.currentTextChanged.connect(self.handle_orientation_changed)
-        self.tab.orient_z.currentTextChanged.connect(self.handle_orientation_changed)
-
-        self.connect_simple_widgets()
-
-    def _ui_to_cfg(self):
-        self._config['base_directory'] = self.src_folder
 
     def cfg_to_ui(self):
-        self.reload()
         super().cfg_to_ui()
+        self._update_convert_button_label()  # Force run after hydration endc
 
-    def fix_cfg_file(self, f_path):  # FIXME: seems wrong to pass f_path just for that usage
-        # cfg = ConfigLoader.get_cfg_from_path(f_path)
-        self.config['base_directory'] = os.path.dirname(f_path)  # WARNING: needs to be self.config
-                                                                 #  to be sure that we are up to date
-                                                                 #  (otherwise write but potentially no reload)
-        if not self.sample_id:
-            sample_id, ok = QInputDialog.getText(self.tab, 'Warning: missing ID',
-                                                 '<b>Missing sample ID</b><br>Please input below')
-            self.sample_id = sample_id
-            if not ok:
-                raise ValueError('Missing sample ID')
-        self.config['sample_id'] = self.sample_id
-        self.config['use_id_as_prefix'] = self.use_id_as_prefix
-        self.config.write()
+    def _publish_crop_changed(self, _=None):
+        self.publish(UiCropChanged(channel_name=self.name, slice_x=self.slice_x,
+                                   slice_y=self.slice_y, slice_z=self.slice_z))
 
-    # Sample params
-    @property
-    def sample_id(self):
-        return self.tab.sampleIdTxt.text()
-
-    @sample_id.setter
-    def sample_id(self, id_):
-        self.tab.sampleIdTxt.setText(id_)
-
-    def handle_sample_id_changed(self, id_=None):
-        if self.config is not None:
-            self.config['sample_id'] = self.sample_id
-            self.ui_to_cfg()   # FIXME: check
+    def set_geometry_settings_from_options(self, items):
+        self.tab.sampleChannelGeometryChannelComboBox.clear()
+        self.tab.sampleChannelGeometryChannelComboBox.addItems(items)
 
     @property
-    def raw_path(self):
-        f_path = self.tab.rawPath.toPlainText()
-        f_path = f_path if f_path else None
-        return f_path
+    def cfg_subtree(self):
+        return ['sample', 'channels', self.name]    # REFACTOR: section name from config_handler
 
-    @raw_path.setter
-    def raw_path(self, f_path):
-        f_path = f_path if f_path is not None else ''
-        self.tab.rawPath.setPlainText(f_path)
+    @param_handler
+    def handle_name_changed(self, old_name: str, new_name: str):
+        self._apply_patch({'$rename': {'channels': {old_name: new_name}}})  # config emits event
+        self.publish(UiChannelRenamed(old=old_name, new=new_name))
 
-    def handle_raw_path_changed(self):
-        self.config['src_paths']['raw'] = self.raw_path
+    def connect(self):
+        def _on_name_editing_finished():
+            old_name = self.name  # the channel of this page, not the tab at an index which may have moved
+            new_name = self.nameWidget.text().strip()
+            if not new_name or new_name == old_name:
+                return
+            self._parent_collection.handle_channel_rename_request(old_name, new_name, requester=self)
+
+            # self.handle_name_changed(old_name, new_name)            # send patch
+            # channels_tab_w.setTabText(self.page_index, new_name)    # amend UI
+            # self.publish(UiChannelRenamed(old=old_name, new=new_name))
+
+        self.nameWidget.editingFinished.connect(_on_name_editing_finished)
+        self.tab.orientXSpinBox.valueChanged.connect(self.handle_orientation_changed)  # REFACTOR: push to paramslink instead
+        self.tab.orientYSpinBox.valueChanged.connect(self.handle_orientation_changed)
+        self.tab.orientZSpinBox.valueChanged.connect(self.handle_orientation_changed)
 
     @property
     def orientation(self):
-        x = int(self.tab.orient_x.currentText())
-        y = int(self.tab.orient_y.currentText())
-        z = int(self.tab.orient_z.currentText())
-        n_axes = len(set([abs(e) for e in (x, y, z)]))
-        if n_axes != 3:
-            raise ParamsOrientationError('Number of different axis is only {} instead of 3. '
-                                         'Please amend duplicate axes'.format(n_axes))
-        return x, y, z
+        x = self.tab.orientXSpinBox.value()
+        y = self.tab.orientYSpinBox.value()
+        z = self.tab.orientZSpinBox.value()
+        orientation = (x, y, z)
+        return self.validate_orientation(orientation)  # REFACTOR: add validator in paramslink instead
 
     @orientation.setter
-    def orientation(self, orientation):
-        n_axes = len(set([abs(e) for e in orientation]))
-        if n_axes != 3:
-            raise ParamsOrientationError('Number of different axis is only {} instead of 3. '
-                                         'Please amend duplicate axes'.format(n_axes))
-        self.tab.orient_x.setCurrentText(f'{orientation[0]}')
-        self.tab.orient_y.setCurrentText(f'{orientation[1]}')
-        self.tab.orient_z.setCurrentText(f'{orientation[2]}')
+    @param_setter
+    def orientation(self, orientation):  # FIXME: only when all 3 are set
+        orientation = self.validate_orientation(orientation)
+        for spin_box, value in zip((self.tab.orientXSpinBox, self.tab.orientYSpinBox, self.tab.orientZSpinBox),
+                                   orientation):
+            with QSignalBlocker(spin_box):  # Painting the config is not an edit: the handler has nothing to do
+                spin_box.setValue(value)
 
-    def handle_orientation_changed(self, val):  # WARNING: does not seem to move up the stack because of pyqtsignals
+    def validate_orientation(self, orientation):
+        return validate_orientation(orientation, self.name, raise_error=False)
+
+    @param_handler
+    def handle_orientation_changed(self, _):
+        ori = list(self.orientation)
+        if ori == DEFAULT_ORIENTATION or 0 not in ori:  # Default or fully defined, proceed
+            self._update_value(['orientation'], ori)
+        if 0 not in ori:  # i.e. fully defined
+            self.publish(UiOrientationChanged(channel_name=self.name, orientation=ori))
+
+    def _update_convert_button_label(self, _=None):
+        """Update the button text based on the channel's raw path pattern."""
+        btn = self.tab.convertToClearMapPushButton
         try:
-            orientation = self.orientation
-        except ParamsOrientationError as err:
-            print('Invalid orientation, keeping current')
+            path = self.path  # reads from widget via ParamLink
+            if not path:
+                btn.setText('Import to workspace')
+                return
+
+            from ClearMap.Utils.tag_expression import Expression
+            exp = Expression(path)
+            tag_names = set(exp.tag_names())
+
+            if tag_names & {'X', 'Y'}:
+                btn.setText('Convert tiles to numpy')
+            elif 'Z' in tag_names:
+                btn.setText('Stack layers into volume')
+            else:
+                btn.setText('Import to workspace')
+        except Exception:
+            btn.setText('Import to workspace')
+
+
+class SampleParameters(ChannelsUiParameterCollection):
+    """
+    Class that links the sample params file to the UI
+    """
+    publishes = Publishes(UiPrepareRawDataForClearMap, UiRequestPlotMiniBrain, UiRequestPlotAtlas,
+                          UiChannelRenamed, UiChannelsChanged, UiOrientationChanged, UiCropChanged)
+
+    cfg_subtree = ['sample']
+
+    def __init__(self, tab, *, event_bus: EventBus,
+                 plan_file_renames: Callable[[Mapping[str, str]], ChannelRenamePlan], get_view=None, apply_patch=None):
+        """
+        Parameters
+        ----------
+        plan_file_renames : Callable[[Mapping[str, str]], ChannelRenamePlan]
+            The files to rename with the channels, by the new name of each renamed channel (by old name), planned
+            before the rename (e.g. :meth:`ExperimentController.plan_channel_file_renames`).
+        """
+        self._plan_file_renames = plan_file_renames
+        self.shared_sample_params = SharedSampleParams(tab, event_bus=event_bus,
+                                                       get_view=get_view, apply_patch=apply_patch)
+        self._last_channels: Optional[List[str]] = None
+        super().__init__(tab, pipeline_name='Sample', event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
+        self._emit_timer = QTimer(self.tab)
+        self._emit_timer.setSingleShot(True)
+        self._emit_timer.timeout.connect(self._flush_channels_changed)
+        self._pending = None
+
+    @property
+    def config_channels(self):
+        return list(self.view.get('channels', {}).keys())
+
+    @property
+    def params(self):
+        return [self.shared_sample_params] + list(self.channel_params.values())
+
+    def cfg_to_ui(self):
+        # hydrate shared first
+        self.shared_sample_params.cfg_to_ui()
+
+        # create UI elements for channels in config
+        tab_widget = self.tab.channelsParamsTabWidget
+        for channel_name in self.config_channels:
+            if channel_name not in self.channels:
+                # self.tab.add_channel_tab(channel_name)  # Wrong object tab as in python tab not tabwidget Qt tab
+                if (hasattr(tab_widget, 'get_channel_widget')
+                        and tab_widget.get_channel_widget(channel_name) is not None):
+                    self.ensure_channel_param(channel_name)
+                # self.ensure_channel_param(channel_name)
+            if channel_name in self.channel_params:
+                self.channel_params[channel_name].cfg_to_ui()
+        self.reconcile_from_config()
+
+    def request_add_channel(self, channel_name: str):
+        # guard against double-clicks based on current view
+        if channel_name in self.config_channels:
             return
-        self._config['orientation'] = orientation
+        self._update_value(['channels', channel_name], {})
+
+    def ensure_channel_param(self, channel_name: str):
+        if channel_name in self.channels:
+            return
+        channel_params = SampleChannelParameters(self.tab, channel_name, event_bus=self._bus,
+                                                 get_view=self._get_view,
+                                                 apply_patch=self._apply_patch)
+        channel_params._parent_collection = self  # WARNING: circular ref, but safe because we don't pickle these and they clean up on teardown
+        self._bind_channel_signals(channel_params)  # connect only on creation
+        self.channel_params[channel_name] = channel_params
+
+    def add_channel(self, channel_name: str):
+        if channel_name in self.channels:
+            return
+        self.request_add_channel(channel_name)
+            # ↑ May fire ChannelsChanged synchronously.
+            #   reconcile_channel_pages runs, but the page already exists
+            #   in the tab widget, so it's a no-op for this channel.
+            #   Re-entry into add_channel is blocked by the guard above
+            #   because ensure_channel_param may have run via reconcile...
+            #   BUT reconcile_channel_pages only calls add_channel_tab
+            #   for channels NOT in tab_widget, and ours IS there already.
+        if channel_name in self.channels:  # belt-and-suspenders:
+            return  # reconcile beat us to it
+        self.ensure_channel_param(channel_name)
+
+    def handle_channel_rename_request(self, old_name: str, new_name: str,
+                                      requester: SampleChannelParameters) -> None:
+        """
+        Orchestrate rename:
+          0. Ask the user to vet the renaming of the files of the channel (if it has any); cancelling it
+             cancels the rename
+          1. Update parent-owned state (dict key, tab text) so synchronous
+             cascade sees consistent state
+          2. Ask child to write its config
+          3. Verify; on failure, revert and tell the user why
+          4. Rename the files the user kept
+
+        Parameters
+        ----------
+        old_name: str
+            The current name of the channel to rename. This must be a key in self.channel_params.
+        new_name: str
+            The desired name for the channel. This must be a valid channel name.
+        requester: SampleChannelParameters
+            The sub tab (channel) that triggered this rename.
+            This is needed to route the config change and to revert the UI if something goes wrong.
+        """
+        if old_name not in self.channel_params:
+            warnings.warn(f'Cannot rename {old_name!r}: not in channel_params')
+            return
+
+        # The rule of the config, applied before this dict changes: it would lose the params of the other channel
+        try:
+            refuse_renames_onto_existing_channels({old_name: new_name}, self.channels)
+        except ChannelNameTakenError as err:
+            requester.show_name()  # Its name field holds the text typed over it
+            handle_exception(err, parent=self.tab, context=f'Rename {old_name!r} → {new_name!r}')
+            return
+
+        # 0. Planned under the old names (the files, the workspace and the registration config still use them)
+        try:
+            file_renames = self._vet_file_renames(old_name, new_name)
+        except Exception as err:  # E.g. an inconsistent registration config: not renamed without its files
+            requester.show_name()
+            handle_exception(err, parent=self.tab, context=f'The renaming of the files of {old_name!r} cannot be '
+                                                           f'planned: the channel keeps its name')
+            return
+        if file_renames is None:  # The user cancelled: the channel keeps its name
+            requester.show_name()
+            return
+
+        # 1. Parent updates its own state (dict key). The requester's name (tab text and name field) is set
+        #    through its page, never through an index which may be stale
+        self.channel_params[new_name] = self.channel_params.pop(old_name)
+        requester.name = new_name
+
+        # 2. Child writes config (may fail, but parent already updated, so we can revert to consistent state)
+        try:
+            requester.handle_name_changed(old_name, new_name)
+        except Exception as err:
+            self._refuse_rename(old_name, new_name, requester, err)
+            return
+
+        # 3. Verify config accepted it
+        if new_name not in self.config_channels:
+            err = ClearMapValueError(f'The config did not accept the name {new_name!r} for the channel {old_name!r}.')
+            self._refuse_rename(old_name, new_name, requester, err)
+            return
+
+        # 4. Success
+        self._publish_channels_changed(self.config_channels)
+        self._rename_files(old_name, new_name, file_renames)
+
+    def _vet_file_renames(self, old_name: str, new_name: str) -> list[Rename] | None:
+        """
+        The renames of the files of the channel, as vetted by the user. None if the user cancelled (the channel
+        keeps its name), empty if the channel has no file.
+        """
+        plan = self._plan_file_renames({old_name: new_name})
+        if not plan:
+            return []
+        dialog = VerifyRenamingDialog(plan.renames, not_renamed=plan.not_renamed,
+                                      title=f'Rename the channel {old_name!r} to {new_name!r}',
+                                      message=f'The files of the channel {old_name!r} are named after it. Unless '
+                                              f'they are renamed too, the pipeline does not find them under the '
+                                              f'name {new_name!r}. Untick a file to leave it as it is.',
+                                      accept_text='Rename the channel and its files', parent=self.tab)
+        if dialog.exec() != QDialog.Accepted:
+            return None
+        return dialog.selected_renames
+
+    def _rename_files(self, old_name: str, new_name: str, file_renames: list[Rename]) -> None:
+        """Rename the files of the renamed channel. If it fails, they keep their old names: tell the user"""
+        try:
+            apply_renames(file_renames)
+        except FileRenameError as err:
+            handle_exception(err, parent=self.tab,
+                             context=f'The channel {old_name!r} is renamed to {new_name!r} but its files keep '
+                                     f'their old names')
+
+    def _refuse_rename(self, old_name: str, new_name: str, requester: SampleChannelParameters,
+                       reason: Exception) -> None:
+        """Put the old name back (params, page, name field), then tell the user why it was refused"""
+        self._revert_rename(old_name, new_name, requester)
+        handle_exception(reason, parent=self.tab, context=f'Rename {old_name!r} → {new_name!r}')
+
+    def _revert_rename(self, old_name: str, new_name: str, requester: SampleChannelParameters) -> None:
+        """Handle failed rename attempt (e.g. refused by coordinator)"""
+        self.channel_params[old_name] = self.channel_params.pop(new_name, None)
+        requester.name = old_name
+
+    def _bind_channel_signals(self, channel_params: "SampleChannelParameters"):
+        def get_current_index():
+            tab_widget = self.tab.channelsParamsTabWidget
+            idx = tab_widget.indexOf(channel_params.tab)
+            return idx if idx != -1 else None
+
+        def publish_with_current_index(event_class):
+            idx = get_current_index()
+            if idx is not None:
+                self.publish(event_class(channel_index=idx))
+
+        def publish_with_current_name(event_class):
+            idx = get_current_index()
+            if idx is not None:
+                name = self.get_channel_name(idx)
+                self.publish(event_class(channel_name=name))
+
+        def run_with_current_name(func):
+            idx = get_current_index()
+            if idx is not None:
+                func(self.get_channel_name(idx))
+
+        channel_params.tab.convertToClearMapPushButton.clicked.connect(
+            functools.partial(publish_with_current_name, UiPrepareRawDataForClearMap),
+            type=Qt.UniqueConnection)  # avoid double binding (PyQt >= 5.14)
+        channel_params.tab.plotMiniBrainPushButton.clicked.connect(
+            functools.partial(publish_with_current_index, UiRequestPlotMiniBrain),
+            type=Qt.UniqueConnection)
+        channel_params.tab.sampleViewAtlasPushButton.clicked.connect(
+            functools.partial(publish_with_current_index, UiRequestPlotAtlas),
+            type=Qt.UniqueConnection)
+        channel_params.tab.sampleChannelGeometryChannelCopyPushButton.clicked.connect(
+            functools.partial(run_with_current_name, self.propagate_params),
+            type=Qt.UniqueConnection)
+
+    def reconcile_from_config(self):
+        """Makes channels in UI match view (i.e. config)."""
+        # create params for new channels
+        for channel_name in set(self.config_channels) - set(self.channels):
+            self.ensure_channel_param(channel_name)
+
+        # remove params for deleted channels
+        for channel_name in set(self.channels) - set(self.config_channels):
+            self.channel_params[channel_name].teardown()
+            del self.channel_params[channel_name]
+
+        # Update list of channels geometry can be copied from
+        for chan, params in self.channel_params.items():
+            other_channels = list(set(self.config_channels) - {chan})
+            params.set_geometry_settings_from_options(other_channels)
+
+        # Signal that channels changed
+        self._publish_channels_changed(self.config_channels)
+
+    def _publish_channels_changed(self, new_list):
+        """
+        Publish UiChannelsChanged signal if the list of channels changed since last call.
+        This is cached so that multiple rapid changes to the channels only emit one signal.
+
+        Parameters
+        ----------
+        new_list: List[str]
+            The new list of channels to compare to the last emitted one.
+        """
+        before = self._last_channels
+        after = list(new_list)
+        if self._last_channels is None:
+            # establish baseline silently on first call
+            self._last_channels = after
+            return
+        if self._last_channels != after:
+            self._pending = (before, after)
+            self._emit_timer.start(0)
+
+    def _flush_channels_changed(self):
+        if not self._pending:
+            return
+        before, after = self._pending
+        self.publish(UiChannelsChanged(before=before, after=after))
+        self._last_channels = after
+        self._pending = None
+
+    def get_channel_name(self, channel_idx):
+        return self.tab.channelsParamsTabWidget.tabText(channel_idx)
+
+    def propagate_params(self, channel):
+        target_params = self[channel]
+        ref_params = self[target_params.geometry_settings_from]
+
+        keys_to_copy = ('slice_x', 'slice_y', 'slice_z', 'resolution', 'orientation')
+        patch = {}
+        # Suppress all signal-driven config writes during bulk UI update
+        with target_params._suppress_handlers():
+            for key in keys_to_copy:
+                value = getattr(ref_params, key)
+                setattr(target_params, key, value)
+
+                # Collect config patch
+                p_link = target_params.params_dict.get(key)
+                if isinstance(p_link, ParamLink) and p_link.keys:
+                    set_item_recursive(patch, target_params.cfg_subtree + p_link.keys, value)
+                elif isinstance(p_link, list):  # e.g. orientation: ['orientation']
+                    set_item_recursive(patch, target_params.cfg_subtree + p_link, value)
+
+        # Single atomic config write
+        if patch:
+            self._apply_patch(patch)
 
 
-class RigidStitchingParams(UiParameter):
+class SharedSampleParams(UiParameter):
+    """
+    Links the shared sample parameters (i.e. independent of channel like
+    folder, sample_id...) to the UI
+
+    Attributes
+    ----------
+    sample_id : str
+        The ID of the sample. This must be unique
+    use_id_as_prefix : bool
+        Whether to use the sample ID as a prefix for the output files
+    default_tile_extension : str
+        The extension of the tile files
+    """
+    src_folder: str
+    sample_id: str
+    use_id_as_prefix: bool
+    default_tile_extension: str
+
+    cfg_subtree = ['sample']
+
+    def build_params_dict(self):
+        return {
+            'sample_id': ParamLink(['sample_id'], self.tab.sampleIdTxt),
+            'use_id_as_prefix': ParamLink(['use_id_as_prefix'], self.tab.useIdAsPrefixCheckBox),
+            'default_tile_extension': ParamLink(['default_tile_extension'], self.tab.defaultTileExtensionLineEdit),
+            'src_folder': ParamLink(keys=None, widget=self.tab.srcFolderTxt, default=''),
+        }
+
+    @property
+    def channels(self):
+        return list(self.view['channels'].keys())
+
+
+class StitchingParams(ChannelsUiParameterCollection):
+    """
+    Class that groups all the parameters related to the stitching of the sample
+    (i.e. rigid and wobbly stitching)
+    """
+    publishes = Publishes(UiLayoutChannelChanged)
+
+    def __init__(self, tab, *, event_bus: EventBus, get_view=None, apply_patch=None):
+        super().__init__(tab, pipeline_name='Stitching', event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
+        # self.cfg_to_ui()
+        # self.reconcile_children_from_view()
+        self.subscribe(UiChannelsChanged, self.reconcile_children_from_view)
+
+    def add_channel(self, channel_name, data_type=None):
+        """
+        Create the stitching parameters of a channel (if not already present)
+        from its entry in the config.
+
+        .. warning::
+            This **does not** write the config: the config adjusters create the entry
+            of every stitchable channel. It does not create the UI elements either:
+            UI creation is handled by the tab's ``add_channel_tab()`` method.
+
+        Parameters
+        ----------
+        channel_name : str
+            The name of the channel to add.
+        data_type : str, optional
+        """
+        if channel_name in self.channels:
+            return
+        else:
+            self.reconcile_children_from_view()  # ensure param object created
+
+    def reconcile_children_from_view(self, *_):
+        """Ensure we have one ChannelStitchingParams per stitching.channels entry."""
+        cfg = self.view or {}
+        channels_cfg = cfg.get('channels') or {}
+        desired_channels = tuple(channels_cfg.keys())
+
+        if not desired_channels:  # likely still in early hydration
+            return
+        # add if missing
+        self.create_missing_channels_from_view(desired_channels)
+        self.prune_obsolete_channels(desired_channels)
+
+    def create_missing_channels_from_view(self, desired_channels: tuple):
+        for ch in desired_channels:
+            self.materialize_channel(ch)
+
+    def materialize_channel(self, ch):
+        if ch not in self.channel_params:
+            tw = self.tab.channelsParamsTabWidget
+            page = tw.get_channel_widget(ch)
+            if page is not None:  # Skip (defer) otherwise
+                self[ch] = ChannelStitchingParams(self.tab, ch, event_bus=self._bus, get_view=self._get_view,
+                                                  apply_patch=self._apply_patch)
+
+    def prune_obsolete_channels(self, desired_channels: tuple):
+        for ch in list(self.channel_params.keys()):
+            if ch not in desired_channels:
+                self.drop_channel(ch)
+
+    def handle_layout_channel_changed(self, channel, layout_channel):
+        self.publish(UiLayoutChannelChanged(channel_name=channel, layout_channel=layout_channel))
+
+    def compute_layout(self, channel):
+        return self[channel].compute_layout()
+
+    def get_channels_to_run(self):
+        # FIXME: do not bind run
+        return [channel for channel in self.channels if self[channel].shared.run]
+
+    def set_channels_to_run(self, channels):
+        for channel in self.channels:
+            status = self[channel].shared.run
+            self[channel].shared.run = status or (channel in channels)
+
+    @property
+    def params(self):
+        return list(self.values())
+
+
+class ChannelStitchingParams(UiParameterCollection):
+    def __init__(self, tab, channel, *, event_bus: EventBus, get_view=None, apply_patch=None):
+        super().__init__(tab, pipeline_name='Stitching', event_bus=event_bus,
+                         get_view=get_view, apply_patch=apply_patch)
+        self.name = channel
+        self.ready = False
+
+        # The sub-params
+        self.shared = GeneralChannelStitchingParams(tab, channel, event_bus=event_bus,
+                                                    get_view=get_view, apply_patch=apply_patch)
+        self.stitching_rigid = None
+        self.stitching_wobbly = None
+
+        self.connect()
+
+        self.cfg_to_ui()  # Initial setup
+
+        initial_compute_val = self.compute_layout()
+        self._set_sections_visibility(initial_compute_val)
+        self._set_sections_enabled(not self.shared.use_existing_layout)
+
+        if initial_compute_val:  # WARNING: only created if compute layout
+            self._materialize_section_params()
+
+        self.ready = True
+
+    def _materialize_section_params(self):
+        if self.stitching_rigid is None:
+            self.stitching_rigid = RigidChannelStitchingParams(self.tab, self.name, event_bus=self._bus,
+                                                                get_view=self._get_view, apply_patch=self._apply_patch)
+        if self.stitching_wobbly is None:
+            self.stitching_wobbly = WobblyChannelStitchingParams(self.tab, self.name, event_bus=self._bus,
+                                                                get_view=self._get_view, apply_patch=self._apply_patch)
+
+    def _set_sections_visibility(self, visible: bool):
+        shared_tab = self.shared.tab
+        shared_tab.rigidParamsGroupBox.setVisible(visible)
+        shared_tab.wobblyParamsGroupBox.setVisible(visible)
+
+    def _set_sections_enabled(self, enabled: bool):
+        shared_tab = self.shared.tab
+        shared_tab.rigidParamsGroupBox.setEnabled(enabled)
+        shared_tab.wobblyParamsGroupBox.setEnabled(enabled)
+
+    def connect(self):
+        self.subscribe(UiLayoutChannelChanged, self.handle_layout_channel_changed)
+        self.subscribe(UiUseExistingLayoutChanged, self.handle_use_existing_layout_changed)
+
+    @param_handler  # FIXME: check
+    def handle_layout_channel_changed(self, layout_changed_event: UiLayoutChannelChanged):
+        if not self.ready:
+            return
+        if layout_changed_event.channel_name != self.name:
+            return
+        compute_layout = self.compute_layout()
+
+        if compute_layout and (self.stitching_rigid is None or self.stitching_wobbly is None):
+            self._materialize_section_params()
+        self._set_sections_visibility(compute_layout)
+        self.shared.tab.useExistingLayoutCheckBox.setVisible(compute_layout)
+
+    @param_handler  # FIXME: check
+    def handle_use_existing_layout_changed(self, use_existing_layout_event: UiUseExistingLayoutChanged):
+        if use_existing_layout_event.channel_name != self.name:
+            return
+        if not self.ready:
+            return
+        if self.compute_layout():
+            self._set_sections_enabled(not use_existing_layout_event.use_existing)
+
+    def compute_layout(self):
+        """
+        Checks if the layout should be computed for this channel.
+        This is the case if the layout channel is the current channel.
+        If the config has not been pushed to the ui yet, it will use the config directly.
+
+        Returns
+        -------
+        bool
+            Whether the stitching layout should be computed for this channel
+        """
+        layout_channel = (self.shared.layout_channel or
+                          (self.shared.view.get('layout_channel') if self.shared.view else None))
+        return layout_channel == self.name
+
+    @property
+    def params(self):
+        result = [self.shared]
+        try:
+            view = self.shared.view or {}
+        except Exception:
+            view = {}
+        if self.stitching_rigid is not None and 'rigid' in view:
+            result.append(self.stitching_rigid)
+        if self.stitching_wobbly is not None and 'wobbly' in view:
+            result.append(self.stitching_wobbly)
+        return result
+
+class GeneralChannelStitchingParams(ChannelUiParameter):
+    publishes = Publishes(UiLayoutChannelChanged, UiUseExistingLayoutChanged)
+
+    use_npy: bool
+    run: bool
+    layout_channel: str
+    use_existing_layout: bool
+
+    def build_params_dict(self):
+        return {
+            'use_npy': ParamLink(['use_npy'], self.tab.useNpyCheckBox),
+            # 'run': ParamLink(['run'], self.tab.runCheckBox),
+            'run': ['run'],
+            'layout_channel': ParamLink(
+                ['layout_channel'], self.tab.layoutChannelComboBox,
+                notify_apply=lambda: self.publish(
+                    UiLayoutChannelChanged(channel_name=self.name,
+                                           layout_channel=self.layout_channel)),
+                # extra_connect=self.refresh_layout_channel_items,
+                cast_to_ui=layout_channel_to_ui,
+                cast_from_ui=layout_channel_from_ui),
+            'use_existing_layout': ParamLink(
+                ['use_existing_layout'], self.tab.useExistingLayoutCheckBox, default=False,
+                missing_ok=True,  # WARNING: only if self.layout_channel != self.name
+                present_if=self._existing_layout_relevant,
+                notify_apply=lambda: self.publish(
+                    UiUseExistingLayoutChanged(channel_name=self.name, use_existing=self.use_existing_layout)))
+        }
+
+    def _existing_layout_relevant(self, view: dict) -> bool:
+        """Only a channel which is its own layout channel computes a layout, so can reuse an existing one"""
+        return view.get('layout_channel') == self.name
+
+    @property
+    def run(self):
+        return self.view['run']
+
+    @run.setter
+    @param_setter
+    def run(self, value):
+        if self._painting:
+            return
+        self._update_value(['run'], value)
+
+    @property
+    def cfg_subtree(self):
+        return ['stitching', 'channels', self.name]    # REFACTOR: section name from config_handler
+
+    def refresh_layout_channel_items(self):
+        """Populate and keep in sync the layoutChannelComboBox items."""
+        layout_combobox = self.tab.layoutChannelComboBox
+
+        channel_names = list(self._get_view()['stitching']['channels'].keys())
+
+        current = layout_combobox.currentText()
+        layout_combobox.blockSignals(True)  # No update during refresh
+        layout_combobox.clear()
+        layout_combobox.addItems([UNDEFINED_LAYOUT_CHANNEL_TEXT] + channel_names)
+        # reselect current value if still valid (else explicit 'undefined')
+        layout_combobox.setCurrentText(current if current in channel_names else UNDEFINED_LAYOUT_CHANNEL_TEXT)
+        layout_combobox.blockSignals(False)
+
+
+class RigidChannelStitchingParams(ChannelUiParameter):
     skip: bool
     x_overlap: int
     y_overlap: int
@@ -219,413 +876,946 @@ class RigidStitchingParams(UiParameter):
     background_level: int
     background_pixels: int
 
-    def __init__(self, tab, src_folder=None):
-        super().__init__(tab, src_folder)
-        self.params_dict = {
-            'skip': ParamLink(['skip'], self.tab.skipRigidCheckbox),
-            'x_overlap': ParamLink(['overlap_x'], self.tab.xOverlapSinglet),
-            'y_overlap': ParamLink(['overlap_y'], self.tab.yOverlapSinglet),
-            'projection_thickness': ['project_thickness'],  # FIXME: change to projection
+    def build_params_dict(self):
+        return {
+            'skip': ParamLink(['skip'], self.tab.rigidParamsGroupBox,
+                              cast_to_ui=invert, cast_from_ui=invert),
+            'x_overlap': VectorLink(['overlap_x'], self.tab.xOverlapSinglet,
+                                    disable_globally=True, disabled_value='auto',
+                                    default_on_enable=1, show_sentinel_when_off=True),
+            'y_overlap': VectorLink(['overlap_y'], self.tab.yOverlapSinglet,
+                                    disable_globally=True, disabled_value='auto',
+                                    default_on_enable=1, show_sentinel_when_off=True),
+            'projection_thickness': VectorLink(
+                ['projection_thickness'], self.tab.projectionThicknessDoublet,
+                disable_globally=False, disabled_value=None, default_on_enable=[1, 1],
+                cast_from_ui=lambda v: (v + [None]) if isinstance(v, list) else [v, None]),
+                # Projection thickness has 2 axis in UI but 3 in config
             'max_shifts_x': ParamLink(['max_shifts_x'], self.tab.rigidMaxShiftsXDoublet),
             'max_shifts_y': ParamLink(['max_shifts_y'], self.tab.rigidMaxShiftsYDoublet),
             'max_shifts_z': ParamLink(['max_shifts_z'], self.tab.rigidMaxShiftsZDoublet),
             'background_level': ParamLink(['background_level'], self.tab.rigidBackgroundLevel),
             'background_pixels': ParamLink(['background_pixels'], self.tab.rigidBackgroundPixels)
         }
-        self.cfg_subtree = ['stitching', 'rigid']
-        self.connect()
-
-    def connect(self):
-        self.tab.projectionThicknessDoublet.valueChangedConnect(self.handle_projection_thickness_changed)
-        self.connect_simple_widgets()
 
     @property
-    def projection_thickness(self):
-        val = self.tab.projectionThicknessDoublet.getValue()
-        if val is not None:
-            val.append(None)
-        return val
+    def cfg_subtree(self):
+        return ['stitching', 'channels', self.name, 'rigid']   # REFACTOR: section name from config_handler
 
-    @projection_thickness.setter
-    def projection_thickness(self, thickness):
-        if thickness is not None:
-            thickness = thickness[:2]
-        self.tab.projectionThicknessDoublet.setValue(thickness)
+    OVERLAP_ATTRS = ('x_overlap', 'y_overlap')
 
-    def handle_projection_thickness_changed(self):
-        self.config['project_thickness'] = self.projection_thickness
+    def set_visible(self, state):
+        self.tab.rigidParamsGroupBox.setVisible(state)
+
+    def set_enabled(self, state):
+        self.tab.rigidParamsGroupBox.setEnabled(state)
+
+    def set_auto_overlap_allowed(self, allowed: bool, reason: str = '') -> None:
+        """
+        Allow or forbid the 'auto' overlap (read from the OME metadata of the tiles).
+
+        When forbidden (tiles without OME metadata), the overlap global toggle is forced on
+        (i.e. manual values) and locked. If the config still holds 'auto', the value shown in
+        the spinboxes (the default on enable) is written to the config so that the UI and config agree.
+        When allowed again, the toggle is simply unlocked (the current value is kept).
+        """
+        for attr in self.OVERLAP_ATTRS:
+            link = self.params_dict[attr]
+            check_box = link.widget.getCheckBox()
+            if check_box is None:
+                continue
+            if not allowed and not check_box.isChecked():
+                with self._suppress_handlers():  # Do not patch the config for the toggle itself
+                    check_box.setChecked(True)
+                self._emit_patch(link.keys, getattr(self, attr))  # Now UI == config, no silent mismatch
+            check_box.setEnabled(allowed)
+            check_box.setToolTip('' if allowed else reason)
 
 
-class WobblyStitchingParams(UiParameter):
+class WobblyChannelStitchingParams(ChannelUiParameter):
     skip: bool
     max_shifts_x: List[int]
     max_shifts_y: List[int]
     max_shifts_z: List[int]
-    valid_range: list  # FIXME: missing pixel size
-    slice_range: List[int]
-    slice_pixel_size: int
+    stack_valid_range: list
+    stack_pixel_size: int | None
+    slice_valid_range: List[int]
+    slice_pixel_size: int  | None
 
-    def __init__(self, tab, src_folder=None):
-        super().__init__(tab, src_folder)
-        self.params_dict = {
-            'skip': ParamLink(['skip'], self.tab.skipWobblyCheckBox),
+    def build_params_dict(self):
+        return {
+            'skip': ParamLink(['skip'], self.tab.wobblyParamsGroupBox,
+                              cast_to_ui=invert, cast_from_ui=invert),
             'max_shifts_x': ParamLink(['max_shifts_x'], self.tab.wobblyMaxShiftsXDoublet),
             'max_shifts_y': ParamLink(['max_shifts_y'], self.tab.wobblyMaxShiftsYDoublet),
             'max_shifts_z': ParamLink(['max_shifts_z'], self.tab.wobblyMaxShiftsZDoublet),
-            'valid_range': ParamLink(['stack_valid_range'], self.tab.wobblyValidRangeDoublet),
-            'slice_range': ParamLink(['slice_valid_range'], self.tab.wobblySliceRangeDoublet),
-            'slice_pixel_size': ParamLink(['slice_pixel_size'], self.tab.wobblySlicePixelSizeSinglet)
+            'stack_valid_range': VectorLink(['stack_valid_range'], self.tab.wobblyStackValidRangeDoublet),
+            'stack_pixel_size': VectorLink(['stack_pixel_size'], self.tab.wobblyStackPixelSizeSinglet,
+                                           default_on_enable=1, disabled_value=None, show_sentinel_when_off=True),
+            'slice_valid_range': VectorLink(['slice_valid_range'], self.tab.wobblySliceRangeDoublet),
+            'slice_pixel_size': VectorLink(['slice_pixel_size'], self.tab.wobblySlicePixelSizeSinglet,
+                                           default_on_enable=1, disabled_value=None, show_sentinel_when_off=True)
         }
-        self.cfg_subtree = ['stitching', 'wobbly']
-        self.connect()
-
-    def connect(self):
-        self.connect_simple_widgets()
-
-
-class GeneralStitchingParams(UiParameter):
-    use_npy: bool
-    run_raw: bool
-    run_arteries: bool
-    preview_raw: bool
-    preview_arteries: bool
-    convert_output: bool
-    convert_raw: bool
-    convert_arteries: bool
-    conversion_fmt: str
-    # stitching_preview_step: str
-
-    def __init__(self, tab, src_folder=None):
-        super().__init__(tab, src_folder)
-        self.params_dict = {
-            'use_npy': ParamLink(['conversion', 'use_npy'], self.tab.stitchingUseNpyCheckBox),
-            'run_raw': ParamLink(['stitching', 'run', 'raw'], self.tab.stitchingRunRawCheckBox),
-            'run_arteries': ParamLink(['stitching', 'run', 'arteries'], self.tab.stitchingRunArteriesCheckBox),
-            'preview_raw': ParamLink(['stitching', 'preview', 'raw'], self.tab.stitchingPreviewRawCheckBox),
-            'preview_arteries': ParamLink(['stitching', 'preview', 'arteries'], self.tab.stitchingPreviewArteriesCheckBox),
-            'convert_output': ['stitching', 'output_conversion', 'skip'],
-            'convert_raw': ParamLink(['stitching', 'output_conversion', 'raw'], self.tab.stitchingConvertRawCheckBox),
-            'convert_arteries': ParamLink(['stitching', 'output_conversion', 'arteries'], self.tab.stitchingConvertArteriesCheckBox),
-            'conversion_fmt': ParamLink(['stitching', 'output_conversion', 'format'], self.tab.outputConversionFormat),
-            # 'stitching_preview_step': ParamLink([], self.tab.stitchingPreviewStep, connect=False)
-        }
-        self.attrs_to_invert = ['convert_output']  # FIXME: check
-        self.connect()
-
-    def connect(self):
-        self.tab.skipOutputConversioncheckBox.stateChanged.connect(self.handle_convert_output_changed)
-        self.connect_simple_widgets()
 
     @property
-    def convert_output(self):
-        return not self.tab.skipOutputConversioncheckBox.isChecked()
+    def cfg_subtree(self):
+        return ['stitching', 'channels', self.name, 'wobbly']    # REFACTOR: section name from config_handler
 
-    @convert_output.setter
-    def convert_output(self, skip):
-        self.set_check_state(self.tab.skipOutputConversioncheckBox, not skip)
+    def set_visible(self, state):
+        self.tab.wobblyParamsGroupBox.setVisible(state)
 
-    def handle_convert_output_changed(self, state):
-        self.config['stitching']['output_conversion']['skip'] = not self.convert_output
+    def set_enabled(self, state):
+        self.tab.wobblyParamsGroupBox.setEnabled(state)
 
 
-class RegistrationParams(UiParameter):
-    atlas_id_changed = pyqtSignal(str)
-    atlas_structure_tree_id_changed = pyqtSignal(str)
+class ChannelRegistrationParams(ChannelUiParameter):
+    """
+    The registration of a channel. Its direction (moving_channel) is chosen with radio buttons, relative to the channel
+    (see registration_channels): they are painted from the config after the linked widgets (cfg_to_ui) and only
+    available once the channel has a partner (align_with).
+    """
+    publishes = Publishes(UiAlignWithChanged)
 
-    skip_resampling: bool
-    atlas_resolution: List[float]
+    def __init__(self, tab, channel_name, *, event_bus: EventBus, get_view=None, apply_patch=None):
+        super().__init__(tab, channel_name, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
+        self.tab.landmarksWeightsPanel = LandmarksWeightsPanel(self.tab)
+        self.tab.landmarksWeightsLayout.addWidget(self.tab.landmarksWeightsPanel)
+        self._direction_buttons = QButtonGroup(self.tab)
+        for button in self._direction_radio_buttons.values():
+            self._direction_buttons.addButton(button)
+
+        self.handle_params_files_changed()  # Initial setup
+
+    def build_params_dict(self):
+        return {
+            'resample': ParamLink(['resample'], self.tab.resampleCheckBox),
+            'resampled_resolution': ParamLink(['resampled_resolution'], self.tab.resampleResolutionTriplet),
+            'align_with': ParamLink(['align_with'], self.tab.alignWithComboBox,
+                                    cast_to_ui=align_with_to_ui,
+                                    cast_from_ui=align_with_from_ui,
+                                    connect=self.handle_align_with_edited),
+            # moving_channel: the direction radio buttons (see _paint_direction and handle_direction_toggled)
+            # WARNING: broken by class replacement
+            'params_files': ParamLink(['params_files'], self.tab.paramsFilesListWidget,
+                                      object_name='paramsFilesListWidget', scope_root=self.tab),
+            # 'landmarks_weights': ['landmarks_weights'],
+        }
+
+    @property
+    def cfg_subtree(self):
+        return ['registration', 'channels', self.name]   # REFACTOR: section name from config_handler
+
+    @property
+    def n_registration_files(self) -> int:
+        return self.tab.paramsFilesListWidget.count()
+
+    @property
+    def use_landmarks_for(self):
+        params_to_weights = self.tab.landmarksWeightsPanel.get_params_and_weights()
+        return [k for k, v in params_to_weights.items() if v > 0]
+
+    def connect(self):
+        if hasattr(self.tab.paramsFilesListWidget, 'itemsChanged'):
+            self.tab.paramsFilesListWidget.itemsChanged.connect(self.handle_params_files_changed)
+        if hasattr(self.tab, 'landmarksWeightsPanel'):
+            self.tab.landmarksWeightsPanel.weightAtChanged.connect(
+                self.handle_landmarks_weight_changed)
+        for direction, button in self._direction_radio_buttons.items():
+            button.toggled.connect(functools.partial(self.handle_direction_toggled, direction))
+
+    @property
+    def _direction_radio_buttons(self) -> dict[str, QRadioButton]:
+        """The radio button of each direction (moving_channel)"""
+        return {MOVING_OTHER: self.tab.movingOtherRadioButton,
+                INTRINSICALLY_ALIGNED: self.tab.intrinsicallyAlignedRadioButton,
+                MOVING_SELF: self.tab.movingSelfRadioButton}
+
+    def cfg_to_ui(self):
+        super().cfg_to_ui()
+        self._paint_direction()
+
+    def _paint_direction(self) -> None:
+        """
+        Check the radio button of the direction of the config, named after the channel and its partner. Without a
+        partner they are disabled (the direction is kept, it is used again with the next partner).
+        """
+        view = self.view
+        align_with = view.get('align_with')
+        moving_channel = view.get('moving_channel')
+        has_partner = align_with not in NOT_SELECTED_FOR_REGISTRATION
+        try:
+            direction = registration_direction(self.name, view)
+        except ClearMapConfigError:  # A name left over from another partner: none is checked, the registration says why
+            direction = None
+        if direction is None and moving_channel in REGISTRATION_DIRECTIONS:
+            direction = moving_channel
+        partner = align_with if has_partner else 'the partner'
+        texts = {MOVING_OTHER: f'{partner} moves onto {self.name}',
+                 INTRINSICALLY_ALIGNED: f'Acquired together with {partner}',
+                 MOVING_SELF: f'{self.name} moves onto {partner}'}
+        self._painting = True
+        try:
+            self._direction_buttons.setExclusive(False)  # So that none is checked when there is no direction
+            for button_direction, button in self._direction_radio_buttons.items():
+                button.setText(texts[button_direction])
+                button.setChecked(button_direction == direction)
+            self._direction_buttons.setExclusive(True)
+            self.tab.movingDirectionFrame.setEnabled(has_partner)
+        finally:
+            self._painting = False
+
+    def handle_direction_toggled(self, direction: str, checked: bool) -> None:
+        if self._painting or not checked:
+            return
+        self._emit_patch(['moving_channel'], direction)
+        if direction == MOVING_SELF:
+            QMessageBox.warning(self.tab, 'Registration computed the other way round',
+                                f'{self.name} will be registered onto {self.view.get("align_with")}. Images can be '
+                                f'transformed through it, but transforming the points of {self.name} (cells, '
+                                f'tracts, vessels) needs the inverse transform, which is not supported yet: their '
+                                f'coordinates would be wrong.')
+
+    def handle_align_with_edited(self, *_) -> None:
+        """
+        The partner is changed in its combo box: written with the direction, relative to the channel (a new partner
+        moves onto the channel unless a direction was chosen, see :func:`partner_change`).
+        """
+        if self._painting:
+            return
+        align_with = self.align_with
+        self._emit_patch([], partner_change(self.name, self.view, align_with))
+        self.publish(UiAlignWithChanged(channel_name=self.name, align_with=align_with))
+
+    @property
+    def params_files(self):
+        if hasattr(self.tab.paramsFilesListWidget, 'get_items_text'):
+            return self.tab.paramsFilesListWidget.get_items_text()
+        else:
+            return list_widget_getter(self.tab.paramsFilesListWidget)
+
+    @params_files.setter
+    def params_files(self, value):
+        list_widget_setter(self.tab.paramsFilesListWidget, value)
+
+    @param_handler  # FIXME: check
+    def handle_params_files_changed(self):  # TODO: hide by default (unless advanced mode)
+        if not isinstance(self.tab.paramsFilesListWidget, FileDropListWidget):
+            warnings.warn("ChannelRegistrationParams.handle_params_files_changed"
+                          " called but paramsFilesListWidget is not a FileDropListWidget yet"
+                          " ensure proper initialization order",
+                RuntimeWarning)
+            return
+        def file_name_to_title(file_name: str) -> str:
+            if '.' in file_name:
+                base = file_name.split('.')[0]
+            else:
+                base = file_name
+            return snake_to_title(base)
+        params_files_with_ext = self.tab.paramsFilesListWidget.get_items_text()
+        new_params_files = [file_name_to_title(p) for p in params_files_with_ext]
+        # Now match length of weights (prune or pad with 0). Slider values (percents) in the config too
+        new_weights = trim_or_pad(self.view['landmarks_weights'], len(new_params_files), pad_value=0)
+
+        self.tab.landmarksWeightsPanel.set_items(new_params_files, new_weights)
+
+        patch = {}
+        set_item_recursive(patch, self.cfg_subtree + ['params_files'], params_files_with_ext)
+        set_item_recursive(patch, self.cfg_subtree + ['landmarks_weights'], new_weights)
+        self._apply_patch(patch)
+
+    @param_handler  # FIXME: check
+    def handle_landmarks_weight_changed(self, idx: int, value: int):
+        new_weights = self.view['landmarks_weights'][:]
+        if idx == len(new_weights):
+            new_weights.append(value)
+        elif idx < len(new_weights):
+            new_weights[idx] = value
+        else:
+            raise ValueError(f'Index {idx} out of bounds for channel {self.name} '
+                             f'landmarks weights {self.view["landmarks_weights"]}')
+        self._update_value(['landmarks_weights'], new_weights)
+
+
+class SharedRegistrationParams(UiParameter):
+    def build_params_dict(self):
+        return {
+            'plot_channel': ParamLink(None, self.tab.plotChannelComboBox),
+            'plot_composite': ParamLink(None, self.tab.plotCompositeCheckBox),
+        }
+
+
+class ReferenceChannelParams(UiParameter):
+    """The reference channel of the registration (registration.reference_channel), chosen in the tab"""
+    reference_channel: str | None
+
+    def __init__(self, tab, *, event_bus: EventBus, get_view=None, apply_patch=None):
+        self.cfg_subtree = ['registration']  # REFACTOR: section name from config_handler
+        super().__init__(tab, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
+
+    def build_params_dict(self):
+        return {'reference_channel': ParamLink(['reference_channel'], self.tab.referenceChannelComboBox,
+                                               cast_to_ui=align_with_to_ui, cast_from_ui=align_with_from_ui)}
+
+
+class RegistrationParams(ChannelsUiParameterCollection):  # TEST: does not seem to follow tab click
+    publishes = Publishes(UiRequestLandmarksDialog)   # Bind by number because name may change
+
+    def __init__(self, tab, *, event_bus: EventBus, get_view=None, apply_patch=None):
+        super().__init__(tab, pipeline_name='Registration', event_bus=event_bus,
+                         get_view=get_view, apply_patch=apply_patch)
+        self.atlas_params = AtlasParams(tab, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
+        self.reference_channel_params = ReferenceChannelParams(tab, event_bus=event_bus, get_view=get_view,
+                                                               apply_patch=apply_patch)
+        self.shared_params = SharedRegistrationParams(tab, event_bus=event_bus,
+                                                     get_view=get_view, apply_patch=apply_patch)
+
+    def add_channel(self, channel_name, data_type=None):
+        if channel_name in self.channels:
+            return
+        else:
+            channel_params = ChannelRegistrationParams(self.tab, channel_name, event_bus=self._bus,
+                                                        get_view=self._get_view, apply_patch=self._apply_patch)
+            self[channel_name] = channel_params
+            channel_params.tab.selectLandmarksPushButton.clicked.connect(
+                functools.partial(self.request_landmarks_dialog, channel_params))
+
+    def request_landmarks_dialog(self, channel_params, *_checked):  # *_checked: the button passes its checked state
+        """Ask for the landmarks dialog of the channel, by the index its page has now (its name may change)"""
+        self.publish(UiRequestLandmarksDialog(page_index=channel_params.page_index))
+
+    @property
+    def params(self):
+        return [self.atlas_params, self.reference_channel_params, self.shared_params] + list(self.values())
+
+    def get_channel_name(self, channel_idx):
+        return self.tab.channelsParamsTabWidget.tabText(channel_idx)
+
+
+class AtlasParams(UiParameter):
+    publishes = Publishes(UiAtlasIdChanged, UiAtlasStructureTreeIdChanged)
+
     atlas_id: str
     structure_tree_id: str
     atlas_folder: str
-    channel_affine_file_path: str
-    ref_affine_file_path: str
-    ref_bspline_file_path: str
 
-    def __init__(self, tab, src_folder=None):
-        super().__init__(tab, src_folder)
-        self.params_dict = {
-            'skip_resampling': ParamLink(['resampling', 'skip'], self.tab.skipRegistrationResamplingCheckBox),
-            'atlas_resolution': ['resampling', 'raw_sink_resolution'],
-            'atlas_id': ['atlas', 'id'],
-            'structure_tree_id': ['atlas', 'structure_tree_id'],
-            'atlas_folder': ParamLink(['atlas', 'align_files_folder'], self.tab.atlasFolderPath, connect=False),  # FIXME: ensure that set correctly by picking
-            'channel_affine_file_path': ParamLink(['atlas', 'align_channels_affine_file'], self.tab.channelAffineFilePath),
-            'ref_affine_file_path': ParamLink(['atlas', 'align_reference_affine_file'], self.tab.refAffineFilePath),
-            'ref_bspline_file_path': ParamLink(['atlas', 'align_reference_bspline_file'], self.tab.refBsplineFilePath),
-        }
+    def __init__(self, tab, *, event_bus: EventBus, get_view=None, apply_patch=None):
         self.atlas_info = ATLAS_NAMES_MAP
-        self.cfg_subtree = ['registration']
-        self.connect()
+        self.cfg_subtree = ['registration', 'atlas']  # REFACTOR: section name from config_handler
+        super().__init__(tab, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
+
+    def build_params_dict(self):
+        return {
+            'atlas_id': ParamLink(['id'], self.tab.atlasIdComboBox,
+                                  extra_connect=lambda w, cb: (
+                                      w.currentTextChanged.connect(lambda _t: self.update_atlas_resolution()),
+                                      lambda: None,  # provide a real disconnector if you have one
+                                  )[1], notify_apply=self.notify_atlas_id_changed, ),
+            'structure_tree_id': ParamLink(['structure_tree_id'], self.tab.structureTreeIdComboBox,
+                                           notify_apply=lambda: self.publish(UiAtlasStructureTreeIdChanged(
+                                               tree_id=self.structure_tree_id))),
+            'atlas_folder': ParamLink(['align_files_folder'], self.tab.atlasFolderPath, connect=False),
+            'atlas_resolution': ParamLink(None, self.tab.atlasResolutionTriplet),  # TODO: check if we bind to cfg here
+        }
 
     def connect(self):
-        self.tab.atlasResolutionTriplet.valueChangedConnect(self.handle_atlas_resolution_changed)
-        self.tab.atlasIdComboBox.currentTextChanged.connect(self.handle_atlas_id_changed)
-        self.tab.structureTreeIdComboBox.currentTextChanged.connect(self.handle_structure_tree_id_changed)
-        self.connect_simple_widgets()
+        self.tab.atlasResolutionTriplet.valueChangedConnect(self.handle_atlas_resolution_changed)  # TODO: replace with label
+
+    def cfg_to_ui(self):
+        super().cfg_to_ui()
+        # The atlas combo box is set silently from the config:
+        #   show the resolution of the atlas it now holds not the combo box default
+        self.update_atlas_resolution()
+
+    @property
+    def _atlas_entry(self) -> dict:
+        """The ATLAS_NAMES_MAP entry of the atlas selected in the combo box"""
+        if self.atlas_id not in self.atlas_info:
+            raise ClearMapValueError(f'Unknown atlas "{self.atlas_id}", known atlases: {list(self.atlas_info)}')
+        return self.atlas_info[self.atlas_id]
+
+    def update_atlas_resolution(self):
+        self.tab.atlasResolutionTriplet.setValue([self._atlas_entry['resolution']] * 3)
 
     @property
     def atlas_base_name(self):
-        return self.atlas_info[self.atlas_id]['base_name']
-        
-    @property
-    def atlas_resolution(self):
-        return self.tab.atlasResolutionTriplet.getValue()
+        return self._atlas_entry['base_name']
 
-    @atlas_resolution.setter
-    def atlas_resolution(self, res):
-        self.tab.atlasResolutionTriplet.setValue(res)
-
+    @param_handler  # FIXME: check
     def handle_atlas_resolution_changed(self, state):
-        self.config['resampling']['raw_sink_resolution'] = self.atlas_resolution
-        self.config['resampling']['autofluo_sink_resolution'] = self.atlas_resolution
+        # WARNING: uses parent config
+        view = self._get_view()
+        if view is None:
+            return
+        view = view['registration']  # REFACTOR: use parent param.cfg_subtree
+        patch = {}
+        for channel in view['channels'].keys():
+            set_item_recursive(patch, ['registration', 'channels', channel, 'resampled_resolution'],
+                               self.atlas_resolution)
+        self._apply_patch(patch)
+
+    def notify_atlas_id_changed(self):  # it's not directly the handler
+        self.publish(UiAtlasIdChanged(atlas_base_name=self.atlas_base_name))
+
+
+class CellMapParams(ChannelsUiParameterCollection):
+    def __init__(self, tab, sample_params, *, event_bus: EventBus, get_view=None, apply_patch=None):
+        super().__init__(tab, pipeline_name='CellMap', event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
+        self.sample_params = sample_params
+        self._perf_params: dict[str, ChannelCellMapPerformanceParams] = {}
+
 
     @property
-    def atlas_id(self):
-        return self.tab.atlasIdComboBox.currentText()
+    def params(self):
+        return list(self.values()) + list(self._perf_params.values())
 
-    @atlas_id.setter
-    def atlas_id(self, value):
-        self.tab.atlasIdComboBox.setCurrentText(value)
+    def add_channel(self, channel_name, data_type=None):
+        if channel_name not in self.keys():
+            dtype = np.uint16  # FIXME: read from stitched file
+            self[channel_name] = ChannelCellMapParams(self.tab, channel_name, main_params=self,
+                                                      event_bus=self._bus, dtype=dtype,
+                                                      get_view=self._get_view, apply_patch=self._apply_patch)
 
-    def handle_atlas_id_changed(self):
-        self.config['atlas']['id'] = self.atlas_id
-        self.atlas_resolution = self.atlas_info[self.atlas_id]['resolution']
-        self.ui_to_cfg()
-        self.atlas_id_changed.emit(self.atlas_base_name)
+    def add_perf_channel(self, channel_name: str):#, page_widget: QWidget):
+        """
+        Called from the tab once the channel UI page exists.
+        """
+        if channel_name in self._perf_params:
+            return
+        # FIXME: do we need to create empty dict entry in cfg for perf params ?
+        self._perf_params[channel_name] = ChannelCellMapPerformanceParams(
+            self.tab, channel_name, event_bus=self._bus,
+            get_view=self._get_view, apply_patch=self._apply_patch)
 
-    @property
-    def structure_tree_id(self):
-        return self.tab.structureTreeIdComboBox.currentText()
-
-    @structure_tree_id.setter
-    def structure_tree_id(self, value):
-        self.tab.structureTreeIdComboBox.setCurrentText(value)
-
-    def handle_structure_tree_id_changed(self):
-        self.config['atlas']['structure_tree_id'] = self.structure_tree_id
-        self.ui_to_cfg()   # TODO: check if required
-        self.atlas_structure_tree_id_changed.emit(self.structure_tree_id)
+    def drop_channel(self, channel_name: str):
+        # tear down both algo + perf params
+        if channel_name in self._perf_params:
+            self._perf_params[channel_name].teardown()
+            del self._perf_params[channel_name]
+        return super().drop_channel(channel_name)
 
 
-class CellMapParams(UiParameter):
+class ChannelCellMapParams(ChannelUiParameter, OrthoviewerSlicingMixin):
     background_correction_diameter: List[int]
     maxima_shape: int
+    h_max: int | None
     detection_threshold: int
     cell_filter_size: List[int]
     cell_filter_intensity: List[int]
+    distance_from_surface_px: int
     voxelization_radii: List[int]
+    voxelization_weights: Optional[str]
     detect_cells: bool
     filter_cells: bool
     voxelize: bool
     save_shape: bool
+    colocalization_compatible: bool
     plot_when_finished: bool
     plot_detected_cells: bool
-    crop_x_min: int
-    crop_x_max: int  # TODO: if 99.9 % source put to 100% (None)
-    crop_y_min: int
-    crop_y_max: int  # TODO: if 99.9 % source put to 100% (None)
-    crop_z_min: int
-    crop_z_max: int  # TODO: if 99.9 % source put to 100% (None)
+    crop_x: List[int]; crop_y: List[int]; crop_z: List[int]  # TODO: if 99.9 % source put to 100% (None)
+    n_detected_cells: int
+    n_filtered_cells: int
 
-    def __init__(self, tab, sample_params=None, preprocessing_params=None, src_folder=None):
-        super().__init__(tab, src_folder)
-        self.params_dict = {
-            'background_correction_diameter': ['detection', 'background_correction', 'diameter'],
+    def __init__(self, tab, channel, *, main_params, event_bus: EventBus, dtype=np.uint16,
+                 get_view=None, apply_patch=None):
+        super().__init__(tab, channel, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
+        self.main_params = main_params
+        self.dtype = dtype
+        self.advanced_controls = [self.tab.detectionShapeGroupBox]
+
+    def build_params_dict(self):
+        return {
+            'background_correction_diameter':
+                ParamLink(['detection', 'background_correction', 'diameter'], self.tab.backgroundCorrectionDiameter,
+                          cast_to_ui = lambda v: (v[0] if isinstance(v, (list, tuple)) and len(v) else v),
+                          cast_from_ui = lambda v: [int(v), int(v)]),
             'maxima_shape': ParamLink(['detection', 'maxima_detection', 'shape'], self.tab.maximaShape),
+            'h_max': ParamLink(['detection', 'maxima_detection', 'h_max'], self.tab.hMaxSinglet,
+                               default=None, missing_ok=True),
             'detection_threshold': ParamLink(['detection', 'shape_detection', 'threshold'], self.tab.detectionThreshold),
             'cell_filter_size': ParamLink(['cell_filtration', 'thresholds', 'size'], self.tab.cellFilterThresholdSizeDoublet),
-            'cell_filter_intensity': ParamLink(['cell_filtration', 'thresholds', 'intensity'],
-                                               self.tab.cellFilterThresholdIntensityDoublet,
-                                               connect=False),
+            'cell_filter_intensity': VectorLink(['cell_filtration', 'thresholds', 'intensity'],
+                                                 self.tab.cellFilterThresholdIntensityDoublet,
+                                                 disabled_value=None, default_on_enable=[0, 65535],
+                                                 cast_from_ui=self.cast_max_from_ui),
+            'distance_from_surface_px': ParamLink(['cell_filtration', 'distance_from_surface_px'],
+                                                  self.tab.distanceFromSurfaceSpinBox, default=0, missing_ok=True),
             'voxelization_radii': ParamLink(['voxelization', 'radii'], self.tab.voxelizationRadiusTriplet),
+            'voxelization_weights': ParamLink(['voxelization', 'weights'], self.tab.voxelizationWeightsComboBox),
+            'crop_x': VectorLink(['detection', 'test_set_slicing', 'dim_0'], self.tab.detectionSubsetXRangeDoublet),
+            'crop_y': VectorLink(['detection', 'test_set_slicing', 'dim_1'], self.tab.detectionSubsetYRangeDoublet),
+            'crop_z': VectorLink(['detection', 'test_set_slicing', 'dim_2'], self.tab.detectionSubsetZRangeDoublet),
+            'plot_when_finished': ParamLink(['run', 'plot_when_finished'], self.tab.runCellMapPlotCheckBox),
             'detect_cells': ParamLink(None, self.tab.runCellMapDetectCellsCheckBox),
             'filter_cells': ParamLink(None, self.tab.runCellMapFilterCellsCheckBox),
             'voxelize': ParamLink(None, self.tab.runCellMapVoxelizeCheckBox),
             'save_shape': ParamLink(None, self.tab.runCellMapSaveShapeCheckBox),
-            'plot_when_finished': ParamLink(['run', 'plot_when_finished'], self.tab.runCellMapPlotCheckBox),
-            'crop_x_min': ParamLink(['detection', 'test_set_slicing', 'dim_0', 0], self.tab.detectionSubsetXRangeMin),
-            'crop_x_max': ParamLink(['detection', 'test_set_slicing', 'dim_0', 1], self.tab.detectionSubsetXRangeMax),
-            'crop_y_min': ParamLink(['detection', 'test_set_slicing', 'dim_1', 0], self.tab.detectionSubsetYRangeMin),
-            'crop_y_max': ParamLink(['detection', 'test_set_slicing', 'dim_1', 1], self.tab.detectionSubsetYRangeMax),
-            'crop_z_min': ParamLink(['detection', 'test_set_slicing', 'dim_2', 0], self.tab.detectionSubsetZRangeMin),
-            'crop_z_max': ParamLink(['detection', 'test_set_slicing', 'dim_2', 1], self.tab.detectionSubsetZRangeMax)
+            'colocalization_compatible': ParamLink(['detection', 'colocalization_compatible'],
+                                                   self.tab.runCellMapColocalizationCompatibleCheckBox,
+                                                   default=False, missing_ok=True),
+            'n_detected_cells': ParamLink(None, self.tab.nDetectedCellsLabel),
+            'n_filtered_cells': ParamLink(None, self.tab.nDetectedCellsAfterFilterLabel),
         }
-        self.sample_params = sample_params
-        self.preprocessing_params = preprocessing_params
-        self.connect()
+
+    @param_handler  # FIXME: check
+    def handle_advanced_state_changed(self, state):
+        super().handle_advanced_state_changed(state)
+        self.tab.detectionShapeGroupBox.setVisible(state)  # FIXME: seems redundant
+
+    @property
+    def cfg_subtree(self):
+        return ['cell_map', 'channels', self.name]  # REFACTOR: section name from config_handler
+
+    @param_handler  # FIXME: check
+    def handle_colocalization_compatible_changed(self, state):
+        self._update_value(['detection', 'colocalization_compatible'],
+                           self.colocalization_compatible)
+        if self.colocalization_compatible:
+            self.save_shape = True
+        self.tab.runCellMapSaveShapeCheckBox.setEnabled(not self.colocalization_compatible)
 
     def connect(self):
-        self.tab.backgroundCorrectionDiameter.valueChanged.connect(self.handle_background_correction_diameter_changed)
-        self.tab.cellFilterThresholdIntensityDoublet.valueChangedConnect(self.handle_filter_intensity_changed)
-        self.connect_simple_widgets()  # |TODO: automatise in parent class
+        self.tab.runCellMapColocalizationCompatibleCheckBox.stateChanged.connect(self.handle_colocalization_compatible_changed)
 
-    def cfg_to_ui(self):
-        self.reload()
-        super().cfg_to_ui()
+    def cast_max_from_ui(self, cfg_vals):
+        """After sentinel mapping back to tokens (None/'auto'), push upper to dtype.max."""
+        out = list(cfg_vals)
+        if out[-1] in (None, 'auto', -1):  # If sentinel, store as dtype max
+            out[-1] = int(np.iinfo(self.dtype).max)
+        return out
 
-    @property
-    def ratios(self):
-        raw_res = np.array(self.sample_params.raw_resolution)
-        atlas_res = np.array(self.preprocessing_params.registration.atlas_resolution)
-        ratios = atlas_res / raw_res  # to original
-        return ratios
 
-    @property
-    def background_correction_diameter(self):
-        return [self.tab.backgroundCorrectionDiameter.value()] * 2
+class ChannelCellMapPerformanceParams(ChannelUiParameter):
+    """
+    Links per-channel detection.block_processing performance to the UI widget.
+    """
 
-    @background_correction_diameter.setter
-    def background_correction_diameter(self, shape):
-        if isinstance(shape, (list, tuple)):
-            shape = shape[0]
-        self.tab.backgroundCorrectionDiameter.setValue(shape)
+    n_processes: int
+    size_min: int
+    size_max: int
+    overlap: int | None
 
-    def handle_background_correction_diameter_changed(self, val):
-        self.config['detection']['background_correction']['diameter'] = self.background_correction_diameter
-
-    @property
-    def cell_filter_intensity(self):
-        intensities = self.tab.cellFilterThresholdIntensityDoublet.getValue()
-        if intensities is None:
-            return
-        else:
-            intensities = list(intensities)
-            if intensities[-1] == -1:
-                intensities[-1] = 65536  # FIXME: hard coded, should read max
-            return intensities
-
-    @cell_filter_intensity.setter
-    def cell_filter_intensity(self, intensity):
-        self.tab.cellFilterThresholdIntensityDoublet.setValue(intensity)
-
-    def handle_filter_intensity_changed(self, _):
-        self.config['cell_filtration']['thresholds']['intensity'] = self.cell_filter_intensity
-
-    def scale_axis(self, val, axis='x'):
-        axis_ratio = self.ratios['xyz'.index(axis)]
-        return round(val * axis_ratio)
-
-    def reverse_scale_axis(self, val, axis='x'):
-        axis_ratio = self.ratios['xyz'.index(axis)]
-        return round(val / axis_ratio)
+    def build_params_dict(self):
+        bp = self.tab.detectionBlockProcessingWidget  # we’ll attach this attr in _setup_channel
+        return {
+            'n_processes': ParamLink(['detection', 'block_processing', 'n_processes'], bp._nproc_widget),
+            'size_min': ParamLink(['detection', 'block_processing', 'size_min'], bp._size_min_spin),
+            'size_max': ParamLink(['detection', 'block_processing', 'size_max'], bp._size_max_spin),
+            'overlap': ParamLink(['detection', 'block_processing', 'overlap'],
+                                 bp._overlap_spin, disabled_value=None, ui_sentinel=-1, enforce_sentinel_min=True),
+        }
 
     @property
-    def slice_tuples(self):
-        return ((self.crop_x_min, self.crop_x_max),
-                (self.crop_y_min, self.crop_y_max),
-                (self.crop_z_min, self.crop_z_max))
-
-    @property
-    def slicing(self):
-        return tuple([slice(ax[0], ax[1]) for ax in self.slice_tuples])
+    def cfg_subtree(self):
+        # Root for this channel’s perf; ParamLinks are already fully qualified, so this is mostly for helpers
+        return ['cell_map', 'performance', 'channels', self.name]
 
 
-class VesselParams(UiParameterCollection):
-    def __init__(self, tab, sample_params, preprocessing_params, src_folder=None):
-        super().__init__(tab, src_folder)
-        # self.sample_params = sample_params  # TODO: check if required
-        # self.preprocessing_params = preprocessing_params  # TODO: check if required
-        self.binarization_params = VesselBinarizationParams(tab, src_folder)
-        self.graph_params = VesselGraphParams(tab, src_folder)
-        self.visualization_params = VesselVisualizationParams(tab, sample_params, preprocessing_params, src_folder)
+class TractMapParams(ChannelsUiParameterCollection):
+    def __init__(self, tab, sample_params, *, event_bus: EventBus, get_view=None, apply_patch=None):
+        super().__init__(tab, pipeline_name='TractMap', event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
+        self.sample_params = sample_params
+        self.performance_params = TractMapPerformanceParams(tab, event_bus=event_bus,
+                                                            get_view=get_view, apply_patch=apply_patch)
 
     @property
     def params(self):
-        return self.binarization_params, self.graph_params, self.visualization_params
+        return list(self.values()) + [self.performance_params]
+
+    def add_channel(self, channel_name, data_type=None):
+        if channel_name not in self.channels:
+            self[channel_name] = ChannelTractMapParams(self.tab, channel_name, main_params=self, event_bus=self._bus,
+                                                       get_view=self._get_view, apply_patch=self._apply_patch)
 
 
-class VesselBinarizationParams(UiParameter):
-    run_raw_binarization: bool
-    raw_binarization_clip_range: List[int]
-    raw_binarization_threshold: int
-    smooth_raw: bool
-    binary_fill_raw: bool
-    fill_main_channel: bool
-    run_arteries_binarization: bool
-    arteries_binarization_clip_range: List[int]
-    arteries_binarization_threshold: int
-    smooth_arteries: bool
-    binary_fill_arteries: bool
-    fill_secondary_channel: bool
+class ChannelTractMapParams(ChannelUiParameter, OrthoviewerSlicingMixin):
+    clipping_decimation_ratio: int
+    clipping_percents: List[float]
+    clip_range: List[int]
+    crop_x: List[int]  # TODO: if 99.9 % source put to 100% (None)
+    crop_y: List[int]  # TODO: if 99.9 % source put to 100% (None)
+    crop_z: List[int]  # TODO: if 99.9 % source put to 100% (None)
+    display_decimation_ratio: int  # For the "cells.feather" file
+    voxelization_radii: List[int]
+    binarize: bool
+    extract_coordinates: bool
+    transform_coordinates: bool
+    label_coordinates: bool
+    voxelize: bool
+    export_df: bool
+
+    def __init__(self, tab, channel, *, main_params, event_bus: EventBus, get_view=None, apply_patch=None):
+        super().__init__(tab, channel, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
+        self.main_params = main_params
+
+    def build_params_dict(self):
+        return {
+            'clipping_decimation_ratio': ParamLink(['binarization', 'decimation_ratio'], self.tab.clippingDecimationRatioSpinBox),
+            'clipping_percents': ParamLink(['binarization', 'percentage_range'],
+                                           self.tab.clippingPixelsPercentDoublet,
+                                           default=[70, 99.999]),
+            'clip_range': ParamLink(['binarization', 'clip_range'], self.tab.clipRangeDoublet),
+            'crop_x': VectorLink(['test_set_slicing', 'dim_0'], self.tab.detectionSubsetXRangeDoublet),
+            'crop_y': VectorLink(['test_set_slicing', 'dim_1'], self.tab.detectionSubsetYRangeDoublet),
+            'crop_z': VectorLink(['test_set_slicing', 'dim_2'], self.tab.detectionSubsetZRangeDoublet),
+            'display_decimation_ratio': ParamLink(['display', 'decimation_ratio'], self.tab.displayDecimationRatioSpinBox),
+            'voxelization_radii': ParamLink(['voxelization', 'radii'], self.tab.voxelizationRadiusTriplet),
+            'binarize': ParamLink(['steps', 'binarize'], self.tab.binarizeCheckBox),
+            'extract_coordinates': ParamLink(['steps', 'extract_coordinates'], self.tab.extractCoordinatesCheckBox),
+            'transform_coordinates': ParamLink(['steps', 'transform_coordinates'], self.tab.transformCoordinatesCheckBox),
+            'label_coordinates': ParamLink(['steps', 'label_coordinates'], self.tab.labelCoordinatesCheckBox),
+            'voxelize': ParamLink(['steps', 'voxelize'], self.tab.voxelizeCheckBox),
+            'export_df': ParamLink(['steps', 'export_df'], self.tab.exportDfCheckBox),
+        }
+
+    @property
+    def cfg_subtree(self):
+        return ['tract_map', 'channels', self.name]  # REFACTOR: section name from config_handler
+
+
+class TractMapPerformanceParams(UiParameter):
+    """
+    tract_map.performance.<section> → performanceGroupBox widgets.
+    Shared (not per-channel) in v3.1.
+    """
+    cfg_subtree = ['tract_map', 'performance']
+
+    def build_params_dict(self):
+        perf_box = self.tab.performanceGroupBox # shorthand
+        return {
+            # binarization.performance
+            'binarization_n_processes': ParamLink(['binarization', 'n_processes'], perf_box.binarizationPerf),
+
+            # where.performance
+            'where_n_processes': ParamLink(['where', 'n_processes'], perf_box.wherePerf),
+
+            # transform.block_processing
+            'transform_size_min': ParamLink(['transform', 'block_processing', 'size_min'],
+                                            perf_box.transformBlock._size_min_spin),
+            'transform_size_max': ParamLink(['transform', 'block_processing', 'size_max'],
+                                            perf_box.transformBlock._size_max_spin),
+            'transform_overlap': ParamLink(['transform', 'block_processing', 'overlap'],
+                                           perf_box.transformBlock._overlap_spin,
+                                           disabled_value=None, ui_sentinel=-1, enforce_sentinel_min=True),
+            'transform_n_processes': ParamLink(['transform', 'block_processing', 'n_processes'],
+                                               perf_box.transformBlock._nproc_widget),
+
+            # label.block_processing
+            'label_size_min': ParamLink(['label', 'block_processing', 'size_min'],
+                                        perf_box.labelBlock._size_min_spin),
+            'label_size_max': ParamLink(['label', 'block_processing', 'size_max'],
+                                        perf_box.labelBlock._size_max_spin),
+            'label_overlap': ParamLink(['label', 'block_processing', 'overlap'],
+                                       perf_box.labelBlock._overlap_spin,
+                                       disabled_value=None, ui_sentinel=-1, enforce_sentinel_min=True),
+            'label_n_processes': ParamLink(['label', 'block_processing', 'n_processes'],
+                perf_box.labelBlock._nproc_widget),
+        }
+
+
+class ColocalizationParams(ChannelsUiParameterCollection):
+    def __init__(self, tab, sample_params, *, event_bus: EventBus, get_view=None, apply_patch=None):
+        super().__init__(tab, pipeline_name='Colocalization', event_bus=event_bus,
+                         get_view=get_view, apply_patch=apply_patch)
+        self.sample_params = sample_params
+
+    @property
+    def params(self):
+        return self.values()
+
+    def add_channel(self, channel_name, data_type=None):
+        if isinstance(channel_name, (tuple, list)):
+            channel_name = '-'.join(channel_name)
+        if channel_name in self.keys():
+            return
+        else:
+            self[channel_name] = ChannelColocalizationParams(self.tab, channel_name, main_params=self,
+                                                             event_bus=self._bus, get_view=self._get_view,
+                                                             apply_patch=self._apply_patch)
+
+
+class ChannelColocalizationParams(ChannelUiParameter):
+    particle_diameter: int
+    n_processes: int
+    max_particle_distance: float
+    relative_overlap_threshold: float
+    voxel_number_overlap_threshold: int
+
+    def __init__(self, tab, channel, *, main_params, event_bus: EventBus, get_view=None, apply_patch=None):
+        super().__init__(tab, channel, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
+        self.main_params = main_params
+
+    def build_params_dict(self):
+        return {
+            'particle_diameter': ParamLink(['comparison', 'particle_diameter'],
+                                           self.tab.colocalizationDiameterSpinBox),
+            # performance is top level subsection, not per chan
+            'n_processes': ParamLink(['performance', 'n_processes'],
+                                     self.tab.colocalizationNProcessesSpinBox, section_level=True),
+            'max_particle_distance': ParamLink(['analysis', 'max_particle_distance'],
+                                               self.tab.colocalizationMaxDistanceSpinBox),
+            'relative_overlap_threshold': ParamLink(['analysis', 'relative_overlap_threshold'],
+                                                    self.tab.colocalizationRelativeThresholdDoubleSpinBox),
+            'voxel_number_overlap_threshold': ParamLink(['analysis', 'voxel_number_overlap_threshold'],
+                                                        self.tab.colocalizationAbsoluteOverlapThresholdSpinBox),
+        }
+
+    @property
+    def cfg_subtree(self):
+        return ['colocalization', 'channels', self.name]   # REFACTOR: section name from config_handler
+
+
+class SharedVesselBinarizationParams(UiParameter):
     fill_combined: bool
     plot_step_1: str
     plot_step_2: str
     plot_channel_1: str
     plot_channel_2: str
 
-    def __init__(self, tab, src_folder=None):
-        super().__init__(tab, src_folder)
-        self.params_dict = {
-            'run_raw_binarization': ParamLink(['raw', 'binarization', 'run'], self.tab.runRawBinarizationCheckBox),
-            'raw_binarization_clip_range': ParamLink(['raw', 'binarization', 'clip_range'],
-                                                     self.tab.rawBinarizationClipRangeDoublet),
-            'raw_binarization_threshold': ['raw', 'binarization', 'threshold'],
-            'smooth_raw': ParamLink(['raw', 'smoothing', 'run'], self.tab.rawBinarizationSmoothingCheckBox),
-            'binary_fill_raw': ParamLink(['raw', 'binary_filling', 'run'], self.tab.rawBinarizationBinaryFillingCheckBox),
-            'fill_main_channel': ParamLink(['raw', 'deep_filling', 'run'], self.tab.binarizationRawDeepFillingCheckBox),
-            'run_arteries_binarization': ParamLink(['arteries', 'binarization', 'run'],
-                                                   self.tab.runArteriesBinarizationCheckBox),
-            'arteries_binarization_clip_range': ParamLink(['arteries', 'binarization', 'clip_range'],
-                                                          self.tab.arteriesBinarizationClipRangeDoublet),
-            'arteries_binarization_threshold': ['arteries', 'binarization', 'threshold'],
-            'smooth_arteries': ParamLink(['arteries', 'smoothing', 'run'],
-                                         self.tab.arteriesBinarizationSmoothingCheckBox),
-            'binary_fill_arteries': ParamLink(['arteries', 'binary_filling', 'run'],
-                                              self.tab.arteriesBinarizationBinaryFillingCheckBox),
-            'fill_secondary_channel': ParamLink(['arteries', 'deep_filling', 'run'],
-                                                self.tab.binarizationArteriesDeepFillingCheckBox),
+    def build_params_dict(self):
+        return {
             'fill_combined': ParamLink(['combined', 'binary_fill'], self.tab.binarizationConbineBinaryFillingCheckBox),
             'plot_step_1': ParamLink(None, self.tab.binarizationPlotStep1ComboBox),
             'plot_step_2': ParamLink(None, self.tab.binarizationPlotStep2ComboBox),
             'plot_channel_1': ParamLink(None, self.tab.binarizationPlotChannel1ComboBox),
             'plot_channel_2': ParamLink(None, self.tab.binarizationPlotChannel2ComboBox),
-
         }
-        self.cfg_subtree = ['binarization']
-        self.connect()
 
-    def connect(self):
-        self.tab.rawBinarizationThresholdSpinBox.valueChanged.connect(self.handle_raw_binarization_threshold_changed)
+    def set_plotable_channels(self, channels):
+        with QSignalBlocker(self.tab.binarizationPlotChannel1ComboBox):
+            self.tab.binarizationPlotChannel1ComboBox.clear()
+            self.tab.binarizationPlotChannel1ComboBox.addItems(channels)
+        with QSignalBlocker(self.tab.binarizationPlotChannel2ComboBox):
+            self.tab.binarizationPlotChannel2ComboBox.clear()
+            self.tab.binarizationPlotChannel2ComboBox.addItems(channels)
 
-        self.tab.arteriesBinarizationThresholdSpinBox.valueChanged.connect(
-            self.handle_arteries_binarization_threshold_changed)
-        self.connect_simple_widgets()
+
+class VesselParams(ChannelsUiParameterCollection):
+
+    def __init__(self, tab, sample_params, *, event_bus: EventBus, get_view=None, apply_patch=None):
+        super().__init__(tab, pipeline_name='TubeMap', event_bus=event_bus,
+                         get_view=get_view, apply_patch=apply_patch)
+        # self.sample_params = sample_params  # TODO: check if required
+        # self.preprocessing_params = preprocessing_params  # TODO: check if required
+        self.shared_binarization_params = SharedVesselBinarizationParams(tab, event_bus=event_bus,
+                                                                       get_view=get_view,
+                                                                       apply_patch=apply_patch)
+        self.graph_params = VesselGraphParams(tab, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
+        self.graph_perf_params = VesselGraphPerformanceParams(tab, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
+        self.visualization_params = VesselVisualizationParams(tab, sample_params=sample_params, event_bus=event_bus,
+                                                                get_view=get_view, apply_patch=apply_patch)
+        self._perf_params: dict[str, VesselBinarizationPerformanceParams] = {}
+
+    @property
+    def params(self):
+        return (list(self.values()) +
+                [self.graph_params, self.graph_perf_params, self.visualization_params] +
+                list(self._perf_params.values()))
+
+    def get_selected_steps_and_channels(self):
+        shared_params = self.shared_binarization_params
+        steps = (shared_params.plot_step_1, shared_params.plot_step_2)
+        channels = (shared_params.plot_channel_1, shared_params.plot_channel_2)
+        channels = [c for s, c in zip(steps, channels) if s is not None]
+        steps = [s for s in steps if s is not None]
+        return steps, channels
+
+    def add_channel(self, channel_name, data_type=None):
+        if channel_name in self.channels:
+            return
+        else:
+            self[channel_name] = VesselBinarizationParams(self.tab, channel_name, event_bus=self._bus,
+                                                            get_view=self._get_view, apply_patch=self._apply_patch)
+
+            if data_type == 'arteries':
+                self.graph_params.use_arteries = True
+
+            self.shared_binarization_params.set_plotable_channels(self.channels)
+
+    def add_perf_channel(self, channel_name: str):
+        """
+        Called from the tab once the channel UI page exists.
+        """
+        if channel_name in self._perf_params:
+            return
+        # FIXME: do we need to create empty dict entry in cfg for perf params ?
+        self._perf_params[channel_name] = VesselBinarizationPerformanceParams(
+            self.tab, channel_name, event_bus=self._bus,
+            get_view=self._get_view, apply_patch=self._apply_patch)
+
+    def drop_channel(self, channel_name: str):
+        # tear down both algo + perf params
+        if channel_name in self._perf_params:
+            self._perf_params[channel_name].teardown()
+            del self._perf_params[channel_name]
+        popped_channel = super().drop_channel(channel_name)
+        if popped_channel is not None:
+            self.shared_binarization_params.set_plotable_channels(self.channels)
+        return popped_channel
+
+
+class VesselBinarizationParams(ChannelUiParameter):
+    run_binarization: bool
+    binarization_clip_range: List[int]
+    binarization_threshold: int
+    run_smoothing: bool
+    run_binary_filling: bool
+    run_deep_filling: bool
+
+    def build_params_dict(self):
+        return {
+            # FIXME: add tabs to UI with matching control names
+            'binarization_clip_range': ParamLink(['binarize', 'clip_range'], self.tab.binarizationClipRangeDoublet),
+            'binarization_threshold': ParamLink(['binarize','threshold'],
+                                                self.tab.binarizationThresholdSpinBox,
+                                                disabled_value=None,
+                                                ui_sentinel=-1,
+                                                enforce_sentinel_min=True,
+                                                # cast_to_ui=self.sanitize_nones,  # REFACTOR: use VectorLink instead ?
+                                                # cast_from_ui=self.sanitize_neg_one
+                                                ),
+        }
+
+    @property
+    def cfg_subtree(self):
+        return ['vasculature', 'binarization', 'single_channels', self.name]   # REFACTOR: section name from config_handler
+
+    def cfg_to_ui(self) -> None:
+        super().cfg_to_ui()
+        # Sync pipeline widget from config — runs even during hydration
+        if self._pipeline_widget is not None:
+            self.widget_ops.set(self._pipeline_widget, self._pipeline_state_from_cfg(), silent=True)
+
+    @property
+    def _pipeline_widget(self) -> Optional['LinearPipelineWidget']:
+        """The LinearPipelineWidget attached to this channel's page widget."""
+        return getattr(self.tab, 'binarizationPipelineWidget', None)
+
+    def _pipeline_state_from_cfg(self) -> dict:
+        """Build the config-schema dict that _lp_setter expects."""
+        cfg = self.view
+        order = cfg.get('step_order') or list(BINARIZATION_STEPS.keys())
+        return {
+            'step_order': order,
+            **{name: {'run': cfg.get(name, {}).get('run', True),
+                      'keep_intermediate': cfg.get(name, {}).get('save', True),}
+               for name in order if name in BINARIZATION_STEPS}
+        }
+
+    def pipeline_from_config(self) -> 'LinearPipeline':
+        """
+        Reconstruct a LinearPipeline from config run flags and step_order.
+        Falls back to BINARIZATION_STEPS insertion order when step_order
+        is absent (e.g. legacy config).
+        """
+        cfg = self.view
+        order = cfg.get('step_order') or list(BINARIZATION_STEPS.keys())
+        steps = []
+        for name in order:
+            if name not in BINARIZATION_STEPS:
+                continue
+            enabled = cfg.get(name, {}).get('run', True)
+            keep_intermediate = cfg.get(name, {}).get('save', True)
+            position_locked = (name == 'binarize')   # binarize must always come first  #  FIXME: use BINARIZATION_STEPS metadata for this instead of hardcoding
+            steps.append(PipelineStep(spec_name=name, enabled=enabled,
+                                      keep_intermediate=keep_intermediate, locked=position_locked))
+        return LinearPipeline(steps=steps)
+
+    def apply_pipeline_to_config(self, pipeline: 'LinearPipeline') -> None:
+        """
+        Write step order and enabled flags from pipeline to config.
+        Called by the tab whenever the pipeline widget changes.
+        """
+        patch = {}
+        for step in pipeline.steps:
+            set_item_recursive(patch,
+                               self.cfg_subtree + [step.spec_name, 'run'], step.enabled)
+            set_item_recursive(patch,
+                               self.cfg_subtree + [step.spec_name, 'save'], step.keep_intermediate)
+        set_item_recursive(patch,
+                           self.cfg_subtree + ['step_order'], [s.spec_name for s in pipeline.steps])
+        self._apply_patch(patch)
+
+    def post_connect(self) -> None:
+        """
+        Create and wire the LinearPipelineWidget after ParamLink connections
+        are established. The widget replaces the run_* checkboxes and is
+        owned here because it drives config writes via apply_pipeline_to_config.
+        """
+        # Build initial state from config (handles hydration correctly)
+        pipeline = self.pipeline_from_config()
+
+        # Build and insert widget
+        pipeline_widget = LinearPipelineWidget(pipeline, parent=self.tab)
+        self.tab.binarizationPipelineWidget = pipeline_widget
+        ctrl_box = self.tab.binarizationStepsGroupBox
+        ctrl_box.layout().insertWidget(0, pipeline_widget)
+
+        # Register in params_dict for cfg_to_ui (WIDGET_OPS.set) and teardown
+        # connect=False because keys=None
+        p_link = ParamLink(keys=None, widget=pipeline_widget)
+        self.params_dict['pipeline'] = p_link
+
+        # Force save to add section if missing
+        self.apply_pipeline_to_config(pipeline_widget.pipeline)
+
+        # Wire change → config write; store disconnector so teardown() cleans up
+        callback = lambda: self.apply_pipeline_to_config(pipeline_widget.pipeline)
+        disconnector = _linear_pipeline_connector(pipeline_widget, callback)
+        p_link.add_disconnector(disconnector)
 
     @property
     def n_steps(self):
-        n_steps = self.run_raw_binarization
-        n_steps += self.smooth_raw or self.binary_fill_raw
-        n_steps += self.fill_main_channel
-        n_steps += self.run_arteries_binarization
-        n_steps += self.smooth_arteries or self.binary_fill_arteries
-        n_steps += self.fill_secondary_channel
-        n_steps += self.fill_combined
-        return
+        if self._pipeline_widget is not None:
+            return len(self._pipeline_widget.pipeline.enabled_steps)
+        # fallback before widget exists (e.g. before hydration)
+        return len([stp for stp in BINARIZATION_STEPS if self.view.get(stp, {}).get('run', True)])
+
+
+class VesselBinarizationPerformanceParams(ChannelUiParameter):
+    n_processes: int
+    size_min: int
+    size_max: int
+    overlap: int | None
+
+    def build_params_dict(self):
+        binarize_bp = self.tab.binarizationBlockProcessingWidget
+        smooth_bp = self.tab.smoothingBlockProcessingWidget
+        binary_fill_n_processes_w = self.tab.binaryFillingNProcessesSpinBox
+        deep_fill_bp = self.tab.deepFillingBlockProcessingWidget
+        return {
+            'binarization_n_processes': ParamLink(['binarize', 'block_processing', 'n_processes'], binarize_bp._nproc_widget),
+            'binarization_size_min': ParamLink(['binarize', 'block_processing', 'size_min'], binarize_bp._size_min_spin,
+                                               disabled_value=None, ui_sentinel=-1, enforce_sentinel_min=True),
+            'binarization_size_max': ParamLink(['binarize', 'block_processing', 'size_max'], binarize_bp._size_max_spin),
+            'binarization_overlap': ParamLink(['binarize', 'block_processing', 'overlap'], binarize_bp._overlap_spin,
+                                              disabled_value=None, ui_sentinel=-1, enforce_sentinel_min=True),
+            'smooth_n_processes': ParamLink(['smooth', 'block_processing', 'n_processes'], smooth_bp._nproc_widget),
+            'smooth_size_min': ParamLink(['smooth', 'block_processing', 'size_min'], smooth_bp._size_min_spin,
+                                         disabled_value=None, ui_sentinel=-1, enforce_sentinel_min=True),
+            'smooth_size_max': ParamLink(['smooth', 'block_processing', 'size_max'], smooth_bp._size_max_spin),
+            'smooth_overlap': ParamLink(['smooth', 'block_processing', 'overlap'], smooth_bp._overlap_spin,
+                                        disabled_value=None, ui_sentinel=-1, enforce_sentinel_min=True),
+            'binary_fill_n_processes': ParamLink(['binary_fill', 'n_processes'], binary_fill_n_processes_w),
+            'deep_fill_n_processes': ParamLink(['deep_fill', 'block_processing', 'n_processes'], deep_fill_bp._nproc_widget),
+            'deep_fill_size_min': ParamLink(['deep_fill', 'block_processing', 'size_min'], deep_fill_bp._size_min_spin,
+                                            disabled_value=None, ui_sentinel=-1, enforce_sentinel_min=True),
+            'deep_fill_size_max': ParamLink(['deep_fill', 'block_processing', 'size_max'], deep_fill_bp._size_max_spin),
+            'deep_fill_overlap': ParamLink(['deep_fill', 'block_processing', 'overlap'], deep_fill_bp._overlap_spin,
+                                           disabled_value=None, ui_sentinel=-1, enforce_sentinel_min=True),
+        }
 
     @property
-    def raw_binarization_threshold(self):
-        return self.sanitize_neg_one(self.tab.rawBinarizationThresholdSpinBox.value())
-
-    @raw_binarization_threshold.setter
-    def raw_binarization_threshold(self, value):
-        self.tab.rawBinarizationThresholdSpinBox.setValue(self.sanitize_nones(value))
-
-    def handle_raw_binarization_threshold_changed(self):
-        self.config['raw']['binarization']['threshold'] = self.raw_binarization_threshold
-
-    @property
-    def arteries_binarization_threshold(self):
-        return self.sanitize_neg_one(self.tab.arteriesBinarizationThresholdSpinBox.value())
-
-    @arteries_binarization_threshold.setter
-    def arteries_binarization_threshold(self, value):
-        self.tab.arteriesBinarizationThresholdSpinBox.setValue(self.sanitize_nones(value))
-
-    def handle_arteries_binarization_threshold_changed(self):
-        self.config['arteries']['binarization']['threshold'] = self.arteries_binarization_threshold
+    def cfg_subtree(self):
+        # Root for this channel’s perf; ParamLinks are already fully qualified, so this is mostly for helpers
+        return ['vasculature', 'performance', 'binarization', 'single_channels', self.name]
 
 
 class VesselGraphParams(UiParameter):
+    publishes = Publishes(UiVesselGraphFiltersChanged)
+
+    cfg_subtree = ['vasculature']
+
+    # graph_construction
     skeletonize: bool
     build: bool
     clean: bool
@@ -633,128 +1823,383 @@ class VesselGraphParams(UiParameter):
     transform: bool
     annotate: bool
     use_arteries: bool
+
+    # pre_filtering
     vein_intensity_range_on_arteries_channel: List[int]
     restrictive_min_vein_radius: float
     permissive_min_vein_radius: float
     final_min_vein_radius: float
-    arteries_min_radius: float
+    arteries_min_noise_edges: int
+
+    # tracing
     max_arteries_tracing_iterations: int
     max_veins_tracing_iterations: int
-    min_artery_size: int
-    min_vein_size: int
+    artery_trace_radius_um: float
+    vein_trace_radius_um: float
+    distance_to_surface_min: float
+    artery_intensity_min: float
+    vein_intensity_min: float
 
-    def __init__(self, tab, src_folder=None):
-        super().__init__(tab, src_folder)
-        self.params_dict = {
+    # capillaries_removal
+    min_artery_component_edges: int
+    min_vein_component_edges: int
+
+    def __init__(self, tab, *, event_bus: EventBus, get_view=None, apply_patch=None):
+        super().__init__(tab, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
+        self.filter_params = []
+
+    def build_params_dict(self):
+        return {
             'skeletonize': ParamLink(['graph_construction', 'skeletonize'], self.tab.buildGraphSkeletonizeCheckBox),
             'build': ParamLink(['graph_construction', 'build'], self.tab.buildGraphBuildCheckBox),
             'clean': ParamLink(['graph_construction', 'clean'], self.tab.buildGraphCleanCheckBox),
             'reduce': ParamLink(['graph_construction', 'reduce'], self.tab.buildGraphReduceCheckBox),
             'transform': ParamLink(['graph_construction', 'transform'], self.tab.buildGraphTransformCheckBox),
             'annotate':  ParamLink(['graph_construction', 'annotate'], self.tab.buildGraphRegisterCheckBox),
-            'use_arteries': ParamLink(['graph_construction', 'use_arteries'], self.tab.buildGraphUseArteriesCheckBox),
-            'vein_intensity_range_on_arteries_channel': ParamLink(['vessel_type_postprocessing', 'pre_filtering', 'vein_intensity_range_on_arteries_ch'],
-                                                                  self.tab.veinIntensityRangeOnArteriesChannelDoublet),
-            'restrictive_min_vein_radius': ParamLink(['vessel_type_postprocessing', 'pre_filtering', 'restrictive_vein_radius'],
-                                                     self.tab.restrictiveMinVeinRadiusSpinBox),
-            'permissive_min_vein_radius': ParamLink(['vessel_type_postprocessing', 'pre_filtering', 'permissive_vein_radius'],
-                                                    self.tab.permissiveMinVeinRadiusSpinBox),
-            'final_min_vein_radius': ParamLink(['vessel_type_postprocessing', 'pre_filtering', 'final_vein_radius'],
-                                               self.tab.finalMinVeinRadiusSpinBox),
-            'arteries_min_radius': ParamLink(['vessel_type_postprocessing', 'pre_filtering', 'arteries_min_radius'],
-                                             self.tab.arteriesMinRadiusSpinBox),
-            'max_arteries_tracing_iterations': ParamLink(['vessel_type_postprocessing', 'tracing', 'max_arteries_iterations'],
-                                                         self.tab.maxArteriesTracingIterationsSpinBox),
-            'max_veins_tracing_iterations': ParamLink(['vessel_type_postprocessing', 'tracing', 'max_veins_iterations'],
-                                                      self.tab.maxVeinsTracingIterationsSpinBox),
-            'min_artery_size': ParamLink(['vessel_type_postprocessing', 'capillaries_removal', 'min_artery_size'],
-                                         self.tab.minArterySizeSpinBox),
-            'min_vein_size': ParamLink(['vessel_type_postprocessing', 'capillaries_removal', 'min_vein_size'],
-                                       self.tab.minVeinSizeSpinBox)
+            'use_arteries': ParamLink(['graph_construction', 'use_arteries'],
+                                      self.tab.buildGraphUseArteriesCheckBox),
+
+            'vein_intensity_range_on_arteries_channel': ParamLink(
+                ['vessel_type_postprocessing', 'pre_filtering', 'vein_intensity_range_on_arteries_ch'],
+                self.tab.veinIntensityRangeOnArteriesChannelDoublet),
+            'restrictive_min_vein_radius': ParamLink(
+                ['vessel_type_postprocessing', 'pre_filtering', 'restrictive_vein_radius_um'],
+                self.tab.restrictiveMinVeinRadiusDoubleSpinBox),
+            'permissive_min_vein_radius': ParamLink(
+                ['vessel_type_postprocessing', 'pre_filtering', 'permissive_vein_radius_um'],
+                self.tab.permissiveMinVeinRadiusDoubleSpinBox),
+            'final_min_vein_radius': ParamLink(
+                ['vessel_type_postprocessing', 'pre_filtering', 'final_vein_radius_um'],
+                self.tab.finalMinVeinRadiusDoubleSpinBox),
+            'arteries_min_noise_edges': ParamLink(
+                ['vessel_type_postprocessing', 'pre_filtering', 'arteries_min_noise_edges'],
+                self.tab.arteriesMinComponentEdgesSpinBox),
+
+            'max_arteries_tracing_iterations': ParamLink(
+                ['vessel_type_postprocessing', 'tracing', 'max_arteries_iterations'],
+                self.tab.maxArteriesTracingIterationsSpinBox),
+            'max_veins_tracing_iterations': ParamLink(
+                ['vessel_type_postprocessing', 'tracing', 'max_veins_iterations'],
+                self.tab.maxVeinsTracingIterationsSpinBox),
+            'artery_trace_radius_um': ParamLink(
+                ['vessel_type_postprocessing', 'tracing', 'artery_trace_radius_um'],
+                self.tab.arteryTraceRadiusDoubleSpinBox),
+            'vein_trace_radius_um': ParamLink(
+                ['vessel_type_postprocessing', 'tracing', 'vein_trace_radius_um'],
+                self.tab.veinTraceRadiusDoubleSpinBox),
+            'vein_intensity_min': ParamLink(
+                ['vessel_type_postprocessing', 'tracing', 'vein_intensity_min'],
+                self.tab.veinIntensityMinSpinBox),
+            'distance_to_surface_min': ParamLink(
+                ['vessel_type_postprocessing', 'tracing', 'distance_to_surface_min'],
+                self.tab.arteryDistanceToSurfaceMinDoubleSpinBox),
+            'artery_intensity_min': ParamLink(
+                ['vessel_type_postprocessing', 'tracing', 'artery_intensity_min'],
+                self.tab.arteryIntensityMinDoubleSpinBox),
+
+            'min_artery_component_edges': ParamLink(
+                ['vessel_type_postprocessing', 'capillaries_removal', 'min_artery_component_edges'],
+                self.tab.arteryMinComponentEdgesSpinBox),
+            'min_vein_component_edges': ParamLink(
+                ['vessel_type_postprocessing', 'capillaries_removal', 'min_vein_component_edges'],
+                self.tab.veinsMinComponentEdgesSpinBox)
         }
-        self.connect()
+
+    def add_graph_filter_params(self, widget, graph):
+        self.filter_params.append(GraphFilterParams(main_params=self, widget=widget,
+                                                    graph=graph, event_bus=self._bus,
+                                                    get_view=self._get_view, apply_patch=self._apply_patch))
+        self.notify_filters_changed()
+
+    def notify_filters_changed(self) -> None:
+        self.publish(UiVesselGraphFiltersChanged())
+
+    @property
+    def n_filters(self):
+        return len(self.filter_params)
+
+    def graph_filters(self, graph) -> list[GraphFilter]:
+        """The filters set in the UI, applied to graph (None is enough to name them)"""
+        return [GraphFilter(graph, filter_type=f.filter_type, property_name=f.property_name,
+                            property_value=f.get_property_value())
+                for f in self.filter_params]
+
+    @property
+    def combine_operators(self) -> list[str]:
+        """The operator after each filter but the last one (which has no combine buttons)"""
+        return [f.combine_operator_name for f in self.filter_params[:-1]]
+
+    def compute_filter_suffix(self) -> str:
+        """The filters part of the density file name (see VesselGraphProcessor.density_asset)"""
+        return combined_filters_name(self.graph_filters(graph=None), self.combine_operators)
+
+
+class VesselGraphPerformanceParams(UiParameter):
+    """
+    Graph construction performance parameters.
+    Global — graph operates on the combined binary, not per-channel.
+    Widgets are created dynamically in VasculatureTab._setup_graph_perf()
+    before VesselParams is instantiated.
+    """
+    cfg_subtree = ['vasculature', 'performance', 'graph_construction']
+
+    def build_params_dict(self) -> dict:
+        return {
+            'skeletonize_n_processes': ParamLink(['skeletonize', 'n_processes'],
+                                                 self.tab.skeletonizeNProcessesWidget),
+            'build_n_processes': ParamLink(['build', 'n_processes'],
+                                           self.tab.buildGraphNProcessesWidget),
+            'clean_n_processes': ParamLink(['clean', 'n_processes'],
+                                           self.tab.cleanGraphNProcessesWidget),
+            'reduce_n_processes': ParamLink(['reduce', 'n_processes'],
+                                            self.tab.reduceGraphNProcessesWidget),
+        }
+
+
+GRAPH_FILTER_SCALAR_TYPES = (bool, int, float, str)  # The python value types a filter can compare to
+
+
+class GraphFilterParams(UiParameter):  # FIXME: do we really pass the graph as argument or just the prop names/types ?
+    def __init__(self, *, main_params, widget, graph, event_bus: EventBus, get_view=None, apply_patch=None):
+        self.main_params = main_params
+        super().__init__(widget, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)  # self.tab will be based on filter_name
+        self.index = int(widget.objectName().split('_')[-1])
+        self.layout = self.tab.parent().findChild(QVBoxLayout, 'filterParamsVerticalLayout')
+
+        self.graph = graph
+        self.update_properties()  # connect() is called by UiParameter.__init__
+
+    def build_params_dict(self) -> dict:
+        return {}  # UI only: filters are not stored in the config, they name the density file
 
     def connect(self):
-        self.connect_simple_widgets()
+        self.tab.vertexFilterRadioButton.toggled.connect(self.update_properties)
+        self.tab.graphFilterPropertyNameComboBox.currentTextChanged.connect(self.handle_property_name_changed)
+
+    def _filterable_properties(self) -> dict[str, str]:
+        """
+        The properties that can be filtered on, for the selected filter type.
+
+        Vector valued properties (e.g. coordinates) and other non scalar ones are left out:
+        a filter compares one value (or a range) per vertex/edge.
+        ``degrees`` is only available for vertices.
+
+        Returns
+        -------
+        dict[str, str]
+            The type name ('bool', 'int', 'float' or 'str') of each property name, in graph order.
+        """
+        properties = self.graph._base.vertex_properties if self.filter_type == 'vertex' else self.graph._base.edge_properties
+        dtype_names = {}
+        for prop_name in properties.keys():
+            dtype = properties[prop_name].python_value_type()
+            if dtype in GRAPH_FILTER_SCALAR_TYPES:
+                dtype_names[prop_name] = dtype.__name__
+        if self.filter_type == 'vertex':
+            dtype_names['degrees'] = 'int'
+        return dtype_names
+
+    def update_properties(self, _=None):
+        """
+        Fill the property combo box with the filterable properties of the selected filter type
+        (vertex or edge), then reset the value widget to match the first one.
+
+        Parameters
+        ----------
+        _ : bool, optional
+            The checked state passed by ``toggled(bool)``. Intentionally discarded: the filter type
+            is read from the radio button. Not passed when called directly.
+        """
+        combo_box = self.tab.graphFilterPropertyNameComboBox
+        with QSignalBlocker(combo_box):  # one handler call at the end, not one per item (and none on an empty box)
+            combo_box.clear()
+            for prop_name, dtype_name in self._filterable_properties().items():
+                combo_box.addItem(prop_name, userData=dtype_name)
+
+        self.handle_property_name_changed()  # Set default value for the first property
+
+        self.main_params.notify_filters_changed()  # Notify that properties changed
+
+    @property
+    def cfg_subtree(self):
+        return ['vasculature']  # REFACTOR: section name from config_handler
+
+    @property
+    def filter_type(self):
+        return 'vertex' if self.tab.vertexFilterRadioButton.isChecked() else 'edge'
+
+    @property
+    def property_name(self):
+        return self.tab.graphFilterPropertyNameComboBox.currentText()
+
+    @property
+    def current_dtype(self):
+        return self.tab.graphFilterPropertyNameComboBox.currentData()
+
+    def get_default_property_value(self):
+        property_dtype = self.current_dtype
+        if property_dtype == 'bool':
+            return False
+        elif property_dtype in ('int', 'float'):
+            return 0
+        elif property_dtype == 'str':
+            return ''
+        else:
+            raise ClearMapValueError(f'Unknown property type: {property_dtype}')
+
+    def get_property_value(self):
+        property_dtype = self.current_dtype
+        value_widget = self.tab.graphFilterPropertyValueWidget
+        if property_dtype == 'bool':
+            return value_widget.isChecked()
+        elif property_dtype in ('int', 'float'):
+            return value_widget.getValue()
+            # return self.tab.graphFilterPropertyValueDoublet.getValue()
+        elif property_dtype == 'str':
+            return value_widget.text()
+        else:
+            raise ClearMapValueError(f'Unknown property type: {property_dtype}')
+
+    @property
+    def combine_operator_name(self):
+        """
+        Read the action from the following combine button
+        Returns
+        -------
+
+        """
+        p2 = self.layout.parent().parent()
+        and_button = p2.findChild(QRadioButton, f'filter_{self.index}_and_btn')
+        # or_button = p2.findChild(QRadioButton, f'filter_{self.index}_or_btn')
+        if not and_button:  # Last filter
+            return None
+        return 'and' if and_button.isChecked() else 'or'
+
+    @param_handler  # FIXME: check
+    def handle_property_name_changed(self, _=None):
+        """
+        Replace the value widget by one suited to the type of the selected property
+        (check box, range of numbers or text) holding the default value of this type.
+
+        Parameters
+        ----------
+        _ : str, optional
+            The property name passed by ``currentTextChanged(str)``. Intentionally discarded:
+            the property and its type are read from the combo box. Not passed when called directly.
+        """
+        property_dtype = self.current_dtype
+        value = self.get_default_property_value()
+        controls_layout = self.tab.filterControlsGridLayout
+        if property_dtype == 'bool':
+            widget = QCheckBox(self.tab)
+            widget.setChecked(value)
+        elif property_dtype in ('int', 'float'):
+            if property_dtype == 'int':
+                widget_class = QSpinBox
+            else:
+                widget_class = QDoubleSpinBox
+            widget = self.__create_range_ctrl(widget_class, signed=False)  # FIXME: decide on signed
+
+            widget.setValue(value)
+        elif property_dtype == 'str':
+            widget = QLineEdit(self.tab)
+            widget.setText(value)
+        else:
+            raise ClearMapValueError(f'Unknown property type: {property_dtype}')
+        self.tab.graphFilterPropertyValueWidget = replace_widget(
+            self.tab.graphFilterPropertyValueWidget, widget, layout=controls_layout)
+
+        self.main_params.notify_filters_changed()
+
+    def __create_range_ctrl(self, widget_class, signed=True):
+        """
+        Create a doublet control for a range of values, e.g. for min and max values.
+
+        .. warning::
+            QSpinBox takes only signed 32 bit integers (hence a range of -2**31 to 2**31-1)
+
+        Parameters
+        ----------
+        widget_class
+        signed
+
+        Returns
+        -------
+
+        """
+        range_abs = 2 ** 31
+        if signed:
+            range_min, range_max = -range_abs, range_abs - 1
+        else:
+            range_min, range_max = 0, range_abs - 1
+        widget = QFrame(self.tab)
+        widget.setObjectName('graphFilterPropertyValueDoublet')
+        frame_layout = QHBoxLayout(widget)
+        min_ctrl = widget_class(self.tab)
+        min_ctrl.setMaximumWidth(60)  # FIXME: resize to content instead
+        min_ctrl.setObjectName(f'graphFilterPropertyValueSpinBox_1')  # For doublet ctrl behaviour (needs sorting)
+        min_ctrl.setRange(range_min, range_max)
+        frame_layout.addWidget(min_ctrl)
+        lbl = QLabel(self.tab)
+        lbl.setText('to')
+        frame_layout.addWidget(lbl)
+        max_ctrl = widget_class(self.tab)
+        max_ctrl.setMaximumWidth(60)
+        max_ctrl.setObjectName(f'graphFilterPropertyValueSpinBox_2')  # For doublet ctrl behaviour (needs sorting)
+        max_ctrl.setRange(range_min, range_max)
+        frame_layout.addWidget(max_ctrl)
+        recursive_patch_compound_boxes(self.tab)
+        return widget
 
 
-class VesselVisualizationParams(UiParameter):
-    crop_x_min: int
-    crop_x_max: int
-    crop_y_min: int
-    crop_y_max: int
-    crop_z_min: int
-    crop_z_max: int
+class VesselVisualizationParams(UiParameter, OrthoviewerSlicingMixin):
+    crop_x: List[int]
+    crop_y: List[int]
+    crop_z: List[int]
     graph_step: str
     plot_type: str
     voxelization_size: List[int]
     vertex_degrees: str
-    weight_by_radius: bool
+    weight: str | None  # A GraphWeight name, None: unweighted
 
-    def __init__(self, tab, sample_params=None, preprocessing_params=None, src_folder=None):
-        super().__init__(tab, src_folder)
-        self.params_dict = {  # TODO: if 99.9 % source put to 100% (None)
-            'crop_x_min': ParamLink(['slicing', 'dim_0', 0], self.tab.graphConstructionSlicerXRangeMin),
-            'crop_x_max': ParamLink(['slicing', 'dim_0', 1], self.tab.graphConstructionSlicerXRangeMax),
-            'crop_y_min': ParamLink(['slicing', 'dim_1', 0], self.tab.graphConstructionSlicerYRangeMin),
-            'crop_y_max': ParamLink(['slicing', 'dim_1', 1], self.tab.graphConstructionSlicerYRangeMax),
-            'crop_z_min': ParamLink(['slicing', 'dim_2', 0], self.tab.graphConstructionSlicerZRangeMin),
-            'crop_z_max': ParamLink(['slicing', 'dim_2', 1], self.tab.graphConstructionSlicerZRangeMax),
+    pipeline = 'TubeMap'
+
+    def __init__(self, tab, *, sample_params=None, event_bus: EventBus, get_view=None, apply_patch=None):
+        self.cfg_subtree = ['vasculature', 'visualization']  # REFACTOR: section name from config_handler
+        super().__init__(tab, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
+        self.structure_id = None
+        self.sample_params = sample_params
+
+    def build_params_dict(self):
+        return {  # TODO: if 99.9 % source put to 100% (None)
+            'crop_x': VectorLink(['slicing', 'dim_0'], self.tab.graphConstructionSlicerXRangeDoublet),
+            'crop_y': VectorLink(['slicing', 'dim_1'], self.tab.graphConstructionSlicerYRangeDoublet),
+            'crop_z': VectorLink(['slicing', 'dim_2'], self.tab.graphConstructionSlicerZRangeDoublet),
             'graph_step': ParamLink(None, self.tab.graphSlicerStepComboBox, connect=False),
             'plot_type': ParamLink(None, self.tab.graphPlotTypeComboBox, connect=False),
             'voxelization_size': ParamLink(['voxelization', 'size'], self.tab.vasculatureVoxelizationRadiusTriplet),
-            'vertex_degrees': ParamLink(None, self.tab.vasculatureVoxelizationFilterDegreesSinglet, connect=False),
-            'weight_by_radius': ParamLink(None, self.tab.voxelizationWeightByRadiusCheckBox, connect=False)
-            # 'filter_name': ParamLink(None, self.tab.voxelizationFitlerNameComboBox, connect=False),
-            # 'weight_name': ParamLink(None, self.tab.voxelizationWeightNameComboBox, connect=False),
+            'weight': ParamLink(None, self.tab.voxelizationWeightComboBox, connect=False)
         }
-        self.structure_id = None
-        self.cfg_subtree = ['visualization']
-        self.sample_params = sample_params
-        self.preprocessing_params = preprocessing_params
-        self.connect()
 
-    def connect(self):
-        self.connect_simple_widgets()
+    def graph_weight(self, graph) -> GraphWeight | None:
+        """The weight chosen in the UI, applied to graph (None is enough to name it)"""
+        return None if self.weight is None else GraphWeight.from_name(graph, self.weight)
+
+    def set_weight_choices(self, weight_names: list[str]) -> None:
+        """Offer these weights (see graph_weights.weight_choices), keeping the current choice if still offered"""
+        combo = self.tab.voxelizationWeightComboBox
+        current = combo.currentText()
+        combo.clear()
+        combo.addItems(['None', *weight_names])
+        if combo.findText(current) != -1:
+            combo.setCurrentText(current)
 
     def set_structure_id(self, structure_widget):
         self.structure_id = int(structure_widget.text(1))
 
-    @property
-    def ratios(self):
-        raw_res = np.array(self.sample_params.raw_resolution)
-        atlas_res = np.array(self.preprocessing_params.registration.atlas_resolution)
-        ratios = atlas_res / raw_res  # to original
-        return ratios
-
-    def scale_axis(self, val, axis='x'):
-        return round(val * self.ratios['xyz'.index(axis)])
-
-    def reverse_scale_axis(self, val, axis='x'):
-        axis_ratio = self.ratios['xyz'.index(axis)]
-        return round(val / axis_ratio)
-
-    @property
-    def slice_tuples(self):
-        return ((self.crop_x_min, self.crop_x_max),
-                (self.crop_y_min, self.crop_y_max),
-                (self.crop_z_min, self.crop_z_max))
-
-    @property
-    def slicing(self):
-        return tuple([slice(ax[0], ax[1]) for ax in self.slice_tuples])
-
 
 class PreferencesParams(UiParameter):
-    verbosity: str
-    n_processes_file_conv: int
-    n_processes_resampling: int
-    n_processes_stitching: int
-    n_processes_cell_detection: int
-    n_processes_binarization: int
-    chunk_size_min: int
-    chunk_size_max: int
-    chunk_size_overlap: int
+    verbosity: str  # == loglevel
     start_folder: str
     start_full_screen: bool
     lut: str
@@ -762,348 +2207,253 @@ class PreferencesParams(UiParameter):
     pattern_finder_min_n_files: int
     three_d_plot_bg: str
 
-    def __init__(self, tab, src_folder=None):
-        super().__init__(tab, src_folder)
-        self.params_dict = {
-            'verbosity': ['verbosity'],
-            'n_processes_file_conv': ['n_processes_file_conv'],
-            'n_processes_resampling': ['n_processes_resampling'],
-            'n_processes_stitching': ['n_processes_stitching'],
-            'n_processes_cell_detection': ['n_processes_cell_detection'],
-            'n_processes_binarization': ['n_processes_binarization'],
-            'chunk_size_min': ParamLink(['detection_chunk_size_min'], self.tab.chunkSizeMinSpinBox, connect=False),
-            'chunk_size_max': ParamLink(['detection_chunk_size_max'], self.tab.chunkSizeMaxSpinBox, connect=False),
-            'chunk_size_overlap': ParamLink(['detection_chunk_overlap'], self.tab.chunkSizeOverlapSpinBox, connect=False),
-            'start_folder': ParamLink(['start_folder'], self.tab.startFolderLineEdit, connect=False),
-            'start_full_screen': ParamLink(['start_full_screen'], self.tab.startFullScreenCheckBox, connect=False),
-            'lut': ['default_lut'],
-            'font_size': ParamLink(['font_size'], self.tab.fontSizeSpinBox, connect=False),
-            'pattern_finder_min_n_files': ParamLink(['pattern_finder_min_n_files'],
-                                                    self.tab.patternFinderMinFilesSpinBox, connect=False),
-            'three_d_plot_bg': ['three_d_plot_bg']
+    cfg_subtree = ['machine']
+
+    def build_params_dict(self):
+        return {
+            "verbosity": ParamLink(["verbosity"], self.tab.verbosityComboBox,
+                                   cast_to_ui=self.str_to_capitalize, cast_from_ui=self.str_to_lower, default="info"),
+            "lut": ParamLink(["default_lut"], self.tab.lutComboBox,
+                             cast_to_ui=self.str_to_capitalize, cast_from_ui=self.str_to_lower, default="viridis"),
+            "font_size": ParamLink(["font_size"], self.tab.fontSizeSpinBox,),
+            "pattern_finder_min_n_files": ParamLink(["pattern_finder_min_n_files"],
+                                                    self.tab.patternFinderMinFilesSpinBox, default=2),
+            "three_d_plot_bg": ParamLink(["three_d_plot_bg"], self.tab.threeDPlotsBackgroundComboBox,
+                                         cast_to_ui=self.str_to_capitalize, cast_from_ui=self.str_to_lower,
+                                         default="#000000"),
+            "start_folder": ParamLink(["start_folder"], self.tab.startFolderLineEdit,
+                                      cast_to_ui=self.sanitize_path_read, cast_from_ui=self.sanitize_path_write),
+            "start_full_screen": ParamLink(["start_full_screen"], self.tab.startFullScreenCheckBox)
         }
-        self.connect()
-
-    def _ui_to_cfg(self):  # TODO: check if live update (i.e. connected handlers) or only on save
-        cfg = self._config
-        cfg['verbosity'] = self.verbosity
-        cfg['n_processes_file_conv'] = self.n_processes_file_conv
-        cfg['n_processes_resampling'] = self.n_processes_resampling
-        cfg['n_processes_stitching'] = self.n_processes_stitching
-        cfg['n_processes_cell_detection'] = self.n_processes_cell_detection
-        cfg['n_processes_binarization'] = self.n_processes_binarization
-        cfg['detection_chunk_size_min'] = self.chunk_size_min
-        cfg['detection_chunk_size_max'] = self.chunk_size_max
-        cfg['detection_chunk_overlap'] = self.chunk_size_overlap
-        cfg['start_folder'] = self.start_folder
-        cfg['start_full_screen'] = self.start_full_screen
-        cfg['default_lut'] = self.lut
-        cfg['font_size'] = self.font_size
-        cfg['pattern_finder_min_n_files'] = self.pattern_finder_min_n_files
-        cfg['three_d_plot_bg'] = self.three_d_plot_bg
-
-    def cfg_to_ui(self):
-        self.reload()
-        super().cfg_to_ui()
-
-    @property
-    def three_d_plot_bg(self):
-        return self.tab.threeDPlotsBackgroundComboBox.currentText().lower()
-
-    @three_d_plot_bg.setter
-    def three_d_plot_bg(self, value):
-        self.tab.threeDPlotsBackgroundComboBox.setCurrentText(value)
-
-    @property
-    def verbosity(self):
-        return self.tab.verbosityComboBox.currentText().lower()
-
-    @verbosity.setter
-    def verbosity(self, lvl):
-        self.tab.verbosityComboBox.setCurrentText(lvl.capitalize())
-
-    @property
-    def n_processes_file_conv(self):
-        return self.sanitize_neg_one(self.tab.nProcessesFileConversionSpinBox.value())
-
-    @n_processes_file_conv.setter
-    def n_processes_file_conv(self, n_procs):
-        self.tab.nProcessesFileConversionSpinBox.setValue(self.sanitize_nones(n_procs))
-
-    @property
-    def n_processes_stitching(self):
-        return self.sanitize_neg_one(self.tab.nProcessesStitchingSpinBox.value())
-
-    @n_processes_stitching.setter
-    def n_processes_stitching(self, value):
-        self.tab.nProcessesStitchingSpinBox.setValue(self.sanitize_nones(value))
-
-    @property
-    def n_processes_resampling(self):
-        return self.sanitize_neg_one(self.tab.nProcessesResamplingSpinBox.value())
-
-    @n_processes_resampling.setter
-    def n_processes_resampling(self, value):
-        self.tab.nProcessesResamplingSpinBox.setValue(self.sanitize_nones(value))
-
-    @property
-    def n_processes_cell_detection(self):
-        return self.sanitize_neg_one(self.tab.nProcessesCellDetectionSpinBox.value())
-
-    @n_processes_cell_detection.setter
-    def n_processes_cell_detection(self, n_procs):
-        self.tab.nProcessesCellDetectionSpinBox.setValue(self.sanitize_nones(n_procs))
-
-    @property
-    def n_processes_binarization(self):
-        return self.sanitize_neg_one(self.tab.nProcessesBinarizationSpinBox.value())
-
-    @n_processes_binarization.setter
-    def n_processes_binarization(self, value):
-        self.tab.nProcessesBinarizationSpinBox.setValue(self.sanitize_nones(value))
-
-    @property
-    def lut(self):
-        return self.tab.lutComboBox.currentText().lower()
-
-    @lut.setter
-    def lut(self, lut_name):
-        self.tab.lutComboBox.setCurrentText(lut_name)
-
-    @property
-    def font_family(self):
-        return self.tab.fontComboBox.currentFont().family()
-
-    # @font_family.setter
-    # def font_family(self, font):
-    #     self.tab.fontComboBox.setCurrentFont(font)
 
 
 class BatchParameters(UiParameter):
-    def __init__(self, tab, src_folder=None, preferences=None):
-        super().__init__(tab, src_folder)
+    publishes = Publishes(UiBatchResultsFolderChanged, UiBatchGroupsChanged)
+
+    results_folder: str
+    groups: dict[str, list[str]]
+
+    cfg_subtree = None  # Must be set in subclass
+
+    def __init__(self, tab, *, event_bus: EventBus, preferences=None, get_view=None, apply_patch=None):
+        # WARNING: set fields used by build_params_dict() BEFORE super().__init__()
         self.group_concatenator = ' vs '
         self.preferences = preferences
-        self.tab.sampleFoldersToolBox = QToolBox(parent=self.tab)
-        self.tab.sampleFoldersPageLayout.addWidget(self.tab.sampleFoldersToolBox, 3, 0)
 
-    def _ui_to_cfg(self):
-        self.config['paths']['results_folder'] = self.results_folder
-        self.config['groups'] = self.groups
+        # TODO: check if I need that ?
+        if not hasattr(tab, 'sampleFoldersToolBox') or tab.sampleFoldersToolBox is None:
+            tab.sampleFoldersToolBox = QToolBox(parent=tab)
+            tab.sampleFoldersPageLayout.addWidget(tab.sampleFoldersToolBox, 3, 0)
 
-    def cfg_to_ui(self):
-        self.reload()
-        self.results_folder = self.config['paths']['results_folder']
-        for i in range(len(self.config['groups'].keys())):
-            self.add_group()
-        self.group_names = self.config['groups'].keys()  # FIXME: check that ordered
-        for i, paths in enumerate(self.config['groups'].values()):
-            self.set_paths(i+1, paths)
+        self.groups_adapter = GroupsWidgetAdapter(
+            toolbox=tab.sampleFoldersToolBox,
+            container_layout=tab.sampleFoldersPageLayout,
+            add_btn=tab.addGroupPushButton,
+            remove_btn=tab.removeGroupPushButton,
+            start_folder_getter=lambda: (self.preferences.start_folder if self.preferences else "")
+        )
 
-    def __connect_btn(self, btn, callback):
-        try:
-            btn.clicked.connect(callback, type=Qt.UniqueConnection)
-        except TypeError as err:
-            if err.args[0] == 'connection is not unique':
-                btn.clicked.disconnect()
-                btn.clicked.connect(callback, type=Qt.UniqueConnection)
-            else:
-                raise err
+        super().__init__(tab, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
 
-    def _connect_line_edit(self, ctrl, callback):
-        try:
-            ctrl.editingFinished.connect(callback, type=Qt.UniqueConnection)
-        except TypeError as err:
-            if err.args[0] == 'connection is not unique':
-                ctrl.editingFinished.disconnect()
-                ctrl.editingFinished.connect(callback, type=Qt.UniqueConnection)
-            else:
-                raise err
+    # IMPORTANT: implement in subclass
+    def build_params_dict(self) -> dict:
+        return {
+            'results_folder': ParamLink(['paths', 'results_folder'], self.tab.resultsFolderLineEdit,
+                                        notify_apply=lambda: self.publish(UiBatchResultsFolderChanged(self.results_folder))),
+            'groups': ParamLink(['groups'], self.groups_adapter,
+                                connect=False)#notify_apply=lambda: self.publish(UiBatchGroupsChanged(self.groups)))
+        }
 
     def connect(self):
-        self.tab.addGroupPushButton.clicked.connect(self.add_group)
-        self.tab.removeGroupPushButton.clicked.connect(self.remove_group)
-        self.tab.resultsFolderLineEdit.textChanged.connect(self.handle_results_folder_changed)
-        # self.connect_simple_widgets()
+        self.groups_adapter.connect(self._on_groups_widget_changed)
 
-    def connect_groups(self):
-        for btn in self.gp_add_folder_buttons:
-            self.__connect_btn(btn, self.handle_add_src_folder_clicked)
-        for btn in self.gp_remove_folder_buttons:
-            self.__connect_btn(btn, self.handle_remove_src_folder_clicked)
+    @param_handler
+    def _on_groups_widget_changed(self, *_):
+        """
+        Atomic write: REPLACE the entire groups dict so renamed/deleted
+        keys are removed.  This is the single writer for groups; no other
+        code path should write groups to config.
+        """
+        new_groups = self.groups_adapter.get_value()
+        self._emit_patch(['groups'], REPLACE(new_groups))
+        self.publish(UiBatchGroupsChanged(self.groups))
 
-    def add_group(self):  # REFACTOR: better in tab object
-        new_gp_id = self.n_groups + 1
-        group_controls = create_clearmap_widget('sample_group_controls.ui', patch_parent_class='QWidget')
-        self.tab.sampleFoldersToolBox.addItem(group_controls, f'Group {new_gp_id}')
+    def cfg_to_ui(self):
+        self._painting = True
+        try:
+            self.groups = self.view.get('groups', {})
+            results_folder = self.view.get('paths', {}).get('results_folder', '')
+            if results_folder:
+                self.results_folder = results_folder
+        finally:
+            self._painting = False
 
-        self.connect_groups()
+    def add_group(self, name: Optional[str] = None) -> None:
+        """Add a new empty group (called by SamplePickerDialog and similar wizards)."""
+        self.groups_adapter.add_group(name=name)
 
-    def remove_group(self):
-        last_idx = self.tab.sampleFoldersToolBox.count() - 1
-        widg = self.tab.sampleFoldersToolBox.widget(last_idx)
-        self.tab.sampleFoldersToolBox.removeItem(last_idx)
-        widg.setParent(None)
-        widg.deleteLater()
+    def remove_current_group(self):  # FIXME: not bound
+        idx, removed_name = self.groups_adapter.remove_current_page()
+        if idx < 0: return
+        self.groups = self.groups_adapter.get_value()
+        self.publish(UiBatchGroupsChanged(self.groups))
 
     @property
-    def n_groups(self):
-        return self.tab.sampleFoldersToolBox.count()
-
-    @property
-    def group_names(self):
-        return [lbl.text() for lbl in self.gp_group_name_ctrls]
+    def group_names(self) -> list[str]:
+        return self.groups_adapter.group_names
 
     @group_names.setter
-    def group_names(self, names):
-        for w, name in zip(self.gp_group_name_ctrls, names):
-            w.setText(name)
+    @param_setter
+    def group_names(self, names: list[str]) -> None:
+        self.groups_adapter.group_names = names
+        self.publish(UiBatchGroupsChanged(self.groups))
 
     @property
-    def gp_group_name_ctrls(self):
-        return self.get_gp_ctrls('NameLineEdit')
+    def n_groups(self) -> int:
+        return self.groups_adapter.group_count()
 
-    @property
-    def gp_add_folder_buttons(self):
-        return self.get_gp_ctrls('AddSrcFolderBtn')
+    def set_paths(self, gp_idx: int, paths: list[str]) -> None:
+        self.groups_adapter.set_paths(gp_idx, paths)
+        # fire one bus event; ParamLink will pick it up on next apply
+        self.publish(UiBatchGroupsChanged(self.groups))
 
-    @property
-    def gp_remove_folder_buttons(self):
-        return self.get_gp_ctrls('RemoveSrcFolderBtn')
+    def get_paths(self, gp_idx: int) -> list[str]:
+        return self.groups_adapter.get_paths(gp_idx)
 
-    @property
-    def gp_list_widget(self):
-        return self.get_gp_ctrls('ListWidget')
-
-    def get_gp_ctrls(self, ctrl_name):
-        return [getattr(self.tab.sampleFoldersToolBox.widget(i), f'gp{ctrl_name}') for i in range(self.n_groups)]
-
-    def set_paths(self, gp, paths):
-        list_widget = self.gp_list_widget[gp - 1]
-        list_widget.clear()
-        list_widget.addItems(paths)
-
-    def get_paths(self, gp):  # TODO: should exist from group name
-        list_widget = self.gp_list_widget[gp - 1]
-        return [list_widget.item(i).text() for i in range(list_widget.count())]
-
-    def get_all_paths(self):
-        return [self.get_paths(gp + 1) for gp in range(self.n_groups)]
-
-    @property
-    def groups(self):
-        return {gp: paths for gp, paths in zip(self.group_names, self.get_all_paths())}
-
-    def handle_add_src_folder_clicked(self):
-        gp = self.tab.sampleFoldersToolBox.currentIndex()
-        folder_path = get_directory_dlg(self.preferences.start_folder, 'Select sample folder')
-        if folder_path:
-            self.gp_list_widget[gp].addItem(folder_path)
-
-    def handle_remove_src_folder_clicked(self):
-        # print('call')
-        gp = self.tab.sampleFoldersToolBox.currentIndex()
-        sample_idx = self.gp_list_widget[gp].currentRow()
-        _ = self.gp_list_widget[gp].takeItem(sample_idx)
-        # print(_.text())
-
-    @property
-    def results_folder(self):
-        return self.tab.resultsFolderLineEdit.text()
-
-    @results_folder.setter
-    def results_folder(self, value):
-        self.tab.resultsFolderLineEdit.setText(value)
-
-    def handle_results_folder_changed(self):
-        self.config['paths']['results_folder'] = self.results_folder
+    def get_all_paths(self) -> list[str]:
+        return self.groups_adapter.get_all_paths()
 
 
 class GroupAnalysisParams(BatchParameters):
     """
     Essentially batch parameters with comparisons
     """
+    compute_sd_and_effect_size: bool
+    density_suffix: str
+    pipeline: str
+    cfg_subtree = ['group_analysis']  # FIXME: not treated as pipeline because not collection
 
-    def __init__(self, tab, src_folder=None, preferences=None):
-        super().__init__(tab, src_folder, preferences)
+    def __init__(self, tab, *, event_bus: EventBus, preferences=None, get_view=None, apply_patch=None):
+        super().__init__(tab, preferences=preferences, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
+        self.extend_params_dict({
+            # 'plot_channel': ParamLink(None, self.tab.plotChannelComboBox),
+            'compute_sd_and_effect_size': ParamLink(None, self.tab.computeSdAndEffectSizeCheckBox),
+            'density_suffix': ParamLink(None, self.tab.densitySuffixComboBox),
+            'pipeline': ParamLink(['pipeline'], self.tab.batchPipelineNameComboBox)
+        })
+        self.tab.densitySuffixComboBox.setEditable(True)
 
-        self.comparison_checkboxes = []
+        self._cmp_model = ComparisonsModel(sep=self.group_concatenator)
+        self._cmp_ui = ComparisonsWidgetAdapter(self.tab.comparisonsVerticalLayout,
+                                                groups_sep=self.group_concatenator,
+                                                suffix_widget=self.tab.densitySuffixContainerWidget,
+                                                suffix_combo=self.tab.densitySuffixComboBox)
+
+        # FIXME: do I want this ?
+        self._channels_provider: Optional[Callable[[Optional[str]], list[str | tuple[str, ...]]]] = None
+        self._suffixes_provider: Optional[Callable[[], list[str]]] = None
+
+        self._on_plot_group: Optional[Callable[[str], None]] = None
+
+        self._channels: dict[str, str | tuple[str, ...]] = {}  # What the user picks from (label) -> the channel
+        self._channel_label = ''
+        # The channels are those which have a density map for the suffix
+        self.tab.densitySuffixComboBox.currentIndexChanged.connect(self.refresh_channels)
+        self.tab.densitySuffixComboBox.lineEdit().editingFinished.connect(self.refresh_channels)
+
+        # FIXME: do I remove this ?
+        self.subscribe(UiBatchGroupsChanged, self._rebuild_comparisons)
 
     def _ui_to_cfg(self):
-        super()._ui_to_cfg()
-        self.config['comparisons'] = {letter: pair for letter, pair in zip(string.ascii_lowercase,
-                                                                           self.selected_comparisons)}
+        self._update_value(['comparisons'], self._comparisons_dict())
 
     def cfg_to_ui(self):
         super().cfg_to_ui()
-        self.update_comparisons()
-        for chk_bx in self.comparison_checkboxes:
-            if chk_bx.text().split(self.group_concatenator) in self.config['comparisons'].values():
-                self.set_check_state(chk_bx, True)
+        if 'comparisons' not in self.view:  #  not set
+            return
+        persisted = [tuple(v) for v in self.view['comparisons'].values()]
+        self._rebuild_comparisons_core(preselected=persisted)
 
-    def connect_groups(self):
-        super().connect_groups()
-        for ctrl in self.gp_group_name_ctrls:
-            self._connect_line_edit(ctrl, self.update_comparisons)
+    def set_pipelines(self, pipelines: list[str]):
+        with QSignalBlocker(self.tab.batchPipelineNameComboBox):
+            self.tab.batchPipelineNameComboBox.clear()
+            self.tab.batchPipelineNameComboBox.addItems(pipelines)
+
+    def _comparisons_dict(self) -> dict[str, list[str]]:
+        comp_names = string.ascii_lowercase  # Just a,b,c,...,z
+        comparisons = self.selected_comparisons
+        comps = {name: list(pair) for name, pair in zip(comp_names, comparisons)}
+        return comps
+
+    # injection points from the tab
+    def set_channels_provider(self, provider: Callable[[Optional[str]], list[str | tuple[str, ...]]]):
+        """provider(density_suffix): the channels to analyse, those which have a density map for the suffix"""
+        self._channels_provider = provider
 
     @property
-    def comparisons(self):
+    def channel(self) -> str | tuple[str, ...] | None:
         """
+        The channel picked in the tab, as the density maps, statistics and plots name it
+        (a tuple for a compound channel, e.g. the vessels), or None if there is none to analyse.
+        """
+        return self._channels.get(self._channel_label)
 
-        Returns
-        -------
-            The list of all possible pairs of groups
-        """
-        # return list(combinations(self.group_names, 2))
-        return list(permutations(self.group_names, 2))
+    def refresh_channels(self, *_) -> None:
+        """Offer the channels which have a density map for the current suffix, keeping the pick if possible"""
+        suffix = self.density_suffix or None
+        channels = self._channels_provider(suffix) if callable(self._channels_provider) else []
+        self._channels = {channel_file_name_token(channel): channel for channel in channels}
+        if self._channel_label not in self._channels:
+            self._channel_label = next(iter(self._channels), '')
+        self._cmp_ui.set_channels(list(self._channels), current=self._channel_label)
+
+    def set_suffixes_provider(self, provider: Callable[[], list[str]]):
+        self._suffixes_provider = provider
+
+    def set_on_plot_group(self, handler: Callable[[str], None]):
+        self._on_plot_group = handler
+
+    def _rebuild_comparisons(self, event: Optional[UiBatchGroupsChanged] = None):
+        self._rebuild_comparisons_core(preselected=self._cmp_model.selected)
+
+    def _rebuild_comparisons_core(self, *, preselected: Optional[list[Pair]] = None):
+        self._cmp_model.group_names = list(self.group_names)
+        self._cmp_model.selected = preselected or []
+
+        suffixes = self._suffixes_provider() if callable(self._suffixes_provider) else []
+
+        def _on_channel_changed(label: str):
+            self._channel_label = label
+
+        self._cmp_ui.rebuild(self._cmp_model,
+                             on_plot_group=(self._on_plot_group or (lambda _g: None)),
+                             on_channel_changed=_on_channel_changed,
+                             suffixes=suffixes,
+                             preselected_comparisons=self._cmp_model.selected)
+        self.refresh_channels()  # After the suffixes: the channels depend on the one selected
+    @property
+    def comparisons(self) -> list[Pair]:
+        return self._cmp_model.all_pairs()
 
     @property
-    def selected_comparisons(self):
-        return [box.text().split(self.group_concatenator) for box in self.comparison_checkboxes if box.isChecked()]
-
-    def update_comparisons(self):
-        clear_layout(self.tab.comparisonsVerticalLayout)
-        self.comparison_checkboxes = []
-        for pair in self.comparisons:
-            chk = QCheckBox(self.group_concatenator.join(pair))
-            chk.setChecked(False)
-            self.tab.comparisonsVerticalLayout.addWidget(chk)
-            self.comparison_checkboxes.append(chk)
+    def selected_comparisons(self) -> list[Pair]:
+        return self._cmp_ui.selected_pairs(self._cmp_model)
 
 
 class BatchProcessingParams(BatchParameters):
     """
     Essentially BatchParameters with processing steps
     """
+    align: bool
+    count_cells: bool
+    run_vasculature: bool
 
-    def __init__(self, tab, src_folder=None, preferences=None):
-        super().__init__(tab, src_folder, preferences)
+    cfg_subtree = ['batch_processing']  # FIXME: not treated as pipeline because not collection
 
-    @property
-    def align(self):
-        return self.tab.batchAlignCheckBox.isChecked()
-
-    @align.setter
-    def align(self, value):
-        self.tab.batchAlignCheckBox.setChecked(value)
-
-    # def handle_align_changed(self):
-    #     self.
-
-    @property
-    def count_cells(self):
-        return self.tab.batchCountCellsCheckBox.isChecked()
-
-    @count_cells.setter
-    def count_cells(self, value):
-        self.tab.batchCountCellsCheckBox.isChecked()
-
-    # def handle_count_cells_changed(self):
-
-    @property
-    def run_vaculature(self):
-        return self.tab.batchVasculatureCheckBox.isChecked()
-
-    @run_vaculature.setter
-    def run_vaculature(self, value):
-        self.tab.batchVasculatureCheckBox.setChecked(value)
+    def __init__(self, tab, *, event_bus: EventBus, preferences=None, get_view=None, apply_patch=None):
+        super().__init__(tab, preferences=preferences, event_bus=event_bus, get_view=get_view, apply_patch=apply_patch)
+        self.extend_params_dict({
+            'align': ParamLink(None, self.tab.batchAlignCheckBox),
+            'count_cells': ParamLink(None, self.tab.batchCountCellsCheckBox),
+            'run_vasculature': ParamLink(None, self.tab.batchVasculatureCheckBox)
+        })

@@ -1,7 +1,7 @@
 #TODO: integrate fully in ClearMap
 
 __author__    = 'Sophie Skriabin, Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__license__   = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
@@ -119,13 +119,11 @@ if __name__ == "__main__":
     latent = torch.from_numpy(latent).cuda().float()
 
     criterion2 = Class_balancing_loss()
-F
     # print(np.unique(latent[0, 1, :, :, 0]))
 
     sigma = 4
     kernel_size = 11
     # kernel = get_gaussian_filter(sigma, kernel_size)
 
-    soft_loss = criterion2(latent, kernel)
-
-    print(soft_loss)
+    # soft_loss = criterion2(latent, kernel)
+    # print(soft_loss)

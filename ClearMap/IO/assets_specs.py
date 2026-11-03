@@ -1,0 +1,441 @@
+"""
+This module contains the specifications for the assets in the pipeline.
+The specifications are used to create the assets and to
+determine the file names and locations.
+The specs passed to the asset are
+`TypeSpec` objects and `ChannelSpec` objects.
+
+`TypeSpec`
+    contain the information about the type of asset
+    (i.e. the step in the pipeline, e.g. stitched, layout, cells, density, binary...)
+
+`ChannelSpec`
+    contain the information about the channel
+    (i.e. the labeling of the asset, e.g. cfos, dapi, autofluorescence, gfp...
+    and the type of labelling e.g. nuclei, cells, vessels, veins, arteries, axons...).
+"""
+import ctypes
+import multiprocessing
+import warnings
+
+from ClearMap.IO.assets_constants import (EXTENSIONS, COMPRESSION_ALGORITHMS, CHECKSUM_ALGORITHMS,
+                                          RESOURCE_TYPE_TO_FOLDER, DATA_CONTENT_TYPES, FILE_NAME_TOKEN_RE)
+from ClearMap.Utils.exceptions import ClearMapValueError
+from ClearMap.config.compound_keys import is_compound_channel, compound_channel_parts
+from ClearMap.Utils.tag_expression import Expression
+from ClearMap.Utils.utilities import validate_arg
+
+
+WEIGHTED_SUB_TYPE_INFIX = 'weighted'  # <sub_type>_weighted_<weights name>, see weighted_sub_type
+
+
+def weighted_sub_type(sub_type: str, weights_name: str) -> str:
+    """
+    The (dynamic) sub-type of a weighted variant of sub_type,
+    e.g. ``counts_weighted_size`` or ``branches_weighted_vertex_radius_units``
+
+    Raises
+    ------
+    ClearMapValueError
+        If weights_name cannot be used in a file name.
+    """
+    if not FILE_NAME_TOKEN_RE.fullmatch(weights_name):
+        raise ClearMapValueError(f'Weights {weights_name!r} cannot be used in a file name '
+                                 f'(allowed characters: {FILE_NAME_TOKEN_RE.pattern}).')
+    return f'{sub_type}_{WEIGHTED_SUB_TYPE_INFIX}_{weights_name}'
+
+
+class TypeSpec:
+    """
+    A specification for a type of asset. Not a concrete asset.
+    This has all the information for a step in the pipeline regardless of the channel.
+    """
+    def __init__(self, *, resource_type: str | None = None, type_name: str | None = None,
+                 sub_types: list[str] | dict | None = None, basename: str = '',
+                 sub_folder: str = '', file_format_category: str | None = None, resource_type_to_folder: dict | None = None,
+                 relevant_pipelines: list[str] | None = None, compression_algorithms: list[str] | None = None,
+                 checksum_algorithm: str | None = None, extensions: list[str] | None = None):
+        """
+        A specification for a step in the pipeline. Not a concrete asset.
+
+        Parameters
+        ----------
+        resource_type: str | None
+            The type of resource. E.g. 'data', 'results', 'graphs'...
+            This is used to determine the directory where the file should be stored.
+            If empty, the file is stored in the root directory.
+            If None, same as type_name. (For folder assets)
+        type_name: str
+            The name of the type.
+            E.g. 'stitched', 'layout', 'background', 'resampled', 'cells', 'density', 'binary'...
+            This is the name of the step, not necessarily the name of the file.
+            It is used to compute the file name.
+        sub_types: List[str] | Dict[str, SubTypeSpec] | None
+            The subtypes of the asset. These are the substeps in the pipeline.
+            E.g. `cleaned` in graph_cleaned.gt or `raw` for cells_raw.npy.
+        basename: str
+            The base name of the file. This is the name of the file without the extension and substep.
+            It is linked to type_name but can be different. Leave empty if it is the same.
+        file_format_category: str | None
+            The file_type used to map to the list of possible extensions
+            for the file. E.g. 'image', 'table', 'graph'...
+            If None, the asset is a folder.
+            **If extensions is not None, this is ignored.**
+        relevant_pipelines: List[str] | None
+            The list of pipelines that are relevant for this asset.
+        compression_algorithms: List[str]
+            The list of possible compression algorithms for the file (ordered by preference).
+        checksum_algorithm: str
+            The checksum algorithm used to check the integrity of the file.
+        extensions: List[str] | None
+            The list of possible extensions for the file. This should be determined by the file_type.
+            This can be used to override the default extensions.
+        """
+        self._name = None
+        if Expression(str(basename)).tags:
+            basename = Expression(str(basename))
+        self.basename = basename or type_name
+        self.name = type_name
+        self.resource_type_to_folder = resource_type_to_folder or RESOURCE_TYPE_TO_FOLDER
+        if resource_type and resource_type not in self.resource_type_to_folder:
+            raise ValueError(f'Unknown resource type: {resource_type}')
+        self.resource_type = resource_type
+        self.relevant_pipelines = relevant_pipelines or []
+        if isinstance(sub_types, (list, tuple)):
+            sub_types = {k: None for k in sub_types}
+        else:
+            sub_types = sub_types or {}
+        # None and dict entries become SubTypeSpecs in get_sub_type
+        self.sub_types: dict[str, TypeSpec | dict | None] = sub_types
+        self.sub_folder = sub_folder
+
+        self._file_format_category = file_format_category
+        if extensions:
+            self.extensions = extensions
+        else:
+            self.extensions = EXTENSIONS[file_format_category] if file_format_category else None
+        compression_algorithms = compression_algorithms or COMPRESSION_ALGORITHMS
+        self.compression_algorithms = compression_algorithms
+        if checksum_algorithm is None:
+            checksum_algorithm = CHECKSUM_ALGORITHMS[0]
+        self.checksum_algorithm = validate_arg('checksum algorithm', checksum_algorithm, CHECKSUM_ALGORITHMS)
+
+    def __str__(self):
+        return f'{self.resource_type} - {self.basename}'
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}({str(self)})'
+
+    @property
+    def basename(self):
+        return self._basename
+
+    @basename.setter
+    def basename(self, value):
+        if isinstance(value, str) and Expression(value).tags:
+            value = Expression(value)
+        self._basename = value
+
+    def is_expression(self):
+        return Expression.is_expression(self._basename)  # FIXME: why not self.basename (prop)
+
+    def get_sub_type(self, sub_type_name, extensions=None, file_format_category=None, expression=None):
+        sub_type = self.sub_types.get(sub_type_name)
+
+        if isinstance(sub_type, dict):
+            # Explicit kwargs override the stored dict.
+            overrides = dict(sub_type)
+            if extensions is not None:
+                overrides['extensions'] = extensions
+            if file_format_category is not None:
+                overrides['file_format_category'] = file_format_category
+            if expression is not None:
+                overrides['expression'] = expression
+            sub_type = self.add_sub_type(sub_type_name, **overrides)
+        elif sub_type is None:
+            sub_type = self.add_sub_type(sub_type_name, extensions, file_format_category, expression)
+
+        return sub_type
+
+    def add_sub_type(self, sub_type_name, extensions=None, file_format_category=None, expression=None):
+        """
+        Adds or updates an asset subtype
+
+        Parameters
+        ----------
+        sub_type_name
+        extensions
+        file_format_category
+        expression
+
+        Returns
+        -------
+
+        """
+        if extensions is None and file_format_category is not None:
+            extensions = EXTENSIONS[file_format_category]
+        sub_type = SubTypeSpec(resource_type=self.resource_type,
+                               resource_type_to_folder=self.resource_type_to_folder,
+                               relevant_pipelines=self.relevant_pipelines,
+                               type_name=f'{self.name}_{sub_type_name}',
+                               basename=expression or self.basename,
+                               compression_algorithms=self.compression_algorithms,
+                               checksum_algorithm=self.checksum_algorithm,
+                               extensions=extensions or self.extensions)
+        self.sub_types[sub_type_name] = sub_type
+        return sub_type
+
+    @property
+    def name(self):
+        return self._name
+
+    @name.setter
+    def name(self, value):
+        self._name = value
+        if not self.basename and value != 'raw':  # Skip raw because it has no default basename
+            self.basename = value
+
+    @property
+    def is_folder(self):
+        return self.extensions is None
+
+    @property
+    def directory(self):
+        """
+        The directory where the asset should be stored.
+        Returns the directory based on the resource type. If empty, returns the root directory.
+
+        Returns
+        -------
+        str
+            The directory where the asset should be stored.
+        """
+        if self.sub_folder:  # Explicit sub_folder has priority
+            return self.sub_folder
+        if self.resource_type == '':  # Experiment root dir if empty
+            return ''
+        else:
+            return self.resource_type_to_folder[self.resource_type or self.name]  # If None, defaults to self.name
+
+    @property
+    def default_extension(self):
+        """
+        The default extension for this asset (based on type and sub_type).
+
+        Returns
+        -------
+        str
+            The default extension for this asset.
+        """
+        return self.extensions[0] if self.extensions else ''
+
+    def to_dict(self):
+        return {
+            'resource_type': self.resource_type,
+            'resource_type_to_folder': self.resource_type_to_folder,
+            'type_name': self.name,
+            'sub_types': {k: (v.to_dict() if v is not None else None)
+                          for k, v in self.sub_types.items()},
+            'basename': str(self.basename),
+            'file_format_category': self._file_format_category,
+            'sub_folder': self.sub_folder,
+            'relevant_pipelines': self.relevant_pipelines,
+            'compression_algorithms': self.compression_algorithms,
+            'checksum_algorithm': self.checksum_algorithm,
+            'extensions': self.extensions
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        sub_types = data.get('sub_types')
+        if sub_types:
+            sub_types = {k: (TypeSpec.from_dict(v) if v is not None else None)
+                         for k, v in sub_types.items()}
+        return cls(
+            resource_type=data.get('resource_type'),
+            resource_type_to_folder=data.get('resource_type_to_folder'),
+            type_name=data.get('type_name'),
+            sub_types=sub_types,
+            basename=data.get('basename', ''),
+            file_format_category=data.get('file_format_category'),
+            sub_folder=data.get('sub_folder', ''),
+            relevant_pipelines=data.get('relevant_pipelines'),
+            compression_algorithms=data.get('compression_algorithms'),
+            checksum_algorithm=data.get('checksum_algorithm'),
+            extensions=data.get('extensions')
+        )
+
+
+class SubTypeSpec(TypeSpec):
+    """
+    A specification for a subtype of an asset. Not a concrete asset.
+    This has all the information for a substep in the pipeline regardless of the channel.
+    """
+    def __init__(self, **kwargs):
+        """
+        A specification for a substep in the pipeline. Not a concrete asset.
+
+        Parameters
+        ----------
+        kwargs
+            The same parameters as TypeSpec.
+        """
+        super().__init__(**kwargs)
+
+    @property
+    def main_type(self):
+        return self.name.split('_')[0]
+
+    # def to_dict(self):
+    #     out = super().to_dict()
+    #     out['main_type'] = self.main_type
+    #     return out
+    #
+    # @classmethod
+    # def from_dict(cls, data):
+    #     return super().from_dict(data)
+
+
+ChannelId = str | tuple[str, ...]
+
+
+class ChannelSpec:
+    """
+    A specification for a channel. Not a concrete asset.
+    This has all the information for a channel regardless of the type of asset.
+
+    Attributes
+    ----------
+    name: ChannelId
+        The name of the channel. (Typically the name of the labeling, e.g.
+        cfos, dapi, autofluorescence, gfp ...)
+        If a tuple, the channel is a composite of the channels in the tuple.
+    content_type: str
+        The type of content in the channel.
+        E.g. 'nuclei', 'cells', 'vessels'...
+    number: int
+        The number id of the channel.
+    """
+    channel_names = []
+
+    def __init__(self, channel: ChannelId, content_type: str, channel_number: int | None = None):
+        """
+        A specification for a channel. Not a concrete asset.
+
+        Parameters
+        ----------
+        channel: ChannelId
+            The name of the channel. (Typically the name of the labeling, e.g.
+            cfos, dapi, autofluorescence, gfp ...)
+            If a tuple, the channel is a composite of the channels in the tuple
+        content_type: str
+            The type of content in the channel.
+            E.g. 'nuclei', 'cells', 'vessels'...
+        channel_number: int
+            The number of the channel.
+        """
+        if isinstance(channel, list) and all(isinstance(c, str) for c in channel):
+            channel = tuple(channel)
+            warnings.warn('Passing a list as channel is deprecated and will be removed in a future version.'
+                          ' Use a tuple instead.', DeprecationWarning, stacklevel=2)
+        parts = compound_channel_parts(channel)  # None for a simple channel; validates the names
+        if parts is not None:
+            channel = parts  # A compound channel is always identified by its tuple, never by 'a-b'
+        elif content_type == 'compound':  # Enforce consistency between structure and content_type
+            raise ValueError(
+                f"content_type='compound' requires a compound ChannelId (tuple), "
+                f"got atomic {channel!r}"
+            )
+
+        if channel not in ChannelSpec.channel_names:
+            ChannelSpec.channel_names.append(channel)
+        self.name = channel
+        self.content_type = validate_arg('data content type', content_type, DATA_CONTENT_TYPES)
+        self.number = len(ChannelSpec.channel_names) - 1 if channel_number is None else channel_number
+
+    @classmethod
+    def channel_number_to_name(cls, channel_number):
+        return cls.channel_names[channel_number]
+
+    def is_simple_channel(self):
+        return not self.is_compound()
+
+    def has_pipeline(self):
+        return self.content_type not in (None, 'undefined', 'no-pipeline', 'compound')
+
+    def is_compound(self):
+        return is_compound_channel(self.name)
+
+    def to_dict(self):
+        return {
+            'name': self.name,
+            'content_type': self.content_type,
+            'number': self.number
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(
+            channel=data['name'],
+            content_type=data['content_type'],
+            channel_number=data['number']
+        )
+
+
+class StateManager:
+    """
+    A context manager to handle the state (e.g. debug mode).
+    It is multiprocess safe using shared memory for the status.
+
+    Attributes
+    ----------
+    _status: str
+        The current context keyword.
+    known_contexts: list[str]
+        The list of known context keywords.
+    """
+    def __init__(self):
+        self._status = multiprocessing.Array(ctypes.c_char, 20, lock=True)   # Shared memory for multiprocessing
+        self.known_contexts = []
+
+    def __call__(self, status=None):
+        if status:
+            if not isinstance(status, str):
+                status = 'debug'
+            self.status = status
+        return self
+
+    def __enter__(self):
+        if not self.status:
+            self.status = 'debug'
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.status = ''
+
+    @property
+    def status(self):
+        with self._status.get_lock():
+            val = self._status.value.decode('utf-8')
+            if val.lower() in ('', 'none', 'null'):
+                return None
+            elif val.lower() == 'true':
+                return True
+            elif val.lower() == 'false':
+                return False
+            else:
+                return val
+
+    @status.setter
+    def status(self, value):
+        with self._status.get_lock():
+            # if value not in self.known_contexts:
+            #     raise ValueError(f'Unknown context: {value}')
+            if isinstance(value, bool):
+                value = str(value).lower()
+            if value is None:
+                value = ''
+            if len(value) > 20:
+                warnings.warn('Context keyword is too long, max 20 characters.')
+                value = value[:20]
+            self._status.value = value.encode('utf-8')

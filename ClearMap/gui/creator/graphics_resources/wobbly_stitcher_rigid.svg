@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.2" baseProfile="tiny" width="620" height="340" viewBox="0 0 620 340">
+  <title>Rigid stitcher: overlap and projection thickness</title>
+  <rect x="0" y="0" width="620" height="340" fill="#262a30"/>
+
+  <!-- Two neighbouring tiles along X (top view), overlapping -->
+  <rect x="30" y="80" width="260" height="170" fill="#00b4d8" fill-opacity="0.30" stroke="#00b4d8" stroke-width="2"/>
+  <rect x="200" y="80" width="260" height="170" fill="#e040a0" fill-opacity="0.30" stroke="#e040a0" stroke-width="2"/>
+  <text x="110" y="170" font-family="sans-serif" font-size="15" fill="#cfefff" text-anchor="middle">tile 1</text>
+  <text x="380" y="170" font-family="sans-serif" font-size="15" fill="#ffd6ec" text-anchor="middle">tile 2</text>
+
+  <!-- The projected bands: the last columns of tile 1, the first ones of tile 2 -->
+  <rect x="261" y="81" width="28" height="168" fill="#ffffff" fill-opacity="0.85" stroke="#00b4d8" stroke-width="2"/>
+  <rect x="201" y="81" width="28" height="168" fill="#ffffff" fill-opacity="0.85" stroke="#e040a0" stroke-width="2"/>
+
+  <!-- Overlap: dimension above -->
+  <line x1="200" y1="48" x2="200" y2="76" stroke="#d8dde3" stroke-width="1" stroke-dasharray="3,3"/>
+  <line x1="290" y1="48" x2="290" y2="76" stroke="#d8dde3" stroke-width="1" stroke-dasharray="3,3"/>
+  <line x1="204" y1="56" x2="286" y2="56" stroke="#d8dde3" stroke-width="1.5"/>
+  <polygon points="200,56 208,52 208,60" fill="#d8dde3"/>
+  <polygon points="290,56 282,52 282,60" fill="#d8dde3"/>
+  <text x="245" y="40" font-family="sans-serif" font-size="14" fill="#d8dde3" text-anchor="middle">overlap</text>
+
+  <!-- Projection thickness: dimensions below, one per tile -->
+  <line x1="200" y1="254" x2="200" y2="290" stroke="#ffffff" stroke-width="1" stroke-dasharray="3,3"/>
+  <line x1="230" y1="254" x2="230" y2="290" stroke="#ffffff" stroke-width="1" stroke-dasharray="3,3"/>
+  <line x1="204" y1="280" x2="226" y2="280" stroke="#e040a0" stroke-width="2"/>
+  <polygon points="200,280 208,276 208,284" fill="#e040a0"/>
+  <polygon points="230,280 222,276 222,284" fill="#e040a0"/>
+  <line x1="260" y1="254" x2="260" y2="290" stroke="#ffffff" stroke-width="1" stroke-dasharray="3,3"/>
+  <line x1="290" y1="254" x2="290" y2="290" stroke="#ffffff" stroke-width="1" stroke-dasharray="3,3"/>
+  <line x1="264" y1="280" x2="286" y2="280" stroke="#00b4d8" stroke-width="2"/>
+  <polygon points="260,280 268,276 268,284" fill="#00b4d8"/>
+  <polygon points="290,280 282,276 282,284" fill="#00b4d8"/>
+  <text x="245" y="314" font-family="sans-serif" font-size="15" font-weight="bold" fill="#ffffff" text-anchor="middle">projection thickness</text>
+
+  <!-- Axes -->
+  <line x1="30" y1="324" x2="70" y2="324" stroke="#9aa3ad" stroke-width="1.5"/>
+  <polygon points="76,324 68,320 68,328" fill="#9aa3ad"/>
+  <text x="82" y="329" font-family="sans-serif" font-size="13" fill="#9aa3ad">X</text>
+  <line x1="30" y1="324" x2="30" y2="292" stroke="#9aa3ad" stroke-width="1.5"/>
+  <polygon points="30,286 26,294 34,294" fill="#9aa3ad"/>
+  <text x="38" y="296" font-family="sans-serif" font-size="13" fill="#9aa3ad">Y</text>
+
+  <!-- What is done with the bands -->
+  <text x="478" y="96" font-family="sans-serif" font-size="13" fill="#d8dde3">Each tile is</text>
+  <text x="478" y="114" font-family="sans-serif" font-size="13" fill="#d8dde3">projected (max)</text>
+  <text x="478" y="132" font-family="sans-serif" font-size="13" fill="#d8dde3">along X over its</text>
+  <text x="478" y="150" font-family="sans-serif" font-size="13" fill="#ffffff" font-weight="bold">white band</text>
+  <text x="478" y="168" font-family="sans-serif" font-size="13" fill="#d8dde3">facing the other;</text>
+  <text x="478" y="186" font-family="sans-serif" font-size="13" fill="#d8dde3">the two Y-Z images</text>
+  <text x="478" y="204" font-family="sans-serif" font-size="13" fill="#d8dde3">are correlated to</text>
+  <text x="478" y="222" font-family="sans-serif" font-size="13" fill="#d8dde3">find the shift.</text>
+  <text x="478" y="250" font-family="sans-serif" font-size="13" fill="#9aa3ad">auto: the overlap</text>
+</svg>

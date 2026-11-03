@@ -1,0 +1,25 @@
+clearmap_schema: 3
+clearmap_version: "3.1.0"
+
+base_directory: ""
+
+sample_id: ""
+use_id_as_prefix: false
+default_tile_extension: [".ome.tif", ".ome.npy"]
+comments: ""
+
+templates:
+  channel:
+    orientation: [1, 2, 3]
+    data_type: "undefined"
+    resolution: null
+    wavelength: null
+    slicing:
+      x: null
+      y: null
+      z: null
+    extension: ".ome.tif"
+    path: ""
+    comments: ""
+
+channels: {}  # required for first hydration

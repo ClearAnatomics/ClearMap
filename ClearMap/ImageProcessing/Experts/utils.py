@@ -1,9 +1,7 @@
-import numpy as np
-
 import ClearMap.IO.IO as clearmap_io
+from ClearMap.IO import source_initialization
 
 from ClearMap.ParallelProcessing.DataProcessing import ArrayProcessing as ap
-import ClearMap.ImageProcessing.LocalStatistics as ls
 import ClearMap.Utils.Timer as tmr
 import ClearMap.Utils.HierarchicalDict as hdict
 
@@ -14,19 +12,8 @@ def initialize_sinks(cell_detection_parameter, shape, order):
         if isinstance(par, dict):
             filename = par.get('save')
             if filename:
-                ap.initialize_sink(filename, shape=shape, order=order, dtype='float')
-
-
-def equalize(source, percentile=(0.5, 0.95), max_value=1.5, selem=(200, 200, 5), spacing=(50, 50, 5),
-             interpolate=1, mask=None):
-    equalized = ls.local_percentile(source, percentile=percentile, mask=mask, dtype=float,
-                                    selem=selem, spacing=spacing, interpolate=interpolate)
-    normalize = 1/np.maximum(equalized[..., 0], 1)
-    maxima = equalized[..., 1]
-    ids = maxima * normalize > max_value
-    normalize[ids] = max_value / maxima[ids]
-    equalized = np.array(source, dtype=float) * normalize
-    return equalized
+                dtype = par.get('save_dtype', 'float')
+                ap.initialize_sink(filename, shape=shape, order=order, dtype=dtype)
 
 
 def print_params(step_params, param_key, prefix, verbose):
@@ -39,26 +26,35 @@ def print_params(step_params, param_key, prefix, verbose):
     return step_params, None
 
 
-def wrap_step(param_key, previous_result, step_function, args=(), remove_previous_result=False,
-              extra_kwargs=None, parameter=None, steps_to_measure=None, prefix='',
-              base_slicing=None, valid_slicing=None):
+def run_step(param_key, previous_result, step_function, args=(), remove_previous_result=False,
+             presave_parser=None, extra_kwargs=None, parameter=None, steps_to_measure=None, prefix='',
+             base_slicing=None, valid_slicing=None):
     if steps_to_measure is None:
         steps_to_measure = {}
     if parameter is None:
         parameter = {}
     if extra_kwargs is None:
         extra_kwargs = {}
-
     step_param = parameter.get(param_key)
     if step_param:
         step_param, timer = print_params(step_param, param_key, prefix, parameter.get('verbose'))
-
         save = step_param.pop('save', None)  # FIXME: check if always goes before step_function call
+        save_dtype = step_param.pop('save_dtype', None)  
         result = step_function(previous_result, *args, **{**step_param, **extra_kwargs})
 
         if save:
-            save = clearmap_io.as_source(save)
-            save[base_slicing] = result[valid_slicing]
+            if save_dtype is None:
+                save = source_initialization.initialize(save)
+            else:                    
+                save = source_initialization.initialize(save, dtype=save_dtype)
+            if presave_parser is None:
+                presave_parser = lambda t : t
+            to_save = presave_parser(result)
+            # useful sanity check
+            if save_dtype=='bool':
+                save[base_slicing] = (to_save[valid_slicing] > 0)
+            else:
+                save[base_slicing] = to_save[valid_slicing]
 
         if parameter.get('verbose'):
             timer.print_elapsed_time(param_key.title())

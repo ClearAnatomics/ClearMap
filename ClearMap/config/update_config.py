@@ -1,33 +1,43 @@
+"""
+This script is used to update the default config files in the ClearMap package.
+
+It will detect if a default config file is missing and create it, or merge it with the existing one.
+If a parameter was altered by the user, it will not be overwritten.
+
+This module will be extended to support conversion from one ClearMap configuration version to another.
+"""
 import copy
-import os.path
 
 import inspect
 import shutil
+from pathlib import Path
 
-from ClearMap.config.config_loader import ConfigLoader, get_alternatives, CONFIG_NAMES, get_cfg_reader_function
+from packaging.version import Version
 
-CFG_DIR = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-CLEARMAP_DIR = os.path.dirname(os.path.dirname(CFG_DIR))  # used by shell script
+from ClearMap.config.config_handler import ConfigHandler, clearmap_version, ALTERNATIVES_REG, LEGACY_SECTIONS
+
+CFG_DIR = Path(inspect.getfile(inspect.currentframe())).resolve().parent
+CLEARMAP_DIR = str(CFG_DIR.parent.parent)  # used by shell script
 
 
-def update_default_config():
-    loader = ConfigLoader(None)
-    for cfg_name in CONFIG_NAMES:
-        default_cfg_path = loader.get_default_path(cfg_name, must_exist=True, install_mode=True)
-        cfg_paths = [loader.get_default_path(alternative, must_exist=False, install_mode=False)
-                     for alternative in get_alternatives(cfg_name)]
-        existing_paths = [os.path.exists(p) for p in cfg_paths]
-        if not any(existing_paths):  # missing then copy
+def update_default_config():  # FIXME: add carry over of previous version settings
+    for cfg_name in ALTERNATIVES_REG.canonical_config_names:
+        if ALTERNATIVES_REG.is_legacy_cfg(cfg_name):
+            continue
+        package_default_path = ConfigHandler.get_default_path(cfg_name, must_exist=True, from_package=True)
+        if ALTERNATIVES_REG.is_global_cfg(cfg_name):
+            user_path = ConfigHandler.get_global_canonical_path(cfg_name)
+        else:
+            user_path = ConfigHandler.get_user_defaults_canonical_path(cfg_name)
+        if not user_path.exists():  # missing -> copy
             print(f'Creating missing default config for {cfg_name}')
-            shutil.copy(default_cfg_path, cfg_paths[0])
-        else:  # if present merge
-            cfg_path = cfg_paths[existing_paths.index(True)]
+            ConfigHandler.copy_if_missing(package_default_path, user_path)  # this can convert formats too
+        else:  # if config for **this** version is already present -> merge
+            package_default_cfg = ConfigHandler.get_cfg_from_path(package_default_path)
+            user_default_cfg = ConfigHandler.get_cfg_from_path(user_path)
 
-            read_cfg = get_cfg_reader_function(cfg_path)
-            cfg = read_cfg(cfg_path)
-            default_cfg = read_cfg(default_cfg_path)
-            print(f'Merging {cfg_name}')
-            merge_config(default_cfg, cfg)
+            print(f'Merging "{cfg_name}" config section')
+            merge_config(package_default_cfg, user_default_cfg)
 
 
 def merge_config(source_cfg, dest_cfg):
@@ -40,11 +50,12 @@ def merge_config(source_cfg, dest_cfg):
 
 
 def remove_extra_keys(a, b):
-    """remove keys from a if not in b"""
-    for key in a:
+    """remove keys from `a` if not in `b`"""
+    for key in list(a.keys()):
         if key in b:
-            if isinstance(a[key], dict) and isinstance(b[key], dict):
-                a[key] = remove_extra_keys(a[key], b[key])
+            v_a, v_b = a[key], b[key]
+            if isinstance(v_a, dict) and isinstance(v_b, dict):
+                a[key] = remove_extra_keys(v_a, v_b)
         else:
             del a[key]
     return a

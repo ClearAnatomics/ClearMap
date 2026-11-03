@@ -10,10 +10,10 @@ Note
     This module is using matplotlib.
 """
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__ = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
-__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+__download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import math
 import numpy as np
@@ -23,7 +23,7 @@ import scipy.stats as st
 
 from matplotlib.colors import rgb_to_hsv, hsv_to_rgb
 import matplotlib.pyplot as plt
-
+from mpl_toolkits.mplot3d import Axes3D  # analysis:ignore
 
 from ClearMap.Alignment import Annotation as annotation
 from ClearMap.Analysis.Statistics.data_frame_operations import sanitize_df, normalise_df_column_names

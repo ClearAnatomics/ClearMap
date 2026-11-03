@@ -10,18 +10,32 @@ See also
 :mod:`ClearMap.IO`.
 """
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__ = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
-__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+__download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import os
+import functools
 import shutil
 import importlib
+import uuid
+from dataclasses import dataclass
+from typing import Iterable
 
 __all__ = ['is_file', 'is_directory', 'file_extension', 'join', 'split',
            'abspath', 'create_directory', 'delete_directory',
-           'copy_file', 'delete_file']
+           'copy_file', 'delete_file', 'Rename', 'FileRenameError', 'check_renames', 'apply_renames']
+
+import warnings
+
+from pathlib import Path
+
+from ClearMap.IO.assets_constants import COMPRESSION_ALGORITHMS
+from ClearMap.IO.source.backends import registry
+from ClearMap.Utils.exceptions import (ClearMapFileNotFoundError, ClearMapIoException, ClearMapNotImplementedError,
+                                       ClearMapValueError, Severity)
+from ClearMap.Utils.tag_expression import Expression
 
 ##############################################################################
 # ## Basic file queries
@@ -41,7 +55,7 @@ def is_file(filename):
     is_file : bool
         True if filename exists on disk and is not a directory.
     """
-    if not isinstance(filename, str):
+    if not isinstance(filename, (str, Path)):
         return False
 
     if os.path.isdir(filename):
@@ -219,9 +233,10 @@ def delete_file(filename):
 
     Arguments
     ---------
-    filename : str
+    filename : str | Path
         Filename to delete.
     """
+    filename = normalize_location_spec(filename)
     if is_file(filename):
         os.remove(filename)
 
@@ -231,7 +246,7 @@ def copy_file(source, sink):
 
     Arguments
     ---------
-    source : str
+    source : str | pathlib.Path
         Filename of the file to copy.
     sink : str
         File or directory name to copy the file to.
@@ -248,14 +263,238 @@ def copy_file(source, sink):
     return sink
 
 
+def link_file(source, sink, overwrite=False):
+    """Create a symbolic link.
+
+    Parameters
+    ----------
+    source : str | pathlib.Path
+        The file to link to.
+    sink : str | pathlib.Path
+        The link to create. If a directory, the link is created
+        inside it with the same name as source.
+    overwrite : bool
+        If True, remove existing file/symlink at sink before creating.
+        If False (default), raise FileExistsError if sink already exists.
+
+    Returns
+    -------
+    sink : str
+        The link path.
+    """
+    if is_directory(sink):
+        path, name = os.path.split(source)
+        sink = os.path.join(sink, name)
+    if overwrite and os.path.lexists(sink):
+        os.remove(sink)
+    os.symlink(source, sink)
+    return sink
+
+
+def link_or_copy(source, sink, overwrite=False):
+    """Efficiently place *source* at *sink* without duplicating bytes when possible.
+
+    Strategy (in order of preference):
+
+    1. **Hardlink** — zero extra disk space, instant.  Works only on the
+       same filesystem and when the OS/filesystem supports it.
+    2. **Symlink** — via :func:`link_file`.  Cross-filesystem, works on
+       Linux/macOS out of the box.  On Windows requires Developer Mode
+       or elevated privileges.
+    3. **Full copy** — via :func:`copy_file`.  Last resort.  A warning is
+       emitted because this can be very expensive for large files.
+
+    Parameters
+    ----------
+    source : str | pathlib.Path
+        Path to the existing file.  Must exist.
+    sink : str | pathlib.Path
+        Desired destination path.  If *sink* is an existing directory the
+        file is placed inside it with the same basename as *source*.
+    overwrite : bool
+        If True, remove an existing file/symlink at *sink* before
+        creating the new link or copy.  If False (default), raise
+        ``FileExistsError`` when *sink* already exists.
+
+    Returns
+    -------
+    str
+        The final path of the created link or copy.
+
+    Raises
+    ------
+    FileNotFoundError
+        If *source* does not exist.
+    FileExistsError
+        If *sink* already exists and *overwrite* is False.
+
+    See Also
+    --------
+    link_file : Symlink creation.
+    copy_file : Full file copy.
+    """
+    source = Path(source).resolve()
+    sink = Path(sink)
+
+    if not source.exists():
+        raise ClearMapFileNotFoundError(f'Source does not exist: {source}')
+
+    if is_directory(str(sink)):
+        sink = sink / source.name
+
+    if sink.exists() or sink.is_symlink():
+        if overwrite:
+            os.remove(sink)
+        else:
+            raise ClearMapIoException(f'Destination already exists: {sink}')
+
+    sink.parent.mkdir(parents=True, exist_ok=True)
+
+    # 1) Hardlink — same filesystem, zero extra space
+    try:
+        os.link(source, sink)
+        return str(sink)
+    except OSError:
+        pass
+
+    # 2) Symlink — delegate to link_file
+    try:
+        return link_file(source, sink)
+    except OSError:
+        pass
+
+    # 3) Full copy — last resort
+    size_gb = source.stat().st_size / 1e9
+    warnings.warn(f'Falling back to full copy for {source.name} → {sink} ({size_gb:.1f} GB). '
+                  f'Consider placing data on the same filesystem to avoid duplication.', stacklevel=2)
+    return copy_file(source, sink)
+
+
+def atomic_replace(tmp: Path, dst: Path) -> None:
+    """
+    Atomically replace dst with tmp.
+    tmp must already exist on the same filesystem as dst.
+    """
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    with tmp.open("rb") as f:   # open read-only
+        os.fsync(f.fileno())
+    os.replace(tmp, dst)
+
+
+def atomic_write(write, location, *args, **kwargs) -> None:
+    """Write a file atomically, so a crash mid-write never destroys the previous file.
+
+    ``write(tmp_path)`` must produce the complete file at ``tmp_path``, which is then
+    moved onto *location* with :func:`atomic_replace`. The temporary file sits in the
+    same directory (so the move is atomic) and keeps the full original file name as
+    its suffix, since some writers pick the format from the extension (e.g. ``.gt``
+    vs ``.gt.gz``). It is removed if writing fails.
+
+    Parameters
+    ----------
+    write : callable
+        Called as ``write(tmp_path, *args, **kwargs)``, with the temporary path as a ``str``.
+    location : str or Path
+        The final file.
+    *args, **kwargs
+        Forwarded to `write` (e.g. ``atomic_write(io_ops.write, path, data)``).
+    """
+    location = Path(location)
+    location.parent.mkdir(parents=True, exist_ok=True)
+    tmp = location.with_name(f'.tmp-{os.getpid()}-{location.name}')
+    try:
+        write(str(tmp), *args, **kwargs)
+        atomic_replace(tmp, location)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
+def atomic_write_bytes(data: bytes, location) -> None:
+    """Write `data` to `location` atomically (see atomic_write)."""
+    atomic_write(_write_bytes, location, data)
+
+
+def _write_bytes(path: str, data: bytes) -> None:
+    Path(path).write_bytes(data)
+
+
+def decompress_file(compressed_path, destination, member=None):
+    """
+    Write the decompressed content of a file in `destination`, streaming (the file is not read in memory).
+
+    Parameters
+    ----------
+    compressed_path : str or pathlib.Path
+        The compressed file. The compression is read from its extension (:data:`COMPRESSION_ALGORITHMS`).
+    destination : str or pathlib.Path
+        Where to write the content.
+    member : str or None
+        For a zip archive, the name of the file in it. Defaults to the name of the archive without ``.zip``.
+    """
+    compressed_path = Path(compressed_path)
+    extension = compressed_path.suffix.lstrip('.')
+    if extension == 'zip':
+        import zipfile
+        with zipfile.ZipFile(compressed_path) as archive, archive.open(member or compressed_path.stem) as source:
+            with open(destination, 'wb') as destination_file:
+                shutil.copyfileobj(source, destination_file)
+    elif extension in COMPRESSION_ALGORITHMS:
+        module = importlib.import_module(extension)
+        with module.open(compressed_path, 'rb') as source, open(destination, 'wb') as destination_file:
+            shutil.copyfileobj(source, destination_file)
+    else:
+        raise ClearMapNotImplementedError(f'Unrecognized compression extension "{compressed_path.suffix}" of '
+                                          f'{compressed_path}, expected one of {COMPRESSION_ALGORITHMS}')
+
+
+def find_or_build(file_name, *, source_dir, cache_dir, build):
+    """
+    The path of a file that ClearMap ships compressed or can compute (a look-up table, an atlas), without writing in
+    the folder of the program unless that is where it already is: that folder is often read-only (a cluster).
+
+    The first of these that exists:
+
+    1. ``source_dir / file_name``: next to the code, as made by an installation that prepared it;
+    2. ``cache_dir / file_name``: made by an earlier run;
+    3. otherwise it is built in `cache_dir`, atomically (see :func:`atomic_write`): runs that start together never see
+       or keep a partial file. They may each build it: the last one to finish wins, with the same content.
+
+    Parameters
+    ----------
+    file_name : str
+        The name of the file.
+    source_dir : str or pathlib.Path
+        The folder of the code, which holds the file when it was prepared and its compressed source otherwise.
+    cache_dir : str or pathlib.Path
+        A writeable folder, created if it does not exist.
+    build : callable
+        ``build(path)`` writes the whole file at `path` (a temporary one, in `cache_dir`).
+
+    Returns
+    -------
+    pathlib.Path
+        The file.
+    """
+    for folder in (Path(source_dir), Path(cache_dir)):
+        if (folder / file_name).exists():
+            return folder / file_name
+    cached_path = Path(cache_dir) / file_name
+    atomic_write(build, cached_path)
+    return cached_path
+
+
 def uncompress(file_path, extension='zip', check=True, verbose=False):
     """
-    Unzips a file only if 1) the file does not exist (check), 2) the compressed file exists.
+    Unzips a file only if:
+        1) the file does not exist (check)
+        2) the compressed file exists.
+
 
     Arguments
     ---------
-    file_path : str
-        The file path to search for.
+    file_path : str or pathlib.Path
+        The file path to search for, or the compressed file itself (its algorithm is then read from its suffix).
     extension : str
         The extension for the compressed file.
     check : bool
@@ -268,52 +507,364 @@ def uncompress(file_path, extension='zip', check=True, verbose=False):
     filename : str or None
         The uncompressed filename or None if failed.
     """
-    if not os.path.exists(file_path) or not check:
+    file_path = Path(file_path)
+    algorithm = file_path.suffix.lstrip('.')  # the suffix has the dot, the algorithms do not
+    if file_path.exists() and algorithm in COMPRESSION_ALGORITHMS:  # the compressed file itself
+        return uncompress(file_path.with_suffix(''), extension=algorithm, check=check, verbose=verbose)
+    if not file_path.exists() or not check:
         if extension == 'auto':
-            for algo in ('zip', 'bz2', 'gzip', 'lzma'):
-                f_path_w_ext = f'{file_path}.{algo}'
-                if os.path.exists(f_path_w_ext):
+            for algo in COMPRESSION_ALGORITHMS:
+                f_path_w_ext = file_path.with_suffix(f'{file_path.suffix}.{algo}')
+                if f_path_w_ext.exists():
                     extension = algo
                     break
             else:
                 raise ValueError(f'Could not find compressed source for {file_path}')
 
-        compressed_path = f'{file_path}.{extension}'
-        if os.path.exists(compressed_path):
+        compressed_path = file_path.with_suffix(f'{file_path.suffix}.{extension}')
+        if compressed_path.exists():
             if verbose:
                 print(f'Decompressing source: {compressed_path}')
             if extension == 'zip':
                 import zipfile
                 try:
-                    with zipfile.ZipFile(compressed_path, 'r') as zipf:
-                        if os.path.splitext(file_path)[-1] in ('.tif', '.nrrd'):
-                            zipf.extract(os.path.basename(file_path), path=os.path.dirname(compressed_path))
-                        else:
-                            zipf.extractall(path=os.path.dirname(compressed_path))
-                    if not os.path.exists(file_path):
+                    if file_path.suffix in ('.tif', '.nrrd'):
+                        atomic_write(functools.partial(decompress_file, compressed_path), file_path)
+                    else:  # the archive may hold several files, which all go next to it
+                        with zipfile.ZipFile(compressed_path, 'r') as zipf:
+                            zipf.extractall(path=compressed_path.parent)
+                    if not file_path.exists():
                         raise FileNotFoundError
                 except Exception as err:  # FIXME: TOO broad
                     print(err)
                     return
-            elif extension in ('bz2', 'gzip', 'lzma'):
-                mod = importlib.import_module(extension)
-                with open(file_path, 'wb') as out, \
-                        open(compressed_path, 'rb') as compressed_file:
-                    out.write(mod.decompress(compressed_file.read()))
+            elif extension in COMPRESSION_ALGORITHMS:
+                # Atomic: never leave a truncated file
+                atomic_write(functools.partial(decompress_file, compressed_path), file_path)
             else:
                 raise NotImplementedError(f'Unrecognized compression extension {extension}')
         else:
             print(f'Cannot find compressed source: {compressed_path}')
     return file_path
+
+
+def compress(file_path, extension='zip', check=True, verbose=False):
+    """
+    Compresses a file only if:
+        1) the file exists (check)
+        2) the compressed file does not exist.
+
+    Arguments
+    ---------
+    file_path : str or pathlib.Path
+        The file path to search for.
+    extension : str
+        The extension for the compressed file.
+    check : bool
+        If True, check if the compressed file already exists.
+    verbose : bool
+        Print progress info.
+
+    Returns
+    -------
+    filename : Path or None
+        The compressed filename or None if failed.
+    """
+    file_path = Path(file_path)
+    compressed_path = None
+    if file_path.exists() and check:
+        if extension == 'auto':
+            extension = 'zip'
+        compressed_path = file_path.with_suffix(f'{file_path.suffix}.{extension}')
+        if not compressed_path.exists():
+            if verbose:
+                print(f'Compressing source: {file_path}')
+            if extension == 'zip':
+                import zipfile
+                with zipfile.ZipFile(compressed_path, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
+                    if file_path.suffix in ('.tif', '.nrrd'):
+                        zipf.write(file_path, arcname=file_path.name)
+                    else:
+                        for root, dirs, files in file_path.walk():
+                            for file in files:
+                                zipf.write(root / file, arcname=root / file)
+                if not compressed_path.exists():
+                    raise FileNotFoundError(f'Could not create compressed file {compressed_path} from {file_path}')
+            elif extension in ('bz2', 'gzip', 'lzma'):
+                mod = importlib.import_module(extension)
+                with open(file_path, 'rb') as in_file, open(compressed_path, 'wb') as compressed_file:
+                    compressed_file.write(mod.compress(in_file.read()))
+            else:
+                raise NotImplementedError(f'Unrecognized compression extension {extension}')
+        else:
+            print(f'Compressed file {compressed_path} exists. Skipping compression.')
+    return compressed_path
+
+
+def checksum(file_path, algorithm='md5', verbose=False):
+    """
+    Calculates the checksum of a file.
+
+    Arguments
+    ---------
+    file_path : str or pathlib.Path
+        The file path to search for.
+    algorithm : str
+        The algorithm to use for the checksum.
+    verbose : bool
+        Print progress info.
+
+    Returns
+    -------
+    checksum : str or None
+        The checksum or None if failed.
+    """
+    file_path = Path(file_path)
+    if file_path.exists():
+        if verbose:
+            print(f'Calculating checksum for {file_path}')
+        import hashlib
+        hash = hashlib.new(algorithm)  # TODO: check because could be faster to call the function directly
+        with open(file_path, 'rb') as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                hash.update(chunk)
+        file_checksum = hash.hexdigest()
+    else:
+        raise FileNotFoundError(f'Cannot find file {file_path}')
+    return file_checksum
+
+
+def find_existing_extension(path, extensions):  # FIXME: see if could use Glob
+    """
+    Return the first extension in the list of `extensions` that creates
+    and existing file with `path`.
+
+    Parameters
+    ----------
+    path
+    extensions
+
+    Returns
+    -------
+    str or None
+    """
+    path = Path(path)
+    for extension in extensions:
+        if path.with_suffix(extension).exists():
+            return extension
+    else:
+        return None
+
+
+def check_extensions(extensions):
+    """
+    Check if the extensions are valid (i.e. correctly constructed and
+    supported by ClearMap IO).
+
+    Parameters
+    ----------
+    extensions: list[str]
+        The list of extensions to check.
+
+    Raises
+    ------
+    ValueError
+    """
+    for ext in extensions:
+        if not ext.startswith('.'):
+            raise ClearMapValueError(f'Extension "{ext}" should start with a dot.')
+        if not registry.supports_extension(ext):
+            raise ClearMapValueError(f'Unknown extension "{ext}". Supported extensions are "{registry.SOURCE_EXTENSIONS}".')
+
+
+def normalize_location_spec(location)-> str | Expression | None:
+    """Normalise representation without interpreting location semantics.
+
+    Path-like and byte representations are converted to text.
+    Tag Expression objects retain their semantic type.
+    Strings are returned unchanged, including strings containing tag
+    expressions such as ``tile_<X,2>.tif``.
+    """
+    if location is None:
+        return None
+
+    if isinstance(location, Expression):  # strings representing expressions remain strings
+        return location
+
+    if isinstance(location, os.PathLike):
+        location = os.fspath(location)
+
+    if isinstance(location, bytes):
+        location = os.fsdecode(location)
+
+    if not isinstance(location, str):  # FIXME: more ClearMapTypeError probably
+        raise ClearMapIoException(f'Expected str, bytes, os.PathLike, Expression or None; got {type(location).__name__}')
+
+    return location
     
+
+###############################################################################
+# ## Renaming
+###############################################################################
+
+# A batch of files and folders is renamed as a whole: checked before anything moves, moved in two steps (so swaps
+# and case-only renames work, also on case-insensitive file systems) and moved back if one of the renames fails.
+
+
+@dataclass(frozen=True)
+class Rename:
+    """A file or folder to move to another name (in the same folder or in another one)"""
+    source: Path
+    target: Path
+
+    def __post_init__(self):
+        object.__setattr__(self, 'source', Path(self.source))
+        object.__setattr__(self, 'target', Path(self.target))
+
+    @property
+    def is_no_op(self) -> bool:
+        return self.source == self.target
+
+
+class FileRenameError(ClearMapIoException):
+    """A batch of renames is refused (nothing moved), or failed (what moved was put back, if possible)"""
+    severity = Severity.RECOVERABLE
+    user_title = 'Files Cannot Be Renamed'
+    user_hint = 'Move or rename the files in the way, then try again.'
+
+
+def _key(path: Path) -> str:
+    """How paths are compared for collisions: whatever the case, so the plan is the same on every platform"""
+    return os.path.normcase(str(path)).casefold()
+
+
+def check_renames(renames: Iterable[Rename]) -> list[Rename]:
+    """
+    Check that the batch can be applied as a whole, without touching the disk.
+
+    Returns
+    -------
+    list[Rename]
+        The renames to apply, in the same order (the ones which change nothing are left out).
+
+    Raises
+    ------
+    FileRenameError
+        If a source is missing or used twice, if two renames have the same target, or if a target exists and
+        is not itself moved away by the batch.
+    """
+    renames = [rename for rename in renames if not rename.is_no_op]
+
+    sources = [_key(rename.source) for rename in renames]
+    if len(set(sources)) != len(sources):
+        raise FileRenameError(f'Several renames start from the same path: {_duplicates(sources)}')
+    targets = [_key(rename.target) for rename in renames]
+    if len(set(targets)) != len(targets):
+        raise FileRenameError(f'Several renames end at the same path: {_duplicates(targets)}')
+
+    missing = [rename.source for rename in renames if not rename.source.exists()]
+    if missing:
+        raise FileRenameError(f'Cannot rename what does not exist: {", ".join(map(str, missing))}')
+
+    moved_away = set(sources)
+    in_the_way = [rename.target for rename in renames
+                  if rename.target.exists() and _key(rename.target) not in moved_away
+                  and not _is_same_file(rename.source, rename.target)]
+    if in_the_way:
+        raise FileRenameError(f'Cannot rename onto what exists: {", ".join(map(str, in_the_way))}')
+    return renames
+
+
+def apply_renames(renames: Iterable[Rename]) -> list[Rename]:
+    """
+    Apply the batch: check it, move every source to a temporary name, then every temporary name to its target.
+    What is inside a renamed folder (and renamed too) moves first, so give its path as it is before the folder
+    moves. If a move fails, everything which moved is put back.
+
+    Returns
+    -------
+    list[Rename]
+        The renames which were applied.
+
+    Raises
+    ------
+    FileRenameError
+        If the batch is refused (nothing moved) or one of the moves failed (see :func:`check_renames`).
+    """
+    renames = check_renames(renames)
+    done: list[tuple[Path, Path]] = []  # (from, to) of every move, to put them back in reverse
+    temporary = {rename: _temporary_path(rename.source) for rename in renames}
+    try:
+        for same_depth_renames in _by_nesting_depth_innermost_first(renames):  # What is inside a folder moves first
+            for rename in same_depth_renames:
+                _move(rename.source, temporary[rename], done)
+            for rename in same_depth_renames:
+                rename.target.parent.mkdir(parents=True, exist_ok=True)
+                _move(temporary[rename], rename.target, done)
+    except Exception as err:
+        stuck = _put_back(done)
+        message = f'Renaming failed ({err}); the files were put back.'
+        if stuck:
+            message = (f'Renaming failed ({err}) and could not put everything back: '
+                       f'{", ".join(f"{path} (was {origin})" for path, origin in stuck)}.')
+        raise FileRenameError(message) from err
+    return renames
+
+
+def _by_nesting_depth_innermost_first(renames: list[Rename]) -> list[list[Rename]]:
+    """
+    The renames in groups of the same nesting depth, the most nested group first.
+
+    The nesting depth of a rename is the number of other renames whose source holds its source (the landmarks file
+    of a registration folder which is renamed too: 1). The renames of a group hold none of each other, so they move
+    together, and what is inside a folder moves before the folder does.
+    """
+    sources = {rename.source for rename in renames}
+    nesting_depths = {rename: len(sources.intersection(rename.source.parents)) for rename in renames}
+    return [[rename for rename in renames if nesting_depths[rename] == depth]
+            for depth in sorted(set(nesting_depths.values()), reverse=True)]
+
+
+def _move(source: Path, target: Path, done: list[tuple[Path, Path]]) -> None:
+    source.rename(target)
+    done.append((source, target))
+
+
+def _put_back(done: list[tuple[Path, Path]]) -> list[tuple[Path, Path]]:
+    """Undo the moves in reverse. Returns the (path, origin) of what could not be put back"""
+    stuck = []
+    for source, target in reversed(done):
+        try:
+            target.rename(source)
+        except OSError:
+            stuck.append((target, source))
+    return stuck
+
+
+def _temporary_path(path: Path) -> Path:
+    return path.with_name(f'.{path.name}.renaming-{uuid.uuid4().hex}')
+
+
+def _is_same_file(source: Path, target: Path) -> bool:
+    """Whether target is source under another spelling (e.g. the case on a case-insensitive file system)"""
+    try:
+        return source.samefile(target)
+    except OSError:
+        return False
+
+
+def _duplicates(keys: list[str]) -> str:
+    return ', '.join(sorted({key for key in keys if keys.count(key) > 1}))
+
 
 ###############################################################################
 # ## Tests
 ###############################################################################
 
+
 def test():
     import ClearMap.IO.FileUtils as fu
-    reload(fu)
+    importlib.reload(fu)
 
     filename = fu.__file__
     path, name = fu.os.path.split(filename)

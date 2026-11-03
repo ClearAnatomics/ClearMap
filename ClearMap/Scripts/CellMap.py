@@ -7,28 +7,42 @@ CellMap
 This script is the main pipeline to analyze immediate early gene expression 
 data from iDISCO+ cleared tissue [Renier2016]_.
 
-See the :ref:`CellMap tutorial </CellMap.ipynb>` for a tutorial and usage.
+See the `CellMap tutorial`_ for a tutorial and usage.
 
+.. _CellMap tutorial: ../scripts/cell_map_tutorial.ipynb
 
-.. image:: ../Static/cell_abstract_2016.jpg
+.. image:: ../static/cell_abstract_2016.jpg
    :target: https://doi.org/10.1016/j.cell.2020.01.028
    :width: 300
 
-.. figure:: ../Static/CellMap_pipeline.png
+.. figure:: ../static/CellMap_pipeline.png
 
   iDISCO+ and ClearMap: A Pipeline for Cell Detection, Registration, and 
   Mapping in Intact Samples Using Light Sheet Microscopy.
-
-
-References
-----------
-.. [Renier2016] `Mapping of brain activity by automated volume analysis of immediate early genes. Renier* N, Adams* EL, Kirst* C, Wu* Z, et al. Cell. 2016 165(7):1789-802 <https://doi.org/10.1016/j.cell.2016.05.007>`_
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__license__   = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+import ClearMap.Settings as settings
+
+from ClearMap.IO import conversion, io_ops, source_geometry, FileUtils as file_utils
+import ClearMap.IO.Workspace as wsp
+
+import ClearMap.Visualization.Plot3d as p3d
+
+import ClearMap.Alignment.Annotation as ano
+import ClearMap.Alignment.Resampling as res
+import ClearMap.Alignment.Elastix as elx
+
+import ClearMap.Analysis.Measurements.Voxelization as vox
+
+import ClearMap.ImageProcessing.Experts.Cells as cells
 
 if __name__ == "__main__":
      
@@ -37,8 +51,6 @@ if __name__ == "__main__":
   ###############################################################################
   
   #%% Initialize workspace
-  
-  from ClearMap.Environment import *  #analysis:ignore
   
   #directories and files
   directory = '/home/ckirst/Programs/ClearMap2/ClearMap/Tests/Data/CellMap_Example/'    
@@ -62,9 +74,9 @@ if __name__ == "__main__":
       overwrite=False, verbose=True);
   
   #alignment parameter files    
-  align_channels_affine_file   = io.join(resources_directory, 'Alignment/align_affine.txt')
-  align_reference_affine_file  = io.join(resources_directory, 'Alignment/align_affine.txt')
-  align_reference_bspline_file = io.join(resources_directory, 'Alignment/align_bspline.txt')
+  align_channels_affine_file   = file_utils.join(resources_directory, 'Alignment/align_affine.txt')
+  align_reference_affine_file  = file_utils.join(resources_directory, 'Alignment/align_affine.txt')
+  align_reference_bspline_file = file_utils.join(resources_directory, 'Alignment/align_bspline.txt')
   
   
   #%%############################################################################
@@ -75,8 +87,8 @@ if __name__ == "__main__":
                
   source = ws.source('raw');
   sink   = ws.filename('stitched')
-  io.delete_file(sink)
-  io.convert(source, sink, processes=None, verbose=True);
+  file_utils.delete_file(sink)
+  conversion.convert(source, sink, processes=None, verbose=True);
   
   
   #%%############################################################################
@@ -92,7 +104,7 @@ if __name__ == "__main__":
       "verbose" : True,             
       };
   
-  io.delete_file(ws.filename('resampled'))
+  file_utils.delete_file(ws.filename('resampled'))
   
   res.resample(ws.filename('stitched'), sink=ws.filename('resampled'), **resample_parameter)
   
@@ -174,12 +186,12 @@ if __name__ == "__main__":
   cell_detection_parameter['intensity_detection']['measure'] = ['source'];
   cell_detection_parameter['shape_detection']['threshold'] = 500;
   
-  io.delete_file(ws.filename('cells', postfix='maxima'))
+  file_utils.delete_file(ws.filename('cells', postfix='maxima'))
   cell_detection_parameter['maxima_detection']['save'] = ws.filename('cells', postfix='maxima')
   
   processing_parameter = cells.default_cell_detection_processing_parameter.copy();
   processing_parameter.update(
-      processes = None, # 'serial',
+      processes = None, # 0: in the calling process (to debug)
       size_max = 20, #100, #35,
       size_min = 11,# 30, #30,
       overlap  = 10, #32, #10,
@@ -243,8 +255,8 @@ if __name__ == "__main__":
   def transformation(coordinates):
     coordinates = res.resample_points(
                     coordinates, sink=None, orientation=None, 
-                    source_shape=io.shape(ws.filename('stitched')), 
-                    sink_shape=io.shape(ws.filename('resampled')));
+                    source_shape=source_geometry.shape(ws.filename('stitched')),
+                    sink_shape=source_geometry.shape(ws.filename('resampled')));
     
     coordinates = elx.transform_points(
                     coordinates, sink=None, 
@@ -277,7 +289,7 @@ if __name__ == "__main__":
   import numpy.lib.recfunctions as rfn
   cells_data = rfn.merge_arrays([source[:], coordinates_transformed, label, names], flatten=True, usemask=False)
   
-  io.write(ws.filename('cells'), cells_data)
+  io_ops.write(ws.filename('cells'), cells_data)
   
   
   
@@ -302,7 +314,7 @@ if __name__ == "__main__":
   for filename, names in clearmap1_format.items():
     sink = ws.filename('cells', postfix=['ClearMap1', filename]);
     data = np.array([source[name] if name in source.dtype.names else np.full(source.shape[0], np.nan) for name in names]);
-    io.write(sink, data);
+    io_ops.write(sink, data);
   
   
   #%%############################################################################
@@ -317,7 +329,7 @@ if __name__ == "__main__":
   #%% Unweighted 
   
   voxelization_parameter = dict(
-        shape = io.shape(annotation_file), 
+        shape = source_geometry.shape(annotation_file),
         dtype = None, 
         weights = None,
         method = 'sphere', 
@@ -338,7 +350,7 @@ if __name__ == "__main__":
   #%% Weighted 
   
   voxelization_parameter = dict(
-        shape = io.shape(annotation_file),
+        shape = source_geometry.shape(annotation_file),
         dtype = None, 
         weights = intensities,
         method = 'sphere', 

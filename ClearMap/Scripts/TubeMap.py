@@ -4,35 +4,58 @@
 TubeMap
 =======
 
-This script is the main pipeline to generate annotated graphs from vascualture 
+This script is the main pipeline to generate annotated graphs from vasculature
 lightsheet data [Kirst2020]_.
 
-See the :ref:`TubeMap tutorial </TubeMap.ipynb>` for a tutorial and usage.
+See the :ref:`TubeMap tutorial <../../ClearMap/Scripts/tube_map_tutorial.ipynb>` for a tutorial and usage.
 
-.. image:: ../Static/cell_abstract_2020.jpg
+.. image:: ../static/cell_abstract_2020.jpg
    :target: https://doi.org/10.1016/j.cell.2016.05.007 
-   :width: 300  
-
-References
-----------
-.. [Kirst2020] `Mapping the Fine-Scale Organization and Plasticity of the Brain Vasculature. Kirst, C., Skriabine, S., Vieites-Prado, A., Topilko, T., Bertin, P., Gerschenfeld, G., Verny, F., Topilko, P., Michalski, N., Tessier-Lavigne, M. and Renier, N., Cell, 180(4):780-795 <https://doi.org/10.1016/j.cell.2020.01.028>`_
+   :width: 300
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__license__   = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
+
+import numpy as np
+
+import ClearMap.Settings as settings
+
+import ClearMap.IO.Workspace as wsp
+from ClearMap.IO import dispatch, conversion, source_geometry, FileUtils as file_utils
+
+import ClearMap.Visualization.Plot3d as p3d
+import ClearMap.Visualization.Color as col
+
+import ClearMap.ParallelProcessing.BlockProcessing as bp
+
+import ClearMap.Alignment.Annotation as ano
+import ClearMap.Alignment.Resampling as res
+import ClearMap.Alignment.Elastix as elx
+import ClearMap.Alignment.Stitching.stitching_rigid as st
+import ClearMap.Alignment.Stitching.stitching_wobbly as stw
+
+import ClearMap.ImageProcessing.Skeletonization.Skeletonization as skl
+import ClearMap.ImageProcessing.machine_learning.vessel_filling.vessel_filling as vf
+import ClearMap.ImageProcessing.Experts.Vasculature as vasc
+
+import ClearMap.Analysis.graphs.graph_gt as grp
+import ClearMap.Analysis.graphs.graph_processing as gp
+import ClearMap.Analysis.Measurements.MeasureExpression as me
+import ClearMap.Analysis.Measurements.radius_measurements as mr
+import ClearMap.Analysis.Measurements.Voxelization as vox
+
 
 if __name__ == '__main__':
 
   #%%############################################################################
   ### Initialization 
   ###############################################################################
-  
+
   #%% Initialize workspace
-  
-  from ClearMap.Environment import *  #analysis:ignore
-  
+
   #directories and files
   directory = '/home/ckirst/Programs/ClearMap2/ClearMap/Tests/Data/TubeMap_Example'    
   
@@ -55,9 +78,9 @@ if __name__ == '__main__':
       overwrite=False, verbose=True);
   
   #alignment parameter files    
-  align_channels_affine_file   = io.join(resources_directory, 'Alignment/align_affine.txt')
-  align_reference_affine_file  = io.join(resources_directory, 'Alignment/align_affine.txt')
-  align_reference_bspline_file = io.join(resources_directory, 'Alignment/align_bspline.txt')
+  align_channels_affine_file   = file_utils.join(resources_directory, 'Alignment/align_affine.txt')
+  align_reference_affine_file  = file_utils.join(resources_directory, 'Alignment/align_affine.txt')
+  align_reference_bspline_file = file_utils.join(resources_directory, 'Alignment/align_bspline.txt')
   
   
   #%%############################################################################
@@ -66,13 +89,13 @@ if __name__ == '__main__':
   
   #%% Convet raw data to npy files     
                
-  io.convert_files(ws.file_list('raw', extension='tif'), extension='npy', 
-                   processes=12, verbose=True);
+  conversion.convert_files(ws.file_list('raw', extension='tif'), extension='npy',
+                           processes=12, verbose=True);
   
   #%% Convert artery data to npy files      
              
-  io.convert_files(ws.file_list('arteries', extension='tif'), extension='npy', 
-                   processes=12, verbose=True);                 
+  conversion.convert_files(ws.file_list('arteries', extension='tif'), extension='npy',
+                           processes=12, verbose=True);
                    
   
   #%%############################################################################
@@ -130,7 +153,7 @@ if __name__ == '__main__':
                                                                                                                                                                   
   layout.replace_source_location(expression_raw, expression_arteries, method='expression')
   
-  stw.stitch_layout(layout, sink = ws.filename('stitched', postfix='arteries'), method = 'interpolation', processes='serial', verbose=True)
+  stw.stitch_layout(layout, sink = ws.filename('stitched', postfix='arteries'), method = 'interpolation', processes=0, verbose=True)
   
   #p3d.plot(ws.filename('stitched', postfix='arteries')) 
   #p3d.plot([ws.filename('stitched'), ws.filename('stitched', postfix='arteries')])
@@ -149,7 +172,7 @@ if __name__ == '__main__':
       "verbose" : True,             
       };
   
-  io.delete_file(ws.filename('resampled'));
+  file_utils.delete_file(ws.filename('resampled'));
   
   res.resample(ws.filename('stitched'), sink=ws.filename('resampled'), **resample_parameter)
   
@@ -162,7 +185,7 @@ if __name__ == '__main__':
       "verbose" : True,                
       };    
   
-  io.delete_file(ws.filename('resampled', postfix='autofluorescence'));
+  file_utils.delete_file(ws.filename('resampled', postfix='autofluorescence'));
   
   res.resample(ws.filename('autofluorescence'), sink=ws.filename('resampled', postfix='autofluorescence'), **resample_parameter_auto)
   
@@ -273,7 +296,8 @@ if __name__ == '__main__':
   processing_parameter.update(processes = 20,
                               as_memory = True);
   
-  vasc.binarize(source, sink, binarization_parameter=binarization_parameter, processing_parameter=processing_parameter);
+  vasc.binarize(source, sink, binarization_parameter=binarization_parameter,
+                processing_parameter=processing_parameter, verbose=True);
   
   #p3d.plot([source, sink])
   
@@ -318,7 +342,7 @@ if __name__ == '__main__':
                    
   source = ws.filename('binary', postfix='arteries_postprocessed');
   sink   = ws.filename('binary', postfix='arteries_filled');
-  io.delete_file(sink);
+  file_utils.delete_file(sink);
   
   processing_parameter = vf.default_fill_vessels_processing_parameter.copy();
   processing_parameter.update(size_max = 1000, 
@@ -426,14 +450,14 @@ if __name__ == '__main__':
   def vote(expression):
     return np.sum(expression) >= len(expression) / 1.5;
   
-  graph_reduced = gp.reduce_graph(graph_cleaned, edge_length=True,
-                            edge_to_edge_mappings = {'length' : np.sum},
-                            vertex_to_edge_mappings={'artery_binary' : vote,
+  graph_reduced = gp.reduce_graph(graph_cleaned, compute_edge_length=True,
+                                  edge_to_edge_mappings = {'length' : np.sum},
+                                  vertex_to_edge_mappings={'artery_binary' : vote,
                                                      'artery_raw'    : np.max,
-                                                     'radii'         : np.max},  
-                            edge_geometry_vertex_properties=['coordinates', 'radii', 'artery_binary', 'artery_raw'],
-                            edge_geometry_edge_properties=None,                        
-                            return_maps=False, verbose=True)
+                                                     'radii'         : np.max},
+                                  edge_geometry_vertex_properties=['coordinates', 'radii', 'artery_binary', 'artery_raw'],
+                                  edge_geometry_edge_properties=None,
+                                  return_maps=False, verbose=True)
   
   #%% Save reduced graph
   
@@ -461,8 +485,8 @@ if __name__ == '__main__':
   def transformation(coordinates):
     coordinates = res.resample_points(
                     coordinates, sink=None, orientation=None, 
-                    source_shape=io.shape(ws.filename('binary', postfix='filled')), 
-                    sink_shape=io.shape(ws.filename('resampled')));
+                    source_shape=source_geometry.shape(ws.filename('binary', postfix='filled')),
+                    sink_shape=source_geometry.shape(ws.filename('resampled')));
     
     coordinates = elx.transform_points(
                     coordinates, sink=None, 
@@ -484,8 +508,8 @@ if __name__ == '__main__':
   
   def scaling(radii):
     resample_factor = res.resample_factor(
-                        source_shape=io.shape(ws.filename('binary', postfix='filled')), 
-                        sink_shape=io.shape(ws.filename('resampled')))
+                        source_shape=source_geometry.shape(ws.filename('binary', postfix='filled')),
+                        sink_shape=source_geometry.shape(ws.filename('resampled')))
     return radii * np.mean(resample_factor);
   
   
@@ -509,7 +533,7 @@ if __name__ == '__main__':
   
   #%% Distance to surface
   
-  distance_atlas = io.as_source(distance_file)
+  distance_atlas = dispatch.as_source(distance_file)
   distance_atlas_shape = distance_atlas.shape
   
   def distance(coordinates):
@@ -801,7 +825,7 @@ if __name__ == '__main__':
       "method"  : 'sphere',      
       "radius"  : (15,15,15),
       "weights" : None,
-      "shape"   : io.shape(reference_file),
+      "shape"   : source_geometry.shape(reference_file),
       "verbose" : True                  
   };
   

@@ -5,28 +5,21 @@ from matplotlib import pyplot as plt
 
 sys.path.insert(0, os.path.abspath('.'))
 
-from ClearMap.IO.metadata import define_auto_stitching_params
-from ClearMap.processors.sample_preparation import init_preprocessor
-import ClearMap.Alignment.Stitching.StitchingRigid as stitching_rigid
+from ClearMap.pipeline_orchestrators.utils import init_sample_manager_and_processors
+import ClearMap.Alignment.Stitching.stitching_rigid as stitching_rigid
 
 
-def stitch_and_plot_layout():
-    pre_proc = init_preprocessor('/data/test/')
-    stitching_cfg = pre_proc.processing_config['stitching']
-    overlaps, projection_thickness = define_auto_stitching_params(pre_proc.workspace.source('raw').file_list[0],
-                                                                  stitching_cfg)
-    layout = pre_proc.get_wobbly_layout(overlaps)
-    return pre_proc.overlay_layout_plane(layout.copy())
 
-
-def plot_all_layouts(folder):
-    pre_proc = init_preprocessor(folder)
+def plot_all_layouts(folder, channel):
+    orchestrators = init_sample_manager_and_processors(folder)
+    sample_manager = orchestrators['sample_manager']
+    stitcher = orchestrators['stitcher']
     for postfix in ('aligned_axis', 'aligned', 'placed'):
-        layout = stitching_rigid.load_layout(pre_proc.filename('layout', postfix=postfix))
-        overlay = pre_proc.overlay_layout_plane(layout)
+        layout = stitching_rigid.load_layout(sample_manager.get_path('layout', channel=channel, asset_sub_type=postfix))
+        overlay = stitcher.overlay_layout_plane(layout)
         plt.imshow(overlay)
         plt.show()
 
 
 if __name__ == '__main__':
-    plot_all_layouts('/data/sample_folder')
+    plot_all_layouts('/data/sample_folder', 'cfos')

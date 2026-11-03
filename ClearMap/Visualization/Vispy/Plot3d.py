@@ -37,7 +37,7 @@ import ClearMap.Visualization.Vispy.VolumeVisual as volume_visual
 
 import ClearMap.Visualization.Color as col
 
-import ClearMap.IO.IO as io
+from ClearMap.IO import io_ops
 
 ###############################################################################
 # ## 3d plotting
@@ -159,7 +159,7 @@ def plot_3d(source, colormap=None, view=None, title=None, center_view=True, **kw
     style.update(**kwargs)
 
     # source
-    source = io.as_source(source)[:]
+    source = io_ops.read(source)[:]
     if source.dtype == bool:
         source = source.view(dtype='uint8')
 
@@ -291,7 +291,7 @@ def plot_box(lower, upper, face_color=(1, 0, 0, 0.5), line_color=None, line_widt
 # ## Helpers
 ###############################################################################
 
-#TODO: vispy.color.ColorMap([col1,col2,...]) is much easier!
+# TODO: vispy.color.ColorMap([col1,col2,...]) is much easier!
 
 def single_color_colormap(color=(1, 1, 1), alpha=0.075, inverse_alpha=False):
     color = tuple(col.color(color, alpha=alpha))
@@ -440,7 +440,7 @@ def initialize_view(view=None, title=None, show=True, fov=None, distance=None, e
         canvas = vispy.scene.SceneCanvas(keys='interactive', title=title, show=show, bgcolor=bg_color)
 
         view = canvas.central_widget.add_view(camera=ttc.ArbitraryRotationCamera())
-        # view.camera = 'turntable'  # WARNING: This overwrites the cam defined above
+        # view.camera = 'turntable'  # WARNING: This overwrites the cam defined as argument to the ctor above
         if fov is not None:
             view.camera.fov = fov
         if distance is not None:
@@ -470,7 +470,7 @@ def save(location, view, transparent=None, *args, **kwargs):
         img = img.transpose([0, 1, 2])
     else:
         img = img[:, :, :3].T
-    return io.write(location, img)
+    return io_ops.write(location, img)
 
 
 ###############################################################################

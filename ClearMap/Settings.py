@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Settings
-=======
+========
 
 Module to set *ClearMap's* internal parameter and paths to external programs.
 
@@ -12,6 +12,7 @@ Edit the :func:`setup` routine to point to set paths for specific hosts.
 See Also
 --------
     * :const:`clearmap_path`
+    * :const:`atlas_folder`
     * :const:`resources_path`
     * :const:`external_path`
     * :const:`ilastik_path`
@@ -20,10 +21,14 @@ __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
-__download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
+__download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 
 import os
+from pathlib import Path
+
+import configobj
+
 
 ###############################################################################
 # ## Paths
@@ -43,52 +48,83 @@ def path():  # FIXME: use inspect and rename
     return f_name
 
 
-"""Absolute path to the ClearMap's root folder."""
 clearmap_path = path()
+"""Absolute path to the ClearMap's root folder."""
 
-"""Absolute path to the ClearMap's resources folder."""
 resources_path = os.path.join(clearmap_path, 'Resources')
+"""Absolute path to the ClearMap's resources folder."""
 
-atlas_folder = os.path.join(resources_path, 'Atlas')
+atlas_folder = os.path.join(resources_path, 'Atlas')  # FIXME: rename or rename others to be consistent
+"""Absolute path to the ClearMap's atlas folder."""
 
-"""Absolute path to the ClearMap's external program folder."""
 external_path = os.path.join(clearmap_path, 'External')
+"""Absolute path to the ClearMap's external program folder."""
 
-"""Absolute path to the ClearMap's test folder."""
 test_path = os.path.join(clearmap_path, 'Tests')
+"""Absolute path to the ClearMap's test folder."""
 
-"""Absolute path to the ClearMap's test data folder."""
 test_data_path = os.path.join(test_path, 'Data')
+"""Absolute path to the ClearMap's test data folder."""
+
+
+CFG_DIR_ENV_VAR = 'CLEARMAP_CFG_DIR'
+"""Environment variable that sets the folder of the user configuration (default: ``~/.clearmap``).
+
+On a cluster, the home folder of a job is often read-only or absent, or shared by jobs that need different settings.
+"""
+
+# WARNING: an empty variable means unset: Path('') is the current folder, not an error
+clearmap_cfg_dir = Path(os.environ.get(CFG_DIR_ENV_VAR) or '~/.clearmap').expanduser().absolute()
+"""Absolute :class:`~pathlib.Path` of the folder of the user configuration (machine parameters, user defaults, ...)."""
+
+clearmap_cache_dir = clearmap_cfg_dir / 'cache'
+"""Absolute :class:`~pathlib.Path` of the folder for the files that ClearMap derives from its own data (look-up tables, ...)
+when the folder of the program cannot be written."""
 
 
 ###############################################################################
 # ## Paths to external programs and resources
 ###############################################################################
 
+cfg_path = str(clearmap_cfg_dir / 'machine_params_v3_0.cfg')
+if os.path.exists(cfg_path):
+    config = configobj.ConfigObj(cfg_path, encoding="UTF8", indent_type='    ', unrepr=True, file_error=True)
+else:
+    package_machine_path = os.path.join(clearmap_path, 'config', 'machine_params_v3_0.cfg')
+    if os.path.exists(package_machine_path):
+        config = configobj.ConfigObj(package_machine_path, encoding="UTF8", indent_type='    ',
+                                     unrepr=True, file_error=True)
+    else:
+        config = {}
+
+default_elastix_path = os.path.join(external_path, 'elastix', 'build')
+elastix_path = config.get('elastix_path', default_elastix_path)
+if elastix_path is None:
+    elastix_path = default_elastix_path
 """Absolute path to the elastix installation
 
 Note
 ----
   `Elastix Webpage <https://elastix.lumc.nl/>`_
 """
-elastix_path = os.path.join(external_path, 'elastix', 'build')
 
+tera_stitcher_path = config.get('tera_stitcher_path')
 """Absolute path to the TeraStitcher installation
 
 Note
 ----
   `TeraSticher Webpage <https://abria.github.io/TeraStitcher/>`_
 """
-tera_stitcher_path = None
 
+imagej_path = config.get('imagej_path')
 """Absolute path to the ImageJ/Fiji installation
 
 Note
-  `ImageJ/Fiji Webpage <https://fiji.sc/>`_
 ----
+  `ImageJ/Fiji Webpage <https://fiji.sc/>`_
 """
-imagej_path = None  # '/usr/local/Fiji.app'
 
+ilastik_path = config.get('ilastik_path')
 """Absolute path to the Ilastik installation
 
 Note
@@ -96,4 +132,3 @@ Note
   `Ilastik Webpage <https://ilastik.org/>`_ 
   `Ilastik Download <https://www.ilastik.org/download.html>`_
 """
-ilastik_path = None  # '/usr/local/ilastik/ilastik-1.2.0-Linux'

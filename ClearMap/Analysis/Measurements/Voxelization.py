@@ -6,14 +6,14 @@ Voxelization
 Converts point data into a voxelized image for visulalization and analysis.
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__license__   = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 import numpy as np
 
-import ClearMap.IO.IO as io
+from ClearMap.IO import io_ops
 
 import ClearMap.ParallelProcessing.DataProcessing.DevolvePointList as dpl
 
@@ -55,7 +55,7 @@ def voxelize(source, sink = None, shape = None, dtype = None, weights = None,
   sink : str, array
     Volumetric data of voxelied point data.
   """
-  points = io.read(source);
+  points = io_ops.read(source)
   
   points_shape = points.shape;
   if len(points_shape) > 1:

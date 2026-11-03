@@ -7,7 +7,7 @@ Shared memory array manager for parallel processing using ctype shared
 arrays in :mod:`~ClearMap.ParallelProcessing.SharedMemoryArray`.
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__license__   = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
@@ -23,7 +23,7 @@ __all__ = ['get', 'insert', 'free', 'clean', 'zeros'];
 ### Manager
 ###############################################################################
 
-class SharedMemmoryManager(object):    
+class SharedMemmoryManager:  # FIXME: module level functions only
   """SharedMemmoryManager provides handles to shared arrays for parallel processing."""
   
   _instance = None
