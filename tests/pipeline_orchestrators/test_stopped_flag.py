@@ -8,8 +8,8 @@ from ClearMap.Utils.utilities import check_stopped
 from ClearMap.pipeline_orchestrators.generic_orchestrators import PipelineOrchestrator
 
 
-class GuardedOrchestrator(PipelineOrchestrator):
-    pipeline = 'stitching'
+class GuardedOrchestrator(PipelineOrchestrator, abstract=True):
+    # abstract: it belongs to no pipeline, so the orchestrator contract tests do not list it
 
     def __init__(self):
         super().__init__(MagicMock())

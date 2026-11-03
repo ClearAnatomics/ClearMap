@@ -1,5 +1,6 @@
 """The fake experiment of tests/fake_experiment.py is a valid new experiment with a colocalization pair"""
 from ClearMap.config.config_handler import ConfigHandler
+from ClearMap.config.config_repository import UNDEFINED_SAMPLE_ID
 from tests.fake_experiment import CHANNEL_NAMES, SAMPLE_FOLDER_NAME, make_fake_experiment
 
 
@@ -33,8 +34,8 @@ def test_fake_experiment_takes_the_data_types_the_sample_id_and_the_folder_name(
                                                                                          'lectin': 'vessels'}
 
 
-def test_fake_experiment_has_no_sample_id_unless_asked(tmp_path):
+def test_fake_experiment_has_the_undefined_sample_id_unless_asked(tmp_path):
     make_fake_experiment(tmp_path)
 
     sample_cfg = ConfigHandler.get_cfg_from_path(tmp_path / SAMPLE_FOLDER_NAME / 'sample.yml')
-    assert not sample_cfg['sample_id']
+    assert sample_cfg['sample_id'] == UNDEFINED_SAMPLE_ID

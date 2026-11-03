@@ -140,6 +140,7 @@ def patches(monkeypatch):
     monkeypatch.setattr(params_interfaces, 'QFrame', FakeWidget.__mro__[1])  # No Qt needed: the fakes are no frames
     monkeypatch.setattr(params_interfaces, 'ExtendableTabWidget', FakeChannelsTabWidget)  # Channel names = tab texts
     monkeypatch.setattr(params, 'LandmarksWeightsPanel', FakeWidget)  # A real QWidget, needs a real parent
+    monkeypatch.setattr(params, 'QButtonGroup', FakeWidget)  # A real QObject as parent, the fake page is none
     return []
 
 

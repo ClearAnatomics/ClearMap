@@ -17,7 +17,8 @@ from pathlib import Path
 
 PACKAGE_DIRECTORY = Path(__file__).resolve().parents[2] / 'ClearMap'
 THE_ONE_PLACE = PACKAGE_DIRECTORY / 'Utils' / 'utilities.py'
-NOT_MAINTAINED_DIRECTORIES = ('External', '_Old', '_Todo')  # Vendored code, and code that is not imported
+# Vendored code, code that is not imported, and the scripts of the user (ignored by git)
+NOT_MAINTAINED_DIRECTORIES = ('External', '_Old', '_Todo', 'custom_scripts')
 COUNTING_THE_CORES = 'cpu_count'
 POOLS = ('Pool', 'ThreadPool', 'ProcessPoolExecutor', 'ThreadPoolExecutor', 'CancelableProcessPoolExecutor')
 NUMBER_OF_WORKERS_KEYWORDS = ('processes', 'max_workers')

@@ -15,7 +15,17 @@ from conftest import SETUP_SCRIPT  # pytest puts this directory on the path
 
 REPOSITORY_ROOT = SETUP_SCRIPT.parent
 LOAD_THE_SETUP_SCRIPT_AND_REPORT = f"""
-import importlib.util, sys
+import importlib.abc, importlib.util, sys
+
+
+class RefuseNumpyAndCython(importlib.abc.MetaPathFinder):
+    # Installed, Cython is imported by setuptools itself (setuptools.command.build_ext): the script must not need them
+    def find_spec(self, name, path, target=None):
+        if name.split('.')[0] in ('numpy', 'Cython'):
+            raise ImportError(f'{{name}} is not available at import time of the setup script')
+
+
+sys.meta_path.insert(0, RefuseNumpyAndCython())
 import setuptools
 
 def setup_must_not_be_called(**_):

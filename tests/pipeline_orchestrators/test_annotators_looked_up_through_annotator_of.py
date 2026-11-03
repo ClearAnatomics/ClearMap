@@ -8,12 +8,13 @@ from pathlib import Path
 
 PACKAGE = Path(__file__).resolve().parents[2] / 'ClearMap'
 OWNER = PACKAGE / 'pipeline_orchestrators' / 'registration_orchestrator.py'
+USER_SCRIPTS = PACKAGE / 'custom_scripts'  # Ignored by git: what the user keeps there is not ClearMap
 
 
 def _annotators_indexed_outside_the_registration_processor():
     found = []
     for path in sorted(PACKAGE.rglob('*.py')):
-        if path == OWNER:
+        if path == OWNER or USER_SCRIPTS in path.parents:
             continue
         try:
             tree = ast.parse(path.read_text(encoding='utf-8'))
