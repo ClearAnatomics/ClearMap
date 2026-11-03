@@ -411,6 +411,10 @@ class CellDetector(ChannelPipelineOrchestrator):
         self.get_cells_df().to_csv(csv_file_path)
 
     def export_collapsed_stats(self, all_regions=True):
+        if not self.registration_processor.was_registered:  # atlas_align did not annotate the cells (P0012)
+            warnings.warn(f'The statistics per brain structure of channel "{self.channel}" need a sample registered '
+                          f'to the atlas. Skipping them.')
+            return
         df = self.get_cells_df()
 
         collapsed = pd.DataFrame()
