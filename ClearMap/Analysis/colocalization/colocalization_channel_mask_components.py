@@ -119,8 +119,9 @@ def bilabel_bincount(labels_1: np.array, labels_2: np.array) -> np.array:
     """
 
     # inspired by the join segmentation of skimage
-    max_1 = labels_1.max()
-    max_2 = labels_2.max()
+    # Python ints: the maxima are numpy scalars of the dtype of the labels, their product wraps around in a small dtype
+    max_1 = int(labels_1.max())
+    max_2 = int(labels_2.max())
     factor = max_2 + 1
     # factor will also be the height of the output
     max_val = max_1 * factor + max_2

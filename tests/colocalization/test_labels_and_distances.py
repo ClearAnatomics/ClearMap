@@ -55,6 +55,22 @@ def test_the_counts_of_the_pairs_of_labels_are_the_naive_counts(random_generator
         assert np.all(counts == _naive_bilabel_bincount(labels_1, labels_2))
 
 
+@pytest.mark.parametrize('dtype, highest_labels', [(np.uint8, (200, 3)), (np.uint16, (300, 400))])
+def test_the_counts_of_the_pairs_of_labels_do_not_overflow_in_the_dtype_of_the_labels(random_generator, dtype,
+                                                                                        highest_labels):
+    # The number of pairs (201 * 4 = 804 and 301 * 401 = 120701) does not fit in the dtype of the labels (255 and
+    # 65535). The highest label of each image is on a pixel where the other image has no label.
+    labels_1 = random_generator.integers(highest_labels[0] + 1, size=(60, 60)).astype(dtype)
+    labels_2 = random_generator.integers(highest_labels[1] + 1, size=(60, 60)).astype(dtype)
+    labels_1[0, 0], labels_2[0, 0] = highest_labels[0], 0
+    labels_1[1, 1], labels_2[1, 1] = 0, highest_labels[1]
+
+    counts = bilabel_bincount(labels_1, labels_2)
+
+    assert counts.shape == (highest_labels[0] + 1, highest_labels[1] + 1)
+    assert np.all(counts == _naive_bilabel_bincount(labels_1, labels_2))
+
+
 def test_the_distances_are_the_euclidean_distances_between_all_the_pairs_of_points(random_generator):
     for _ in range(N_RANDOM_CASES):
         n_dims = random_generator.integers(1, 10)
