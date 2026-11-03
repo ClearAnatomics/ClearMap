@@ -314,8 +314,8 @@ class ColocalizationChannelMaskComponents:
             _description_
         dataframe : pd.DataFrame
             the index must correspond to the row rank, no funky index names or subsets.
-        coord_names : tuple, optional
-            _description_, by default ("x", "y", "z")
+        coord_names : sequence of str, optional
+            the names of the columns of the coordinates in dataframe, kept as a list. By default ("x", "y", "z")
         voxel_dims : _type_, optional
             _description_, by default None
         physical_origin : _type_, optional
@@ -334,6 +334,7 @@ class ColocalizationChannelMaskComponents:
         ValueError
             _description_
         """
+        coord_names = list(coord_names)  # pandas reads a tuple as one column label, and a tuple never equals a list
         if _data_frame_ok(dataframe):
             self.dataframe = dataframe
         else:
