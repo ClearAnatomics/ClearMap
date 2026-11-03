@@ -124,7 +124,7 @@ def test_where_unsupported_dtype_matches_kernel_semantics():
     res = ap.where(src, cutoff=0)
     a, _ = last('where_1d')
     assert a[0].dtype == np.uint8
-    assert list(np.asarray(res.array if hasattr(res, 'array') else res)) == [1, 4]  # entries > 0
+    assert list(np.asarray(res.array if hasattr(res, 'array') else res)) == [1, 2, 4]  # entries != 0: -2 is non-zero
 
 
 def test_apply_lut_checks():
