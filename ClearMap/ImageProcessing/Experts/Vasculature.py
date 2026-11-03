@@ -832,7 +832,8 @@ def apply_smoothing(source, sink, parameter_smooth, processing_parameter, proces
     if parameter_smooth.get('iterations', 1) > 1:
         source_path = Path(source.location)
         tmp_f_path = str(source_path.parent / f'{source_path.stem}_smooth_tmp.npy')
-        tmp_sink = ap.initialize_sink(tmp_f_path, shape=source.shape, dtype=source.dtype,
+        Path(tmp_f_path).unlink(missing_ok=True)  # Left by a previous run, maybe of another dtype: it is overwritten
+        tmp_sink = ap.initialize_sink(tmp_f_path, shape=source.shape, dtype=bool,  # What the smoothing writes
                                       order=source.order, return_buffer=False)
     else:
         tmp_f_path = ''
