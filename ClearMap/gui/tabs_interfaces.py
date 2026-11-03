@@ -9,7 +9,7 @@ import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from contextlib import contextmanager, ExitStack
-from typing import final, Callable, Any, TYPE_CHECKING, TypeVar, Generic, ParamSpec, Tuple, Union
+from typing import final, Callable, Any, Iterable, TYPE_CHECKING, TypeVar, Generic, ParamSpec, Tuple, Union
 
 import numpy as np
 from PyQt5.QtWidgets import QWhatsThis, QWidget, QApplication
@@ -47,6 +47,31 @@ P = ParamSpec('P')
 
 # What a channel page is a page of: a channel, or the channels of a compound (e.g. a colocalization pair)
 PageKey = Union[Channel, Tuple[Channel, ...]]
+
+
+def run_until_aborted(steps: Iterable[tuple[Callable[[], Any], 'PipelineOrchestrator']]) -> bool:
+    """
+    Run the steps of a sequence in order, and stop after the one the user aborted.
+
+    The Abort button stops the step that runs and sets ``stopped`` on its orchestrator. It means the whole sequence
+    stops, not only that step, so the sequence looks at the orchestrator of the step that just ran.
+
+    Parameters
+    ----------
+    steps : Iterable[tuple[Callable[[], Any], PipelineOrchestrator]]
+        Pairs of a step, called without argument, and the orchestrator whose Abort button the step shows
+        (the one that does the step, or the one a nested sequence stops).
+
+    Returns
+    -------
+    bool
+        Whether all the steps ran, i.e. whether none was aborted.
+    """
+    for step, orchestrator in steps:
+        step()
+        if orchestrator.stopped:
+            return False
+    return True
 
 
 def reset_stopped_flag_of(abort_func: Callable | None) -> None:

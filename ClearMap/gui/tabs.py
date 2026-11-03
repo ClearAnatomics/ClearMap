@@ -142,7 +142,8 @@ from ClearMap.Utils.events import (CfgChanged, UiPrepareRawDataForClearMap, UiRe
 from .dialog_helpers import option_dialog, make_splash, prompt_dialog, abort_retry_popup
 from .dialogs import ResourceTypeToFolderDialog
 from .exception_handler import handle_exception
-from .tabs_interfaces import PostProcessingTab, PreProcessingTab, BatchTab, ExperimentTab, GenericTab, PageKey
+from .tabs_interfaces import (PostProcessingTab, PreProcessingTab, BatchTab, ExperimentTab, GenericTab, PageKey,
+                              run_until_aborted)
 from .widgets import (PatternDialog, DataFrameWidget, LandmarksSelectorDialog,
                       CheckableListWidget, FileDropListWidget, ensure_inline_histogram,
                       GraphFilterList, NProcessesWidget, BlockProcessingWidget)
@@ -1005,6 +1006,10 @@ class RegistrationTab(PreProcessingTab['RegistrationProcessor']):
                                        step_kw_args={'channel': channel, 'increment_main': (i != 0)})
                     else:
                         continue
+                if self.worker.stopped:  # Aborted: the whole registration stops
+                    self.main_window.progress_watcher.finish()
+                    self.main_window.print_status_msg('Registration aborted')
+                    return
         self.main_window.wrap_in_thread(self.worker.align)  # FIXME: why not wrap_step
         self.main_window.progress_watcher.finish()
         self.main_window.print_status_msg('Registered')  # The plotable channels follow RegistrationStatusChanged
@@ -1794,11 +1799,14 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
         ordered_gui_steps = [asset_to_gui[stp] for stp in steps_obj.steps
                              if stp not in BinaryVesselProcessorSteps._lifecycle_steps]
 
+        steps = []
+        for step_name in ordered_gui_steps:
+            # WARNING: The parallel cython loops inside fill_channel cannot run from child thread
+            method_name, run_on_main_thread = BinaryVesselProcessorSteps._BINARIZE_STEP_MAP[step_name]
+            steps.append((functools.partial(self._run_binarization_step, getattr(worker, method_name), channel,
+                                            run_on_main_thread), worker))
         try:
-            for step_name in ordered_gui_steps:
-                # WARNING: The parallel cython loops inside fill_channel cannot run from child thread
-                method_name, run_on_main_thread = BinaryVesselProcessorSteps._BINARIZE_STEP_MAP[step_name]
-                self._run_binarization_step(getattr(worker, method_name), channel, run_on_main_thread)
+            run_until_aborted(steps)
         except ClearMapVRamException:  # The user chose to abort (see _run_binarization_step)
             if stop_on_error:
                 raise
@@ -1854,16 +1862,16 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
 
     def run_all(self) -> None:
         """Run the complete vasculature pipeline."""
+        binary_worker = self.get_worker(substep='binary')
+        graph_worker = self.get_worker(substep='graph')
+        steps = [(functools.partial(self.binarize_and_postprocess_channel, channel, stop_on_error=True), binary_worker)
+                 for channel in binary_worker.channels_to_binarize]
+        steps += [(self.combine, binary_worker), (self.build_graph, graph_worker),
+                  (self.post_process_graph, graph_worker), (self.voxelize, graph_worker)]
         try:
-            worker = self.get_worker(substep='binary')
-            for channel in worker.channels_to_binarize:
-                self.binarize_and_postprocess_channel(channel, stop_on_error=True)
+            run_until_aborted(steps)
         except ClearMapVRamException:  # TODO: check if we should popup
             return
-        self.combine()
-        self.build_graph()
-        self.post_process_graph()
-        self.voxelize()
 
     def build_graph(self) -> None:
         """Run the pipeline to build the vasculature graph"""
@@ -1871,10 +1879,13 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
 
         title = 'Building vessel graph'
         worker = self.get_worker(substep='graph')
-        self.wrap_step(title, worker.skeletonize_and_build_graph, abort_func=worker.stop_process, main_thread=True,
-                       step_kw_args={'binary_processor': self.get_worker(substep='binary')})
-        self.wrap_step(title, worker.clean_graph, abort_func=worker.stop_process)
-        self.wrap_step(title, worker.reduce_graph, abort_func=worker.stop_process)
+        wrap_graph_step = functools.partial(self.wrap_step, title, abort_func=worker.stop_process)
+        steps = [(functools.partial(wrap_graph_step, worker.skeletonize_and_build_graph, main_thread=True,
+                                    step_kw_args={'binary_processor': self.get_worker(substep='binary')}), worker),
+                 (functools.partial(wrap_graph_step, worker.clean_graph), worker),
+                 (functools.partial(wrap_graph_step, worker.reduce_graph), worker)]
+        if not run_until_aborted(steps):
+            return
         try:
             self.wrap_step(title, worker.register, abort_func=worker.stop_process)
         except MissingRequirementException:
