@@ -1301,6 +1301,7 @@ class ChannelCellMapParams(ChannelUiParameter, OrthoviewerSlicingMixin):
     detection_threshold: int
     cell_filter_size: List[int]
     cell_filter_intensity: List[int]
+    distance_from_surface_px: int
     voxelization_radii: List[int]
     voxelization_weights: Optional[str]
     detect_cells: bool
@@ -1336,6 +1337,8 @@ class ChannelCellMapParams(ChannelUiParameter, OrthoviewerSlicingMixin):
                                                  self.tab.cellFilterThresholdIntensityDoublet,
                                                  disabled_value=None, default_on_enable=[0, 65535],
                                                  cast_from_ui=self.cast_max_from_ui),
+            'distance_from_surface_px': ParamLink(['cell_filtration', 'distance_from_surface_px'],
+                                                  self.tab.distanceFromSurfaceSpinBox, default=0, missing_ok=True),
             'voxelization_radii': ParamLink(['voxelization', 'radii'], self.tab.voxelizationRadiusTriplet),
             'voxelization_weights': ParamLink(['voxelization', 'weights'], self.tab.voxelizationWeightsComboBox),
             'crop_x': VectorLink(['detection', 'test_set_slicing', 'dim_0'], self.tab.detectionSubsetXRangeDoublet),
