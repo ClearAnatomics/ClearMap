@@ -10,8 +10,26 @@ import warnings
 import numpy as np
 import pytest
 
-import stubenv
-from stubenv import CALLS
+# The stubs below replace the compiled modules in sys.modules, so they only reach the wrappers that are imported after
+# them. When another test module has imported a wrapper before (any run of several test files), the wrapper keeps the
+# real compiled module and the calls this file looks for are never recorded: the file is skipped, not failed.
+WRAPPERS = (
+    'ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing',
+    'ClearMap.ImageProcessing.Clipping.Clipping',
+    'ClearMap.ImageProcessing.Binary.Filling',
+    'ClearMap.ImageProcessing.Differentiation.Hessian',
+    'ClearMap.ImageProcessing.Tracing.Trace',
+    'ClearMap.ImageProcessing.Thresholding.Thresholding',
+    'ClearMap.ParallelProcessing.DataProcessing.MeasurePointList',
+    'ClearMap.ParallelProcessing.DataProcessing.DevolvePointList',
+)
+IMPORTED_BEFORE = [name for name in WRAPPERS if name in sys.modules]
+if IMPORTED_BEFORE:
+    pytest.skip(f'the wrappers were imported with the real compiled modules before the stubs: {IMPORTED_BEFORE}',
+                allow_module_level=True)
+
+import stubenv  # noqa: E402  (installs the stubs: only when the file is not skipped)
+from stubenv import CALLS  # noqa: E402
 
 CODE = {name: stubenv.stub(name) for name in (
     'ClearMap.ParallelProcessing.DataProcessing.ArrayProcessingCode',
