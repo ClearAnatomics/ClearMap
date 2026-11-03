@@ -10,11 +10,13 @@ The package is based on the 2d skimage.filters.rank filter module.
 These filters compute the local histogram at each pixel, using a sliding window
 similar to the method described in [1]_. A histogram is built using a moving
 window in order to limit redundant computation. The moving window follows a
-snake-like path:
+snake-like path::
 
-...------------------------\
-/--------------------------/
-\--------------------------...
+    +--->--->--->--->--->--->--->--->+
+                                     |
+    +<---<---<---<---<---<---<---<---+
+    |
+    +--->--->--->--->--->--->--->--->...
 
 The local histogram is updated at each pixel as the structuring element window
 moves by, i.e. only those pixels entering and leaving the structuring element

@@ -417,13 +417,13 @@ def set_path_transform_files(result_directory):
     """
 
     files = os.listdir(result_directory)
-    files = [x for x in files if re.match('TransformParameters.\d.txt', x)]
+    files = [x for x in files if re.match(r'TransformParameters.\d.txt', x)]
     files.sort()
 
     if not files:
         raise ClearMapRuntimeError(f'Cannot find a valid transformation file in {result_directory}!')
 
-    rec = re.compile("\(InitialTransformParametersFileName \"(?P<parname>.*)\"\)")
+    rec = re.compile(r'\(InitialTransformParametersFileName "(?P<parname>.*)"\)')
 
     for f in files:
         ff = os.path.join(result_directory, f)
@@ -528,8 +528,8 @@ def transform_file_size_and_spacing(transform_file):
     spacing : tuple
       The image spacing.
     """
-    resi = re.compile("\(Size (?P<size>.*)\)")
-    resp = re.compile("\(Spacing (?P<spacing>.*)\)")
+    resi = re.compile(r'\(Size (?P<size>.*)\)')
+    resp = re.compile(r'\(Spacing (?P<spacing>.*)\)')
 
     si = None
     sp = None
@@ -566,8 +566,8 @@ def set_transform_file_size_and_spacing(transform_file, size, spacing):
       The new image spacing.
     """
 
-    resi = re.compile("\(Size (?P<size>.*)\)")
-    resp = re.compile("\(Spacing (?P<spacing>.*)\)")
+    resi = re.compile(r'\(Size (?P<size>.*)\)')
+    resp = re.compile(r'\(Spacing (?P<spacing>.*)\)')
 
     fh, tmpfn = tempfile.mkstemp()
 
