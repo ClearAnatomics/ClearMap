@@ -488,11 +488,15 @@ class SampleInfoTab(ExperimentTab):
         if self._preparation_offered and not force:
             return
 
-        stitching_worker = self.exp_controller.get_worker('stitching')
+        sm = self.sample_manager
         candidates: list[tuple[str, str]] = []  # tuples of channel, btn_title
-        for ch in self.sample_manager.pipeline_ready_channels:
-            if stitching_worker.needs_raw_data_preparation(ch, force):
-                candidates.append((ch, 'convert tiles' if self.sample_manager.is_tiled(ch) else 'stack/import'))
+        for ch in sm.pipeline_ready_channels:
+            if sm.is_tiled(ch):
+                if force or not sm.has_npy(ch):
+                    candidates.append((ch, 'convert tiles'))
+            else:
+                if force or not sm.get('stitched', channel=ch).exists:
+                    candidates.append((ch, 'stack/import'))
 
         self._preparation_offered = True
 
@@ -505,6 +509,7 @@ class SampleInfoTab(ExperimentTab):
                                                     f'{details}\n\nThis prepares raw data for processing.'):
             return
 
+        stitching_worker = self.exp_controller.get_worker('stitching')
         self.wrap_step(f'Preparing {len(candidates)} channel(s)',
                        stitching_worker.prepare_all_channels_raw_data,
                        step_kw_args={'force': force}, n_steps=len(candidates), nested=False)
@@ -743,6 +748,8 @@ class StitchingTab(PreProcessingTab["StitchingProcessor"]):
         channels = stitcher.channels_to_stitch()
         if any(stitcher.should_convert_tiles(channel) for channel in channels):
             self.convert_tiles()  # Before the progress dialog of the stitching: it has its own
+            if stitcher.stopped:
+                return
         try:
             self.wrap_step('Stitching', stitcher.stitch, n_steps=stitcher.n_steps_to_run(channels),
                            abort_func=stitcher.stop_process, close_when_done=False)
@@ -957,6 +964,7 @@ class RegistrationTab(PreProcessingTab['RegistrationProcessor']):
         self.worker.parametrize_assets()
 
     def resample_channel(self, channel: str) -> None:
+        self.worker.reset_stopped()
         self.main_window.make_progress_dialog('Registering', n_steps=2,
                                               abort=self.worker.stop_process, parent=self.main_window)
         self.setup_atlas()
@@ -970,6 +978,7 @@ class RegistrationTab(PreProcessingTab['RegistrationProcessor']):
     def run_registration(self) -> None:
         """Run the actual registration between the sample and the reference atlas."""
         # TODO: compute n_steps (part of processor; n_channels * n_steps_per_channel)
+        self.worker.reset_stopped()
         self.main_window.make_progress_dialog('Registering', n_steps=4,
                                               abort=self.worker.stop_process, parent=self.main_window)
         self.setup_atlas()

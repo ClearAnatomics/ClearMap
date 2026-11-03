@@ -49,6 +49,25 @@ P = ParamSpec('P')
 PageKey = Union[Channel, Tuple[Channel, ...]]
 
 
+def reset_stopped_flag_of(abort_func: Callable | None) -> None:
+    """
+    Start a run with a clean slate: forget the Abort of the previous run of the orchestrator owning `abort_func`.
+
+    `stopped` is set by the Abort button only, the steps guarded by ``check_stopped`` skip themselves while it is set
+    and the tabs read it after each step to leave their sequence of steps.
+
+    Parameters
+    ----------
+    abort_func : Callable | None
+        The function bound to the abort button, normally the ``stop_process`` of an orchestrator.
+        Anything else (including None) is left alone.
+    """
+    owner = getattr(abort_func, '__self__', None)
+    reset_stopped = getattr(owner, 'reset_stopped', None)
+    if reset_stopped is not None:
+        reset_stopped()
+
+
 class GenericUi:
     """
     The first layer of interface. This is not implemented directly but is the base class
@@ -552,6 +571,7 @@ class GenericTab(GenericUi, BusSubscriberMixin):
 
         if task_name:
             n_steps = n_steps if nested else 0
+            reset_stopped_flag_of(abort_func)
             self.main_window.make_progress_dialog(task_name, n_steps=n_steps, abort=abort_func)
 
         try:

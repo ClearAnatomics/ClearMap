@@ -4,6 +4,8 @@ run (it ran the steps of each channel itself, with a copy of the logic of the pr
 differed).
 The tiles to convert have a dialog of their own, which opens only when some are to convert.
 """
+import functools
+
 from ClearMap.Utils.exceptions import MissingRequirementException
 from ClearMap.gui.tabs import StitchingTab
 
@@ -11,6 +13,8 @@ N_STEPS = 5
 
 
 class FakeStitcher:
+    stopped = False
+
     def __init__(self, channels_to_convert=()):
         self.channels_to_convert = channels_to_convert
 
@@ -92,6 +96,16 @@ def test_the_tiles_are_converted_in_their_own_dialog_only_when_some_are_to_conve
     tab = FakeStitchingTab(FakeStitcher(channels_to_convert=['derived']))
     tab.run_stitching()
     assert tab.n_conversions == 1
+
+
+def test_aborting_the_conversion_of_the_tiles_ends_the_run_before_the_stitching():
+    stitcher = FakeStitcher(channels_to_convert=['derived'])
+    tab = FakeStitchingTab(stitcher)
+    tab.convert_tiles = functools.partial(setattr, stitcher, 'stopped', True)
+
+    tab.run_stitching()
+
+    assert tab.steps == []
 
 
 def test_missing_requirements_are_reported_and_the_dialog_is_closed():
