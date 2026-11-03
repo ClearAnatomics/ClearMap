@@ -44,57 +44,30 @@
        <string>Paths</string>
       </attribute>
       <layout class="QGridLayout" name="gridLayout">
-       <item row="0" column="0">
-        <widget class="QLabel" name="label">
-         <property name="text">
-          <string>Channel name:</string>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="1">
-        <widget class="QLineEdit" name="nameLineEdit"/>
-       </item>
-       <item row="1" column="0">
-        <widget class="QLabel" name="label_2">
-         <property name="text">
-          <string>Data type:</string>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="1">
-        <widget class="QComboBox" name="dataTypeComboBox"/>
-       </item>
-       <item row="2" column="0">
-        <widget class="QLabel" name="label_3">
-         <property name="text">
-          <string>Extension:</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="1">
-        <widget class="QComboBox" name="extensionComboBox"/>
-       </item>
-       <item row="3" column="0">
-        <widget class="QLabel" name="label_4">
-         <property name="text">
-          <string>Path:</string>
-         </property>
-        </widget>
-       </item>
-       <item row="3" column="1" colspan="2">
-        <widget class="QPlainTextEdit" name="pathPlainTextEdit"/>
-       </item>
-       <item row="4" column="0">
+       <item row="5" column="0">
         <widget class="QLabel" name="label_5">
          <property name="text">
           <string>Comments</string>
          </property>
         </widget>
        </item>
-       <item row="4" column="1" colspan="2">
-        <widget class="QPlainTextEdit" name="commentsPlainTextEdit"/>
+       <item row="3" column="1">
+        <widget class="QComboBox" name="extensionComboBox"/>
        </item>
-       <item row="5" column="1">
+       <item row="2" column="1">
+        <widget class="QComboBox" name="dataTypeComboBox"/>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="label_2">
+         <property name="text">
+          <string>Data type:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="1" colspan="2">
+        <widget class="QPlainTextEdit" name="pathPlainTextEdit"/>
+       </item>
+       <item row="6" column="1">
         <widget class="QPushButton" name="convertToClearMapPushButton">
          <property name="whatsThis">
           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;This will convert your sample to be compatible with ClearMap. There are 4 options:&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;Tiled sample (with x/y pattern)&lt;/span&gt;&lt;/p&gt;&lt;p&gt;The tiles will be converted to numpy. &lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;Single numpy file &lt;/span&gt;&lt;/p&gt;&lt;p&gt;The file will be renamed. &lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;Single file of supported format &lt;/span&gt;&lt;/p&gt;&lt;p&gt;The file will be converted to numpy. &lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;List of files with Z pattern &lt;/span&gt;&lt;/p&gt;&lt;p&gt;The layers will be stacked into a single numpy file. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
@@ -104,7 +77,17 @@
          </property>
         </widget>
        </item>
-       <item row="5" column="2">
+       <item row="1" column="0">
+        <widget class="QLabel" name="label_8">
+         <property name="text">
+          <string>Wavelength:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="1" colspan="2">
+        <widget class="QPlainTextEdit" name="commentsPlainTextEdit"/>
+       </item>
+       <item row="6" column="2">
         <widget class="QToolButton" name="convertToClearMapPushButtonInfoToolButton">
          <property name="text">
           <string>...</string>
@@ -114,6 +97,33 @@
            <normaloff>:/icons/icons/info.svg</normaloff>:/icons/icons/info.svg</iconset>
          </property>
         </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QLineEdit" name="nameLineEdit"/>
+       </item>
+       <item row="3" column="0">
+        <widget class="QLabel" name="label_3">
+         <property name="text">
+          <string>Extension:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="0">
+        <widget class="QLabel" name="label_4">
+         <property name="text">
+          <string>Path:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="0">
+        <widget class="QLabel" name="label">
+         <property name="text">
+          <string>Channel name:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QSpinBox" name="wavelengthSpinBox"/>
        </item>
       </layout>
      </widget>

@@ -24,7 +24,7 @@ defaultUnits = {'length': 'um', 'mass': 'ug', 'time': 'ms'}
 # ------------------------------------------------------------------------------
 
 
-class LinearSystem(object):
+class LinearSystem:
     def __init__(self, G, withRBC=0, invivo=0, dMin_empirical=3.5, htdMax_empirical=0.6, verbose=True, **kwargs):
         """
         Computes the flow and pressure field of a vascular graph without RBC tracking.

@@ -19,6 +19,11 @@ from functools import cached_property
 import numpy as np
 
 from ClearMap.Analysis.vasculature.vasc_graph_utils import vertex_filter_to_edge_filter, edge_filter_to_vertex_filter
+from ClearMap.IO.assets_constants import FILE_NAME_TOKEN_RE
+from ClearMap.Utils.exceptions import ClearMapValueError
+
+COMBINE_OPERATOR_NAMES = ('and', 'or')
+PROPERTY_TYPES = ('vertex', 'edge')
 
 
 def convert_property(graph, mask, src_filter_type, dest_filter_type, operator=np.logical_and):
@@ -33,6 +38,88 @@ def convert_property(graph, mask, src_filter_type, dest_filter_type, operator=np
         raise ValueError(f'Unsupported conversion from {src_filter_type} to {dest_filter_type}.')
 
 
+def graph_property(graph, property_type, property_name) -> np.ndarray:
+    """
+    The values of a vertex or edge property of graph, one per vertex or edge (in edge id order).
+    The vertex property 'degree' (or 'degrees') is the vertex degrees.
+    """
+    if property_type == 'vertex':
+        if property_name in ('degree', 'degrees'):
+            return graph.vertex_degrees()
+        return graph.vertex_property(property_name)
+    elif property_type == 'edge':
+        return graph.edge_property(property_name)
+    raise ClearMapValueError(f'Property type must be one of {PROPERTY_TYPES}, got {property_type!r}.')
+
+
+def file_name_token(value) -> str:
+    """
+    The file name safe string of a filter value (see GraphFilter.as_mask for the semantics):
+    a pair is a range (``0to5``), another list a set of values (``1+2+3``), anything else is the value.
+
+    Raises
+    ------
+    ClearMapValueError
+        If the value does not make a file name safe string (e.g. empty, spaces or path separators),
+        rather than silently mapping two different values to the same file.
+    """
+    if isinstance(value, (tuple, list)):
+        if len(value) == 2:
+            token = f'{value[0]}to{value[1]}'
+        else:
+            token = '+'.join([str(v) for v in value])
+    else:
+        token = str(value)
+    if not FILE_NAME_TOKEN_RE.fullmatch(token):
+        raise ClearMapValueError(f'Filter value {value!r} cannot be used in a file name '
+                                   f'(allowed characters: {FILE_NAME_TOKEN_RE.pattern}).')
+    return token
+
+
+def combine_filters(filters, operators):
+    """
+    Combine the filters from left to right: ``filters[0] operators[0] filters[1] operators[1] ...``
+    is ``((filters[0] operators[0] filters[1]) operators[1] ...)``, i.e. reading order, not boolean precedence.
+
+    Parameters
+    ----------
+    filters: list[GraphFilter]
+    operators: list[str]
+        The operator between each pair of consecutive filters ('and' or 'or'), so len(filters) - 1 of them.
+
+    Returns
+    -------
+    GraphFilter | CombinedFilter
+    """
+    _check_operators(filters, operators)
+    combined = filters[0]
+    for operator, graph_filter in zip(operators, filters[1:]):
+        combined = combined.combine_with(graph_filter, operator)
+    return combined
+
+
+def combined_filters_name(filters, operators) -> str:
+    """
+    The file name safe description of combine_filters(filters, operators),
+    e.g. ``vertex_radii_0to5_and_vertex_artery_True``
+    """
+    _check_operators(filters, operators)
+    parts = [filters[0].name]
+    for operator, graph_filter in zip(operators, filters[1:]):
+        parts += [operator, graph_filter.name]
+    return '_'.join(parts)
+
+
+def _check_operators(filters, operators):
+    if not filters:
+        raise ClearMapValueError('At least one filter is required.')
+    if len(operators) != len(filters) - 1:
+        raise ClearMapValueError(f'{len(filters)} filters need {len(filters) - 1} operators, got {len(operators)}.')
+    for operator in operators:
+        if operator not in COMBINE_OPERATOR_NAMES:
+            raise ClearMapValueError(f'Operator must be one of {COMBINE_OPERATOR_NAMES}, got {operator!r}.')
+
+
 def operator_name_to_function(operator):
     if isinstance(operator, str):
         if operator == 'and':
@@ -45,7 +132,51 @@ def operator_name_to_function(operator):
 
 
 class BaseFilter:
-    """Shared helpers for GraphFilter & CombinedGraphFilter."""
+    """Shared helpers for GraphFilter & CombinedFilter."""
+
+    def is_defined(self) -> bool:
+        raise NotImplementedError
+
+    def as_mask(self, filter_type=None) -> np.ndarray:
+        raise NotImplementedError
+
+    def combine_with(self, other, operator):
+        """
+        Combine this filter with another filter or a mask using the specified operator.
+        If combined with a mask, return a mask.
+        If combined with another filter, return a CombinedFilter object.
+
+        Parameters
+        ----------
+        other: GraphFilter or np.ndarray
+            The other filter or mask to combine with.
+        operator: str or callable
+            The operator to use for combining the filters or masks. Can be 'and' or 'or'.
+            If a callable is provided, it should take two boolean arrays and return a boolean array.
+
+        Returns
+        -------
+        np.ndarray or CombinedFilter
+            If combined with a mask, returns a boolean mask.
+            If combined with another filter, returns a CombinedFilter object.
+        """
+        if not isinstance(other, (BaseFilter, np.ndarray)):
+            raise TypeError('Can only combine with another filter or a mask.')
+
+        operator = operator_name_to_function(operator)
+
+        if isinstance(other, np.ndarray):
+            mask = self.as_mask()
+            other_mask = other
+            if mask.size != other_mask.size:
+                raise ValueError('Masks must be of the same size.'
+                                 'Size difference implies different graphs or different types (vertex vs edge).')
+            return operator(mask, other_mask)
+        else:
+            for operand in (self, other):
+                if not operand.is_defined():
+                    raise ClearMapValueError(f'Cannot combine an undefined filter: {operand!r}.')
+            return CombinedFilter(self, other, operator)
 
     # NOT  (~filter)
     def __invert__(self):
@@ -83,43 +214,16 @@ class GraphFilter(BaseFilter):
         self.property_name = property_name
         self.property_value = property_value
 
-    def combine_with(self, other, operator):
-        """
-        Combine this filter with another filter or a mask using the specified operator.
-        If combined with a mask, return a mask.
-        If combined with another filter, return a CombinedGraphFilter object.
-
-        Parameters
-        ----------
-        other: GraphFilter or np.ndarray
-            The other filter or mask to combine with.
-        operator: str or callable
-            The operator to use for combining the filters or masks. Can be 'and' or 'or'.
-            If a callable is provided, it should take two boolean arrays and return a boolean array.
-
-        Returns
-        -------
-        np.ndarray or CombinedGraphFilter
-            If combined with a mask, returns a boolean mask.
-            If combined with another filter returns a CombinedGraphFilter object.
-        """
-        if not isinstance(other, (GraphFilter, np.ndarray)):
-            raise TypeError('Can only combine with another GraphFilter object.')
-
-        operator = operator_name_to_function(operator)
-
-        if isinstance(other, np.ndarray):
-            mask = self.as_mask()
-            other_mask = other
-            if mask.size != other_mask.size:
-                raise ValueError('Masks must be of the same size.'
-                                 'Size difference implies different graphs or different types (vertex vs edge).')
-            return operator(mask, other_mask)
-        else:
-            if not self.is_defined() or not other.is_defined():
-                raise ValueError('Cannot combine with another filter if this filter is not defined.')
-            return CombinedFilter(self, other, operator)
-
+    @property
+    def name(self) -> str:
+        """The file name safe description of the filter: ``<filter_type>_<property_name>_<value>``"""
+        if not self.filter_type or not self.property_name or self.property_value is None:
+            raise ClearMapValueError(f'Cannot name an incomplete filter ({self.filter_type=}, '
+                                       f'{self.property_name=}, {self.property_value=}).')
+        if not FILE_NAME_TOKEN_RE.fullmatch(self.property_name):
+            raise ClearMapValueError(f'Property name {self.property_name!r} cannot be used in a file name '
+                                       f'(allowed characters: {FILE_NAME_TOKEN_RE.pattern}).')
+        return f'{self.filter_type}_{self.property_name}_{file_name_token(self.property_value)}'
 
     def is_defined(self):
         return (self.graph is not None and
@@ -136,17 +240,15 @@ class GraphFilter(BaseFilter):
 
     @cached_property
     def _raw_property(self):
-        if self.filter_type == 'vertex':
-            if self.property_name in ('degree', 'degrees'):
-                return self.graph.vertex_degrees()
-            return self.graph.vertex_property(self.property_name)
-        elif self.filter_type == 'edge':
-            return self.graph.edge_property(self.property_name)
-        raise RuntimeError
+        return graph_property(self.graph, self.filter_type, self.property_name)
+
+    def __repr__(self):
+        return (f'GraphFilter({self.filter_type!r}, {self.property_name!r}, {self.property_value!r}, '
+                f'graph={"set" if self.graph is not None else None})')
 
     def as_mask(self, filter_type=None):
-        if not self.is_defined():
-            return
+        if not self.is_defined():  # Fail loudly: indexing with a None mask adds an axis instead of selecting
+            raise ClearMapValueError(f'Cannot compute the mask of an undefined filter: {self!r}.')
 
         if filter_type is None:
             filter_type = self.filter_type
@@ -174,16 +276,29 @@ class CombinedFilter(BaseFilter):
         self.right = right     # idem
         self.op    = op        # a numpy ufunc (logical_and, logical_not, …)
 
+    def __repr__(self):
+        return f'CombinedFilter({self.left!r}, {self.right!r}, {getattr(self.op, "__name__", self.op)})'
+
+    @property
+    def filter_type(self):
+        """The right operand is cast to the type of the left one"""
+        return self.left.filter_type
+
+    def is_defined(self) -> bool:
+        return self.left.is_defined() and (self.right is None or self.right.is_defined())
+
     # -------- core ------------------------------------------------------------
-    def as_mask(self, filter_type):
+    def as_mask(self, filter_type=None):
         """
         Evaluate the whole expression in one pass.
 
         Parameters
         ----------
-        filter_type : 'vertex' | 'edge'
-            Type of mask the caller wants back.
+        filter_type : 'vertex' | 'edge' | None
+            Type of mask the caller wants back. None: the type of the left operand.
         """
+        if filter_type is None:
+            filter_type = self.filter_type
         # Post-order traversal: evaluate leaves first, then apply op
         if self.right is None:  # NOT
             return self.op(self.left.as_mask(filter_type))

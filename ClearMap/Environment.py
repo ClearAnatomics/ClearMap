@@ -1,20 +1,31 @@
 # -*- coding: utf-8 -*-
 """
-Environment
-===========
+Environment (deprecated)
+========================
 
 Initialize a ClearMap environment with all main functionality.
 
-Note
-----
-To initialize the main functions in a ClearMap script use:
->>> from ClearMap.Environment import *
+.. deprecated:: 3.1
+    ``from ClearMap.Environment import *`` imports the whole package (slow, and it hides
+    where names come from). Import the modules you use explicitly instead, e.g.::
+
+        import ClearMap.Alignment.Resampling as res
+        import ClearMap.ImageProcessing.Experts.Cells as cells
+
+    The aliases below (``res``, ``cells``, ...) are the conventional ones; ``io`` is the
+    deprecated ``ClearMap.IO.IO`` shim, use :mod:`ClearMap.IO.io_ops` and friends instead.
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__license__   = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
+
+import warnings
+
+warnings.warn('ClearMap.Environment is deprecated and will be removed in a future version. '
+              'Import the ClearMap modules you use explicitly instead of '
+              '"from ClearMap.Environment import *".', FutureWarning, stacklevel=2)
 
 ###############################################################################
 ### Python
@@ -52,8 +63,8 @@ import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
 import ClearMap.Alignment.Annotation as ano     
 import ClearMap.Alignment.Resampling as res
 import ClearMap.Alignment.Elastix as elx       
-import ClearMap.Alignment.Stitching.StitchingRigid as st
-import ClearMap.Alignment.Stitching.StitchingWobbly as stw
+import ClearMap.Alignment.Stitching.stitching_rigid as st
+import ClearMap.Alignment.Stitching.stitching_wobbly as stw
 
 #image processing
 import ClearMap.ImageProcessing.Clipping.Clipping as clp

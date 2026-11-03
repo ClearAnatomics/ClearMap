@@ -8,7 +8,7 @@ Collection of routines to detect maxima in scalar images.
 Used for finding cells or intensity peaks.
 """
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__ = 'GPLv3 - GNU General Pulic License v3 (see LICENSE)'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
@@ -42,12 +42,13 @@ def h_max_transform(source, h_max):
     Returns
     -------
     transformed : array
-        H-max transformed image if h is not None.
+        H-max transformed image if h is not None (as float32 for an integer image).
     """
     if h_max is None:
         return source
-    else:
-        return gr.reconstruct(source - h_max, source)
+    # In an unsigned type, source - h_max wraps around below h_max: work in float (exact for 8 and 16-bit images)
+    values = source if np.issubdtype(source.dtype, np.floating) else source.astype(np.float32)
+    return gr.reconstruct(values - h_max, values)
 
 
 def local_max(source, shape=5):
@@ -193,7 +194,7 @@ def find_center_of_maxima(source, maxima=None, label=None, verbose=False):
         n_label = label.max()
 
     if n_label > 0:
-        centers = np.array(ndm.center_of_mass(source, label, index=np.arange(1, n_label)))
+        centers = np.array(ndm.center_of_mass(source, label, index=np.arange(1, n_label + 1)))  # Labels 1 to n
     else:
         centers = np.zeros((0, source.ndim))
 

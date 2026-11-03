@@ -13,21 +13,22 @@ The :mod:`~ClearMap.IO.IO` module is the main module organizing all the IO
 functionailty.
 
 >>> import numpy as np
->>> import ClearMap.IO.IO as io
->>> x = np.random.rand(30,40,50);
->>> s = io.as_source(x);
->>> print(s);
+>>> from ClearMap.IO import dispatch
+>>> import ClearMap.IO.IO as cmp_io
+>>> x = np.random.rand(30,40,50)
+>>> s = dispatch.as_source(x)
+>>> print(s)
 Numpy-Source(30, 40, 50)[float64]|C|
 
-The first tuple is the shape of the array, the next list contains the datype 
+The first tuple is the shape of the array, the next list contains the dtype
 or data structure, the `|.|` bracket denotes the order of this array, which 
-can be `|C|` for c-contigous, `|F|` for Fortran contigous or '' if the array
-is non-contigous.
+can be `|C|` for c-contiguous, `|F|` for Fortran contiguous or '' if the array
+is non-contiguous.
 
 File sources contain further information about the location of the files etc.
 
 The :mod:`~ClearMap.IO.FileList` source allows to turn a list of files into a 
-sinlge source, e.g. for microscope data in which each imageing plane comes
+single source, e.g. for microscope data in which each imaging plane comes
 in a separate file.
 
 Supported source types include:
@@ -57,10 +58,10 @@ All sources can be made virtual, containing only pointers to data in order
 to use them in parallel processing via the `as_virtual` function.
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__license__   = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
-__webpage__   = 'http://idisco.info'
-__download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
+__webpage__   = 'https://idisco.info'
+__download__  = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 
 #from ClearMap.IO.IO import *

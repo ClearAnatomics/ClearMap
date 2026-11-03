@@ -3,7 +3,7 @@ import copy
 
 import pytest
 
-from ClearMap.config.config_loader import get_configobj_cfg
+from ClearMap.config.config_handler import get_configobj_cfg
 from ClearMap.config.update_config import deep_merge_dicts, remove_extra_keys
 
 

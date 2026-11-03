@@ -3,7 +3,7 @@ import numpy as np
 
 from .Transformation import TransformationBase
 
-from ClearMap.IO.Slice import sliced_shape, sliced_slicing
+from ClearMap.IO.source.Slice import sliced_shape, sliced_slicing
 #TODO: organize this systematically
 
 class SlicingTransformation(TransformationBase):

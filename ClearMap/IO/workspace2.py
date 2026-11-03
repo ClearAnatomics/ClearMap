@@ -1,35 +1,118 @@
 """
-This module is meant to replace the workspace module in ClearMap2.
-The main difference is the support for an unlimited number of channels.
-This is achieved by having a channel centered approach instead of a processing step centered approach.
+workspace2
+==========
 
-The file types are now context dependant. There is no more "raw" or "stitched" files but the user defines
-the channel prefix and the type (step) of the file so that there can be multiple files of the same type
-depending on the channel.
+Channel-centred workspace for ClearMap experiments.
 
-The `file_type_to_name` dictionaries have thus been extensively modified to reflect this change.
+A :class:`Workspace2` is the single source of truth for **where every
+pipeline output lives on disk**.  It maps *(channel, asset_type)* pairs to
+:class:`~ClearMap.IO.workspace_asset.Asset` objects, which know their path,
+format, and existence status and can read/write data directly.
 
-The workspace is now based on a collection of Asset objects that handle the data themselves.
-The workspace is now also fully stateful.
+Key concepts
+------------
 
-The "debug" mode is now a context manager that supports different contexts and is not restricted to debug mode.
+Channels
+    A channel is a named acquisition stream (e.g. ``'cfos'``,
+    ``'autofluorescence'``).  Each channel has a *content type*
+    (``'nuclei'``, ``'vessels'``, …) that determines which pipeline applies.
+    See :data:`~ClearMap.IO.assets_constants.CONTENT_TYPE_TO_PIPELINE`.
+
+Asset types
+    Each step in a pipeline produces a named asset type: ``'raw'``,
+    ``'stitched'``, ``'resampled'``, ``'cells'``, ``'density'``, etc.
+    Sub-types (e.g. ``'cells_raw'``, ``'cells_filtered'``) refine the step
+    further.  The full registry is
+    :data:`~ClearMap.IO.assets_constants.CHANNELS_ASSETS_TYPES_CONFIG`.
+
+Resource layout
+    Assets are stored under the experiment root according to a
+    *resource type → sub-folder* mapping
+    (:data:`~ClearMap.IO.assets_constants.RESOURCE_TYPE_TO_FOLDER`).
+    The layout can be customised per-workspace via
+    :meth:`Workspace2.sync_resource_type_to_folder`.
+
+State (debug mode)
+    The workspace has a :attr:`Workspace2.debug` flag managed by a
+    :class:`~ClearMap.IO.assets_specs.StateManager` context manager.  When
+    set, asset paths automatically point to a debug sub-tree so test runs
+    never overwrite production data.
+
+Persistence
+    :meth:`Workspace2.to_yaml` / :meth:`Workspace2.from_yaml` serialise and
+    restore the full workspace layout — channel specs, asset type definitions,
+    and the resource-type-to-folder mapping — without touching the data files
+    themselves.
+
+Typical usage
+-------------
+Workspaces are normally created and managed by
+:class:`~ClearMap.pipeline_orchestrators.sample_info_management.SampleManager`.
+Advanced users who want direct access::
+
+    from ClearMap.IO.workspace2 import Workspace2
+
+    ws = Workspace2.from_yaml('/path/to/experiment/workspace.yml')
+
+    # Retrieve an asset and check whether it exists
+    stitched = ws.get('stitched', channel='cfos')
+    if stitched.exists:
+        data = stitched.read()       # returns a numpy array / Source
+
+    # Retrieve a tiled raw dataset
+    raw = ws.get('raw', channel='cfos')
+    if raw.is_tiled:
+        print(raw.tile_grid_shape)   # e.g. {'X': 3, 'Y': 4}
+        print(raw.file_list[:3])     # first few tile paths
+
+    # Add a new channel programmatically
+    ws.add_raw_data(
+        file_path='raw/cfos_<X,2>_<Y,2>.tif',
+        channel_id='cfos',
+        data_content_type='nuclei',
+    )
+
+    # Inspect the workspace
+    print(ws.info())
+
+See also
+--------
+:mod:`ClearMap.IO.workspace_asset` : Asset, TiledAsset, StackedAsset classes.
+:mod:`ClearMap.IO.assets_constants` : Asset type registry and resource layout defaults.
+:mod:`ClearMap.IO.assets_specs` : TypeSpec, ChannelSpec, StateManager.
+:class:`~ClearMap.pipeline_orchestrators.sample_info_management.SampleManager` :
+    High-level manager that creates and reconciles the workspace from config.
 """
+from __future__ import annotations
+
+import itertools
 import os
+import re
 import warnings
 from copy import deepcopy
 from pathlib import Path
+from typing import List, Iterator, Sequence, Optional, Iterable
 
 import numpy as np
 
-from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE, CHANNELS_ASSETS_TYPES_CONFIG, RESOURCE_TYPE_TO_FOLDER
-from ClearMap.IO.assets_specs import ChannelSpec, TypeSpec, StateManager
+from ClearMap.IO.assets_constants import (CONTENT_TYPE_TO_PIPELINE, CHANNELS_ASSETS_TYPES_CONFIG, RESOURCE_TYPE_TO_FOLDER,
+                                          PIPELINE_NAMES)
+from ClearMap.IO.assets_specs import ChannelSpec, TypeSpec, StateManager, ChannelId
+from ClearMap.config.compound_keys import compound_channel_parts, channel_file_name_token
 from ClearMap.IO.workspace_asset import Asset, AssetCollection
-from ClearMap.Utils.exceptions import AssetNotFoundError, ClearMapWorkspaceError, ClearMapAssetError, \
-    MissingChannelError
+from ClearMap.Utils.exceptions import (ClearMapWorkspaceError, ClearMapAssetError, MissingChannelError,
+                                       MissingAssetError, ClearMapValueError)
 from ClearMap.Utils.utilities import substitute_deprecated_arg, handle_deprecated_args, get_ok_n_ok_symbols
 
+SCHEMA_V_STR = 'clearmap_workspace_v2'
 
-def create_assets_types_config(type_spec_dict):
+
+def _build_asset_types(type_spec_dict: dict, resource_type_to_folder: dict) -> dict[str, TypeSpec]:
+    """
+    Convert the config dict (CHANNELS_ASSETS_TYPES_CONFIG) into
+    concrete TypeSpec objects, using the given resource_type_to_folder
+    mapping and auto-creating flattened subtypes.
+    """
     assets_types_config = {}
     for name, spec in type_spec_dict.items():
         instance = TypeSpec(resource_type=spec.get('resource_type'),
@@ -37,20 +120,26 @@ def create_assets_types_config(type_spec_dict):
                             sub_types=spec.get('sub_types'),
                             basename=spec.get('basename', ''),
                             file_format_category=spec.get('file_format_category'),
+                            resource_type_to_folder=resource_type_to_folder,
                             relevant_pipelines=spec.get('relevant_pipelines'),
+                            sub_folder=spec.get('sub_folder'),
+                            compression_algorithms=spec.get('compression_algorithms'),
+                            checksum_algorithm=spec.get('checksum_algorithm'),
                             extensions=spec.get('extensions'))
         assets_types_config[name] = instance
 
     subtypes = {}
     for name, spec in assets_types_config.items():
-        for subtype in spec.sub_types.keys():  # Create subtypes
-            if f'{name}_{subtype}' not in assets_types_config:
-                subtypes[f'{name}_{subtype}'] = spec.get_sub_type(subtype)
+        for st_name in list(spec.sub_types.keys()):  # Create subtypes
+            key = f'{name}_{st_name}'
+            if key not in assets_types_config:
+                st_value = spec.sub_types[st_name]
+                if st_value is not None and not isinstance(st_value, (TypeSpec, dict)):
+                    raise ClearMapValueError(f'Type not supported for {key}, got {type(st_value)}')
+                # None inherits the parent format, a dict carries its own overrides
+                # (e.g. cells.bkg is an image, not a table), a TypeSpec is used as is
+                subtypes[key] = spec.get_sub_type(st_name)
     return {**assets_types_config, **subtypes}
-
-
-CHANNEL_ASSETS_TYPES = create_assets_types_config(CHANNELS_ASSETS_TYPES_CONFIG)
-
 
 
 class Workspace2:  # REFACTOR: subclass dict
@@ -71,26 +160,24 @@ class Workspace2:  # REFACTOR: subclass dict
     sample_id: str
         The id of the sample. This must be unique for each sample
         within an experiment.
-    default_channel: int
-        The default channel to use when no channel is specified.
-    current_channel: int
-        The channel currently in use.
     status_manager: ClearMap.IO.assets_specs.StateManager
         A context manager to handle the workspace state (e.g. debug mode).
     """
-    def __init__(self, directory, default_channel=None, sample_id=None):
-        self.directory = directory
+    def __init__(self, directory: str | Path, *, sample_id: str | None = None,
+                 resource_type_to_folder: dict | None = None, assets_types_config: dict | None = None):
+        self._directory = directory
         self.sample_id = sample_id
+
+        self.resource_type_to_folder = deepcopy(RESOURCE_TYPE_TO_FOLDER)
+        if resource_type_to_folder:
+            self.resource_type_to_folder.update(resource_type_to_folder)
+
+        raw_config = deepcopy(assets_types_config or CHANNELS_ASSETS_TYPES_CONFIG)
+        self.asset_types = _build_asset_types(raw_config, self.resource_type_to_folder)
+
         self.asset_collections = {
             None: AssetCollection(self.directory, self.sample_id, None)  # Global assets
         }
-        if default_channel is not None:
-            warnings.warn('The default_channel argument is potentially dangerous.'
-                          'Please use with caution. For a safer way, use the channel argument'
-                          ' in the `get` method instead.')
-
-            self.default_channel = default_channel
-            self.current_channel = default_channel
 
         self.status_manager = StateManager()
 
@@ -102,6 +189,171 @@ class Workspace2:  # REFACTOR: subclass dict
             if v is not None:
                 out += f'{brackets[0]}{v}{brackets[1]}'
         return out
+
+    def __contains__(self, channel: ChannelId) -> bool:
+        return channel in self.asset_collections
+
+    def has_channels(self, channels: Iterable[ChannelId]) -> bool:
+        """
+        Whether all the given channels are in the workspace.
+
+        Parameters
+        ----------
+        channels : Iterable[ChannelId]
+            The channels to look for.
+
+        Returns
+        -------
+        bool
+            True if every channel is in the workspace (trivially True for no channels).
+        """
+        return all(channel in self for channel in channels)
+
+    def __len__(self) -> int:
+        """
+        Number of channels in the workspace (excluding global None).
+        Returns
+        -------
+        int
+            The number of channels in the workspace.
+        """
+        return sum(1 for k in self.asset_collections.keys() if k is not None)
+
+    def __iter__(self) -> Iterator[ChannelId]:
+        """
+        Iterate non global channel names in the workspace.
+        Returns
+        -------
+        Iterator[str]
+            An iterator over the channel names in the workspace.
+        """
+        return (k for k in self.asset_collections.keys() if k is not None)
+
+    def items(self):
+        return self.asset_collections.items()
+
+    def __getitem__(self, key):
+        """
+        ws[channel] -> AssetCollection
+
+        Raises
+        ------
+        MissingAssetError
+            If the channel is not in the workspace (also a KeyError, for the callers that catch it).
+        """
+        if key not in self:
+            raise self._unknown_channel_error(key)
+        return self.asset_collections[key]
+
+    def _unknown_channel_error(self, channel: ChannelId) -> MissingAssetError:
+        """The error to raise for a channel which is not in the workspace (single source of the message)"""
+        return MissingAssetError(f'Unknown channel "{channel}". Available channels: {list(self.channels)}. '
+                                 f'A sample channel joins the workspace once its config is complete (path and '
+                                 f'data type); a compound channel must be registered (ensure_pipeline) before use.')
+
+    def _iter_channel_specs(self) -> list[ChannelSpec]:
+        specs = []
+        for ch_id, col in self.asset_collections.items():
+            if ch_id is None:
+                continue
+            if col.channel_spec not in specs:
+                specs.append(col.channel_spec)
+        return specs
+
+    @property
+    def directory(self) -> str:
+        return self._directory
+
+    @directory.setter
+    def directory(self, value: str | Path):
+        old = self._directory
+        new = str(Path(value).resolve())
+        if old != new:  # Update and propagate to assets if changed
+            self._directory = new
+            for collection in self.asset_collections.values():
+                collection.base_directory = new
+                for asset in collection.assets.values():
+                    asset.base_directory = Path(new)
+
+    def to_dict(self) -> dict:
+        """
+        Serialize the logical structure of the workspace:
+        - workspace metadata (directory, sample_id)
+        - resource_type -> folder layout
+        - asset type specs (including subfolders)
+        - channels (names, content_type, number)
+        """
+        asset_types_dict = {name: spec.to_dict()
+                            for name, spec in self.asset_types.items()}
+
+        channels_dict = [ch.to_dict() for ch in self._iter_channel_specs()]
+
+        return {
+            'schema': 'clearmap_workspace_v2',
+            'directory': str(self.directory),
+            'sample_id': self.sample_id,
+            'resource_type_to_folder': dict(self.resource_type_to_folder),
+            'asset_types': asset_types_dict,
+            'channels': channels_dict,
+        }
+
+    def to_yaml(self, path: str | Path):
+        import yaml
+        path = Path(path)
+        with path.open('w', encoding='utf-8') as f:
+            yaml.safe_dump(self.to_dict(), f, sort_keys=False)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Workspace2":
+        """
+        Rebuild a workspace *layout* from a dict produced by to_dict().
+        """
+        schema = data.get('schema')
+        if schema not in (None, SCHEMA_V_STR):
+            raise ValueError(f"Unsupported workspace schema {schema}")
+
+        types_cfg = data.get('asset_types')
+
+        # Create instance with injected layout, but we’ll overwrite asset_types after
+        ws = cls(
+            directory=data['directory'],
+            sample_id=data.get('sample_id'),
+            # 'default_channel' (older workspace files) is ignored: the channel is always explicit
+            resource_type_to_folder=(data.get('resource_type_to_folder')),
+            assets_types_config=types_cfg,
+        )
+
+        # Re-hydrate asset types from the dict (using same layout)
+        ws.asset_types = {
+            name: TypeSpec.from_dict(spec_dict)
+            for name, spec_dict in types_cfg.items()
+        }
+
+        # Recreate channels
+        for ch_data in data.get('channels', []):
+            ch_spec = ChannelSpec.from_dict(ch_data)
+            ws._add_channel(ch_spec, sample_id=ws.sample_id)
+
+        return ws
+
+    @classmethod
+    def from_yaml(cls, path: str | Path) -> "Workspace2":
+        import yaml
+        path = Path(path)
+        with path.open('r', encoding='utf-8') as f:
+            data = yaml.safe_load(f)
+        return cls.from_dict(data)
+
+    def set_sample_id(self, sample_id: str):
+        """Set the sample id for the workspace and all its asset collections."""
+        self.sample_id = sample_id
+        for collection in self.asset_collections.values():
+            collection.sample_id = sample_id
+
+    def raw(self, channel: str):
+        """Convenience: return the raw Asset for a channel, or None."""
+        assets_collection = self.asset_collections.get(channel)
+        return None if assets_collection is None else assets_collection.get('raw')
 
     @property
     def debug(self):
@@ -133,8 +385,24 @@ class Workspace2:  # REFACTOR: subclass dict
         return self.get(asset_type, channel=channel, **kwargs).create_debug(slicing, debug)
 
     @property
-    def channels(self):
+    def channels(self):  # FIXME: check if we should exclude None
         return list(self.asset_collections.keys())
+
+    def prune_missing_channels(self, desired_channels: List[str]):
+        desired_channels = set(desired_channels)
+        for channel in self.channels:
+            if channel is None:  # Keep global assets
+                continue
+            elif channel not in desired_channels:
+                channel_spec = self[channel].channel_spec
+                if channel_spec.is_simple_channel():  # Simple channels -> direct removal
+                    self.asset_collections.pop(channel)
+                elif channel_spec.is_compound():  # Compound channels -> check components
+                    channels = compound_channel_parts(channel)
+                    has_obsolete_components = any([c not in desired_channels for c in channels])
+                    if has_obsolete_components:
+                        self.asset_collections.pop(channel)
+
 
     def add_raw_data(self, file_path, channel_id=None,
                      data_content_type=None, sample_id=None):
@@ -161,31 +429,296 @@ class Workspace2:  # REFACTOR: subclass dict
         else:
             raise ClearMapWorkspaceError('A raw dataset cannot be added without a'
                                          ' channel_id and a data_content_type.')
-        if channel_id in self.asset_collections.keys():
+        if channel_id in self:
             raise ClearMapWorkspaceError(f'Channel {channel_id} already exists in the workspace.'
                                          f'Use update_raw_data explicitly instead.')
         self.asset_collections[channel_id] = (
             AssetCollection(self.directory, sample_id, channel_spec))
-        raw_asset = Asset(self.directory, deepcopy(CHANNEL_ASSETS_TYPES['raw']),
+        raw_asset = Asset(self.directory, deepcopy(self.asset_types['raw']),
                           channel_spec,
                           expression=file_path, sample_id=sample_id,
                           status_manager=self.status_manager)
         self.add_asset(raw_asset)
 
+        self.update_pipeline_assets(channel_spec, data_content_type, sample_id)
+
+    def update_pipeline_assets(self, channel_spec: ChannelSpec, data_content_type: str | None,
+                               sample_id: str | None):
         pipelines = [CONTENT_TYPE_TO_PIPELINE[data_content_type]]
         # if raw_asset.is_expression:
 
-        # FIXME: this shouldn't be the case for just stacking
         pipelines.append('stitching')  # WARNING: We need the "stitched" asset even for file conversion
 
-        for name, spec in CHANNEL_ASSETS_TYPES.items():
+        for name, spec in self.asset_types.items():
             if any(p in pipelines for p in spec.relevant_pipelines):
                 self.create_asset(spec, channel_spec, sample_id=sample_id)
 
-    def add_channel(self, channel_spec, sample_id=''):
+    def update_raw_path(self, channel, expression):
+        """
+        Ensure that a 'raw' asset exists for `channel` and has the given expression.
+
+        Cases
+        -----
+        - Channel absent from asset_collections:
+            -> raise MissingChannelError (caller should use add_raw_data)
+        - Channel present but no raw asset:
+            -> create a raw asset for the existing ChannelSpec
+        - Channel present and raw asset exists:
+            -> update its expression if it changed
+        """
+        if channel not in self.asset_collections:  # Missing completely
+            raise MissingChannelError(f'Channel "{channel}" does not exist in the workspace. '
+                                      f'Use add_raw_data to create a new channel.')
+
+        old_asset = self.raw(channel)
+
+        # Case 1: logical channel exists but no raw asset yet (e.g. after loading from YAML)
+        if old_asset is None:
+            collection = self[channel]
+            channel_spec = collection.channel_spec
+            if channel_spec is None:
+                raise MissingChannelError(f'Channel "{channel}" has no channel_spec in the workspace. '
+                                          f'Cannot create raw asset automatically.')
+
+            raw_type_spec = deepcopy(self.asset_types['raw'])
+            raw_asset = Asset(self.directory, raw_type_spec, channel_spec, expression=expression,
+                              sample_id=self.sample_id, status_manager=self.status_manager)
+            self.add_asset(raw_asset)
+            return
+
+        # Case 2: raw asset already exists → just update the expression if needed
+        if old_asset.expression != expression:
+            self.asset_collections[channel]['raw'] = old_asset.variant(expression=expression)
+
+    def sync_resource_type_to_folder(self, desired: dict | None, *, migrate: bool = False,
+                                     dry_run: bool = False, ) -> dict[str, tuple[Path, Path]]:
+        """
+        Synchronize this workspace's resource_type_to_folder with the new `desired` layout.
+        - If no new mapping or identical -> no-op.
+        - If mappings differ:
+            * Build a plan of directory moves (per resource_type).
+            * If `migrate=False` and any source dir exists, raise.
+            * If `dry_run=True`, return the plan but don't touch disk.
+            * Otherwise, rename/move the folders and update the mapping.
+
+        Returns
+        -------
+        dict[resource_type, (old_dir, new_dir)]
+            The directory-level migration plan (executed or planned).
+        """
+        if desired is None:
+            return {}
+
+        current = self.resource_type_to_folder
+        # Fast path: exact same object
+        if current is desired:
+            return {}
+        elif current == desired:  # If equality, ensure identity
+            self.resource_type_to_folder = desired
+            for ts in self.asset_types.values():
+                ts.resource_type_to_folder = self.resource_type_to_folder
+            return {}
+
+        root = Path(self.directory)
+
+        # Compute changes per resource_type
+        changed: dict[str, tuple[Path, Path]] = {}
+        for rtype, old_folder in current.items():
+            new_folder = desired.get(rtype, old_folder)
+            if old_folder != new_folder:
+                changed[rtype] = (root / old_folder, root / new_folder)
+
+        if dry_run:
+            return changed
+
+        any_source_exists = any(old_dir.exists() and old_dir != new_dir
+                                for (old_dir, new_dir) in changed.values())
+
+        if any_source_exists and not migrate:
+            raise ClearMapWorkspaceError('Changing resource_type_to_folder would affect existing on-disk folders. '
+                                         'Call sync_resource_type_to_folder(..., migrate=True) or dry_run=True to inspect the plan.')
+
+        # Migrate
+        for rtype, (old_dir, new_dir) in changed.items():
+            if not old_dir.exists() or old_dir == new_dir:
+                continue
+
+            new_dir.parent.mkdir(parents=True, exist_ok=True)
+
+            if not new_dir.exists():  # Just rename
+                old_dir.rename(new_dir)
+            else:  # Merge w error on name conflicts
+                for child in old_dir.iterdir():
+                    target = new_dir / child.name
+                    if target.exists():
+                        raise ClearMapWorkspaceError(f'Cannot migrate folder layout for resource_type={rtype}: '
+                                                     f'target already exists: {target}')
+                    child.rename(target)
+                try:
+                    old_dir.rmdir()  # Remove if now empty
+                except OSError:
+                    pass
+
+        # Now update mapping and rewire TypeSpecs to the workspace dict
+        current.clear()
+        current.update(desired)
+        for ts in self.asset_types.values():
+            # make sure all TypeSpecs point to the live mapping
+            ts.resource_type_to_folder = current
+
+        return changed
+
+    def _normalize_channel(self, channel: ChannelId) -> ChannelId:
+        # Convert list -> tuple, leave str/tuple intact
+        if isinstance(channel, list):
+            return tuple(channel)
+        return channel
+
+    def _is_compound(self, channel: ChannelId) -> bool:
+        """Whether `channel` is a compound id that can be permuted (at least 2 components)."""
+        parts = compound_channel_parts(channel)
+        return parts is not None and len(parts) > 1
+
+    def _permute_channels(self, channel: ChannelId) -> ChannelId:
+        if not self._is_compound(channel):
+            raise NotImplementedError(f'Channel permutation is only implemented for compound channels.')
+        return tuple(reversed(compound_channel_parts(channel)))
+
+    def ensure_channel(self, channel_id: ChannelId, channel_content_type: str,
+                       sample_id: str, permute_channels: bool):
+        channel = self._normalize_channel(channel_id)
+        sample_id = sample_id or self.sample_id
+        created = []
+
+        def _ensure_one(ch):
+            if ch not in self.asset_collections:
+                spec = ChannelSpec(ch, channel_content_type)
+                self._add_channel(spec, sample_id=sample_id)
+                return spec
+            return self[ch].channel_spec
+
+        # forward
+        created.append(_ensure_one(channel))
+
+        # optionally inverted
+        if permute_channels:
+            inv = self._permute_channels(channel)
+            if inv != channel:
+                created.append(_ensure_one(inv))
+
+        return created
+
+    def ensure_pipeline(self, pipeline_name: str, channel_id: ChannelId, sample_id: str,
+                        permute_channels: bool=False, create_channel: bool=False, channel_content_type: Optional[str] = None):
+        """
+        Ensure that the channel has the assets of the pipeline: only the missing ones are created,
+        the existing ones (e.g. parametrized registration assets) are kept. Idempotent.
+
+        create_channel=True also creates the channel if missing, which is meant for compound channels
+        only: the sample channels are added by the SampleManager (add_raw_data).
+        """
+        channel_id = self._normalize_channel(channel_id)  # FIXME: are we sure about that?
+        sample_id = sample_id or self.sample_id
+
+        if create_channel:
+            if channel_content_type is None:
+                raise ValueError("channel_content_type required when create_channel=True")
+            self.ensure_channel(channel_id, channel_content_type,
+                                sample_id=sample_id,
+                                permute_channels=permute_channels)
+
+        self.add_pipeline(pipeline_name, channel_id, sample_id=sample_id, missing_only=True)
+        if permute_channels:
+            inv = self._permute_channels(channel_id)
+            if inv != channel_id:
+                if inv not in self:
+                    raise MissingChannelError(f'Channel "{inv}" does not exist in the workspace.'
+                                              f'If you want to implicitly create it, set create_channel=True.')
+                self.add_pipeline(pipeline_name, inv, sample_id=sample_id, missing_only=True)
+
+
+    def adopt_compound_order(self, channel: tuple[str, ...]) -> list[tuple[Path, Path]]:
+        """
+        Make channel the only order of its parts in the workspace, for a compound channel whose parts
+        are an unordered set (see compound_keys.compound_channel_key): drop the registry entries of the
+        other orders (no file is deleted), and rename the files named in another order to the name of
+        channel (e.g. the TubeMap files named in the order of the sample config, before the parts were
+        sorted).
+
+        The files are renamed only if channel has none and exactly one other order has some: these are
+        then unambiguously the files of this compound. If channel has files, those of other orders are
+        left as they are, with a warning.
+
+        Parameters
+        ----------
+        channel: tuple[str, ...]
+            The registered compound channel.
+
+        Returns
+        -------
+        list[tuple[Path, Path]]
+            The (old, new) paths of the renamed files.
+
+        Raises
+        ------
+        ClearMapWorkspaceError
+            If channel has no files and several other orders have some, or if a new path exists.
+        """
+        channel = tuple(channel)
+        other_orders = [order for order in itertools.permutations(channel) if order != channel]
+        for order in other_orders:
+            self.asset_collections.pop(order, None)
+
+        directories = {Path(self.directory)}
+        for asset in self[channel].values():
+            directories.add(Path(self.directory) / asset.type_spec.directory)  # an absolute directory stays itself
+        orders_with_files = {order: files for order in other_orders
+                             if (files := self._files_named_after(order, directories))}
+        if not orders_with_files:
+            return []
+        if self._files_named_after(channel, directories):
+            warnings.warn(f'The compound channel {channel} has files, which are used. The files of the other orders '
+                          f'of its parts are left as they are (not used): '
+                          f'{sorted(path.name for files in orders_with_files.values() for path, _ in files)}.')
+            return []
+        if len(orders_with_files) > 1:
+            raise ClearMapWorkspaceError(f'The compound channel {channel} has no files, but several other orders of '
+                                         f'its parts have some: {sorted(orders_with_files)}. Cannot tell which ones '
+                                         f'to rename to the name of {channel}: please keep the files of only one.')
+        (old_order, files), = orders_with_files.items()
+        new_token = channel_file_name_token(channel)
+        renamed = []
+        for path, match in files:
+            new_path = path.with_name(f'{match["lead"]}{new_token}{match["rest"]}')
+            if new_path.exists():
+                raise ClearMapWorkspaceError(f'Cannot rename {path} to {new_path}: the target exists.')
+            path.rename(new_path)
+            renamed.append((path, new_path))
+        warnings.warn(f'Renamed the files of the compound channel {old_order} to the order of {channel}:\n' +
+                      '\n'.join(f'    {old.name} -> {new.name}' for old, new in renamed))
+        return renamed
+
+    def _files_named_after(self, channel: tuple[str, ...], directories) -> list[tuple[Path, re.Match]]:
+        """
+        The files (and folders) of directories whose name is an asset name of channel:
+        ``[<status>_][<sample_id>_]<channel token>_<rest>``
+        """
+        sample_prefix = f'{self.sample_id}_' if self.sample_id else ''
+        pattern = re.compile(rf'(?P<lead>(?:[A-Za-z0-9]+_)?{re.escape(sample_prefix)})'
+                             rf'{re.escape(channel_file_name_token(channel))}(?P<rest>_.+)')
+        files = []
+        for directory in directories:
+            if directory.is_dir():
+                for path in sorted(directory.iterdir()):
+                    if match := pattern.fullmatch(path.name):
+                        files.append((path, match))
+        return files
+
+    def _add_channel(self, channel_spec, sample_id=''):
         self.asset_collections[channel_spec.name] = AssetCollection(self.directory, sample_id, channel_spec)
 
-    def add_pipeline(self, pipeline_name, channel_id=None, **kwargs):
+    def add_pipeline(self, pipeline_name: str, channel_id: Optional[str | Sequence[str]] = None, *,
+                     missing_only: bool = False, **kwargs):
         """
         Add a pipeline to the workspace. This implies creating the corresponding assets
         for the given channel and pipeline.
@@ -194,22 +727,25 @@ class Workspace2:  # REFACTOR: subclass dict
         ----------
         pipeline_name: str
             The name of the pipeline to add.
-        channel_id: str | None
+        channel_id: str | Sequence[str] | None
             The channel id to use for the asset.
+        missing_only: bool
+            Create only the assets the channel does not have yet (see ensure_pipeline),
+            instead of (re)creating them all.
         """
-        if channel_id not in self.asset_collections:
+        if channel_id not in self:
             raise MissingChannelError(f'Channel "{channel_id}" does not exist in the workspace.'
                                       f'Use add_raw_data to create a new channel.')
-        if pipeline_name not in CONTENT_TYPE_TO_PIPELINE.values():
+        if pipeline_name not in PIPELINE_NAMES:
             raise ClearMapWorkspaceError(f'Pipeline {pipeline_name} does not exist in the workspace.')
 
         if 'sample_id' in kwargs:
             sample_id = kwargs.pop('sample_id')
         else:
             sample_id = self.get('raw', channel_id).sample_id
-        channel_spec = self.asset_collections[channel_id].channel_spec
-        for name, spec in CHANNEL_ASSETS_TYPES.items():
-            if pipeline_name in spec.relevant_pipelines:
+        channel_spec = self[channel_id].channel_spec
+        for name, spec in self.asset_types.items():
+            if pipeline_name in spec.relevant_pipelines and not (missing_only and name in self[channel_id]):
                 self.create_asset(spec, channel_spec, sample_id=sample_id)
 
     def add_asset(self, asset):
@@ -224,9 +760,9 @@ class Workspace2:  # REFACTOR: subclass dict
             The asset to add.
         """
         channel = asset.channel_spec.name if asset.channel_spec is not None else None
-        if channel not in self.asset_collections:
+        if channel not in self:
             self.asset_collections[channel] = AssetCollection(self.directory, self.sample_id, asset.channel_spec)
-        self.asset_collections[channel].add_asset(asset=asset)
+        self[channel].add_asset(asset=asset)
 
     def create_asset(self, type_spec, channel_spec=None, sample_id=None):
         """
@@ -253,7 +789,16 @@ class Workspace2:  # REFACTOR: subclass dict
         self.add_asset(asset)
         return asset
 
-    def get(self, asset_type, channel='current',
+    def rename_channel(self, old_name, new_name):
+        if old_name in self:
+            asset_collection = self.asset_collections.pop(old_name)
+            asset_collection.channel_spec.name = new_name
+            self.asset_collections[new_name] = asset_collection
+            name_map = {old_name: new_name}
+            # REFACTOR: that should be automatic on the ChannelSpec level
+            ChannelSpec.channel_names[:] = [name_map.get(n, n) for n in ChannelSpec.channel_names]
+
+    def get(self, asset_type, channel,
             asset_sub_type=None, sample_id=None,
             extension=None, version=None,
             status=None, debug=None,
@@ -294,16 +839,14 @@ class Workspace2:  # REFACTOR: subclass dict
         suffix: str
             The suffix of the asset name. This is to be used for assets where the subtype is
             dynamic.
+        default: Any
+            For an unknown asset type: 'closest' (the default) uses the closest asset type,
+            anything else (e.g. None) is returned. An unknown channel always raises.
 
         Returns
         -------
         Asset object (or subclass)
         """
-
-        if channel == 'current':
-            channel = self.current_channel
-        elif channel == 'default':
-            channel = self.default_channel
 
         if isinstance(channel, list):
             channel = tuple(channel)  # Make sure it is hashable
@@ -321,22 +864,24 @@ class Workspace2:  # REFACTOR: subclass dict
 
         if asset_sub_type and not suffix:
             asset_type += f'_{asset_sub_type}'
-        if channel not in self.asset_collections and isinstance(channel, tuple):
-            channel = ('-'.join(channel)).lower()  # Try string version if tuple version not found
+        if channel not in self:  # Never guessed: another channel's asset would be silently wrong data
+            raise self._unknown_channel_error(channel)
 
-        if asset_type in self.asset_collections[channel]:
-            asset = self.asset_collections[channel][asset_type]
+        if asset_type in self[channel]:
+            asset = self[channel][asset_type]
         else: # asset is somehow None
             if default == 'closest':
                 warnings.warn('No exact match found. Using partial matching from start.')
                 asset = self.get_closest_matching_asset(asset_type, channel)
             else:
                 return default
-        if sample_id or extension or version:  # FIXME: subdirectory
+        if sample_id or extension or version or suffix:  # FIXME: subdirectory
+            # WARNING: call variant(...) w/ kwargs only
             if suffix:
-                asset = asset.variant(sample_id, asset_sub_type, extension, version, sub_type=suffix)
+                asset = asset.variant(sample_id=sample_id, extension=extension, version=version,
+                                      sub_type=suffix)  # FIXME: suffix should be different from asset_sub_type
             else:
-                asset = asset.variant(sample_id, extension, version)
+                asset = asset.variant(sample_id=sample_id, extension=extension, version=version)
         return asset
 
     def get_closest_matching_asset(self, asset_type, channel=None):  # FIXME: compound keys
@@ -359,18 +904,19 @@ class Workspace2:  # REFACTOR: subclass dict
         -------
         Asset object
         """
-        if '*' in asset_type or '?' in asset_type:
+        if '*' in asset_type or '?' in asset_type:  # Regex style matching
             import fnmatch
-            matching_types = [k for k in self.asset_collections[channel].keys() if fnmatch.fnmatch(k, asset_type)]
-        else:
-            matching_types = [k for k in self.asset_collections[channel].keys() if k.startswith(asset_type)]
+            matching_types = [k for k in self[channel].keys() if fnmatch.fnmatch(k, asset_type)]
+        else:  # Prefix style matching
+            matching_types = [k for k in self[channel].keys() if k.startswith(asset_type)]
+
         if len(matching_types) == 0:
-            raise KeyError(f'No asset of type "{asset_type}" found in workspace.')  # FIXME: ClearMapKeyError
+            raise MissingAssetError(f'No asset of type "{asset_type}" found in workspace.')
         elif len(matching_types) == 1:
-            asset = self.asset_collections[matching_types[0]]
+            asset = self[channel][matching_types[0]]
         else:
-            raise AssetNotFoundError(f'Multiple assets of type {asset_type} found in workspace '
-                                     f'({matching_types}). Could not pick one.')
+            raise ClearMapWorkspaceError(f'Multiple assets of type {asset_type} found in workspace '
+                                         f'({matching_types}). Could not pick one.')
         return asset
 
     @handle_deprecated_args({'prefix': 'sample_id', 'postfix': 'asset_sub_type'})
@@ -461,12 +1007,14 @@ class Workspace2:  # REFACTOR: subclass dict
 
     def load(self, file_path):
         """Loads the workspace configuration from disk"""
+        warnings.warn(f'The load method is deprecated. Use Workspace2.from_yaml or Workspace2.from_dict instead.')
         d = np.load(file_path)[0]
         self.__dict__.update(d)
 
     def save(self, file_path):
         """Saves the workspace configuration to disk"""
         # prevent np to add .npy to a .workspace file
+        warnings.warn(f'The save method is deprecated. Use Workspace2.to_yaml or Workspace2.to_dict instead.')
         with open(file_path, "wb") as fid:
             np.save(fid, [self.__dict__])
 
@@ -481,16 +1029,16 @@ class Workspace2:  # REFACTOR: subclass dict
 
         ok_symbol, n_ok_symbol = get_ok_n_ok_symbols()
 
-        len_dirtype = max([len(k) for k in RESOURCE_TYPE_TO_FOLDER.keys()])
-        for resource_type, folder in RESOURCE_TYPE_TO_FOLDER.items():
+        len_dirtype = max([len(k) for k in self.resource_type_to_folder.keys()])
+        for resource_type, folder in self.resource_type_to_folder.items():
             out += f'  [{resource_type : >{len_dirtype}}]: {folder}\n'
 
         out += 'assets:\n'
 
-        len_f_type = max([len(k) for k in CHANNELS_ASSETS_TYPES_CONFIG.keys()])
+        len_f_type = max([len(k) for k in self.asset_types.keys()])
         header = f'  [{{:{len_dirtype}}}] {{:{len_f_type}}}'
 
-        for channel, assets_collection in self.asset_collections.items():
+        for channel, assets_collection in self.items():
             out += f'  Channel: {channel}\n'
             for asset_type, asset in assets_collection.items():
                 asset.header = header
@@ -508,8 +1056,7 @@ class Workspace2:  # REFACTOR: subclass dict
 
 
 def test_context_manager():
-    ws = Workspace2(default_channel='auto')
-    print(ws.default_channel)
+    ws = Workspace2('/tmp/test_workspace')
     print(ws.debug)
     with ws.status_manager():
         print(ws.debug)
@@ -540,17 +1087,16 @@ def setup_test_workspace(tmp_path):
 def test_asset_creation():
     test_dir = Path('/tmp/test_workspace')
     setup_test_workspace(test_dir)
-    ws = Workspace2(directory=test_dir,
-                    default_channel='auto')
+    ws = Workspace2(directory=test_dir)
     auto_expr = '220324_auto_17-34-31/17-34-31_auto_Blaze_C00_xyz-Table Z<Z4>.ome.tif'
     raw_expr = '220324_fos_15-07-15/15-07-15_fos_Blaze[<Y2> x <X2>]_C00.ome.tif'
     ws.add_raw_data(auto_expr, channel_id='auto', data_content_type='reference')  # FIXME:
     ws.add_raw_data(raw_expr, channel_id='cfos', data_content_type='nuclei')
-    assert ws.get('raw').channel_spec.name == 'auto'
+    assert ws.get('raw', 'auto').channel_spec.name == 'auto'
     print(ws.asset_collections)
     raw_asset = ws.get('raw', 'cfos')
     if raw_asset.is_tiled:
-        print(raw_asset.file_list[:min(raw_asset.n_tiles, 10)])
+        print(raw_asset.file_list[:min(raw_asset.n_files_present, 10)])
     assert raw_asset.channel_spec.name == 'cfos'
     assert raw_asset.expression.string() == raw_expr, print(f'Expressions do not match: {raw_asset.expression} != {raw_expr}')
 

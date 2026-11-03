@@ -29,7 +29,7 @@
    <item>
     <widget class="QToolBox" name="toolBox_3">
      <property name="currentIndex">
-      <number>1</number>
+      <number>0</number>
      </property>
      <widget class="QWidget" name="atlasSettingsPage">
       <property name="geometry">
@@ -87,6 +87,21 @@
           <enum>QFrame::Raised</enum>
          </property>
          <layout class="QHBoxLayout" name="horizontalLayout_16">
+          <property name="spacing">
+           <number>2</number>
+          </property>
+          <property name="leftMargin">
+           <number>2</number>
+          </property>
+          <property name="topMargin">
+           <number>2</number>
+          </property>
+          <property name="rightMargin">
+           <number>2</number>
+          </property>
+          <property name="bottomMargin">
+           <number>2</number>
+          </property>
           <item>
            <widget class="QSpinBox" name="spinBox_31">
             <property name="readOnly">
@@ -190,7 +205,25 @@
          </item>
         </widget>
        </item>
-       <item row="3" column="0" colspan="2">
+       <item row="3" column="0">
+        <widget class="QLabel" name="referenceChannelLabel">
+         <property name="toolTip">
+          <string>The channel aligned with the atlas. The other channels are aligned with it by default.</string>
+         </property>
+         <property name="text">
+          <string>Reference channel</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <widget class="QComboBox" name="referenceChannelComboBox">
+         <property name="toolTip">
+          <string>The channel aligned with the atlas (by default the autofluorescence channel).
+__UNDECIDED__: to choose. None: no channel is aligned with the atlas.</string>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="0" colspan="2">
         <widget class="QPushButton" name="registrationGoToSampleOrientationPushButton">
          <property name="text">
           <string>Go to sample orientation</string>

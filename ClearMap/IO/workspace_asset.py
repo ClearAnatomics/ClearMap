@@ -1,24 +1,89 @@
 """
-Asset
-=====
+workspace_asset
+===============
 
-This module implements the Asset class that is used to represent the files and folders of a workspace.
+On-disk asset model for ClearMap workspaces.
 
-The Asset class can represent Sources in which case it wraps the IO functions to read and write the data.
-It is however not limited to Sources and can represent any file or folder of the workspace.
-It also includes the following features:
+Concepts
+--------
 
-* awareness of the content type (e.g. nuclei, veins, arteries, cells, axons, ...) and hence the algorithms applicable.
-* awareness of the resource type (e.g. data, results, graphs, ...) and hence the sub folder to store the asset in.
-* Transparent compression and decompression
-* alternate extensions.
-* checksums
-* alternate file names (shortcuts)
+**Asset**
+    A single logical file or folder that belongs to a processing pipeline step.
+    Assets can be but are not limited to Sources.
+    An :class:`Asset` knows its location on disk, its format, which pipeline it
+    belongs to, and whether it currently exists.  It wraps the ClearMap IO layer
+    so callers can do ``asset.read()``, ``asset.write(data)``, or
+    ``asset.as_source()`` without caring about the underlying format.
+    Assets also transparently implement:
+    * awareness of the content type (e.g. nuclei, veins, arteries, cells, axons, ...) and hence the algorithms applicable.
+    * awareness of the resource type (e.g. data, results, graphs, ...) and hence the sub folder to store the asset in.
+    * Transparent compression and decompression
+    * alternate extensions.
+    * checksums
+    * alternate file names (shortcuts)
 
-In the future, it will also include:
+**TypeSpec** (defined in :mod:`ClearMap.IO.assets_specs`)
+    Describes a *kind* of asset independent of any channel — its resource type
+    (``'raw'``, ``'processed'``, ``'results'``, …), allowed file extensions, the
+    relevant pipelines, and optional sub-types (e.g. ``cells_raw``,
+    ``cells_filtered``).  One ``TypeSpec`` instance is shared across all channels
+    that have that step.
 
-* status (debug, ...)
-* list of parent assets with the parametrised function to generate them
+**ChannelSpec** (defined in :mod:`ClearMap.IO.assets_specs`)
+    Describes a *channel* independent of any step — its name (e.g.
+    ``'cfos'``), content type (``'nuclei'``, ``'autofluorescence'``, …), and
+    ordinal index.  The content type determines which pipeline applies, via the
+    mapping in :mod:`ClearMap.IO.assets_constants`.
+
+**Asset type registry** (:data:`~ClearMap.IO.assets_constants.CHANNELS_ASSETS_TYPES_CONFIG`)
+    The canonical dictionary that lists every known asset type (``'raw'``,
+    ``'stitched'``, ``'cells'``, ``'density'``, …) together with its
+    ``TypeSpec`` parameters.  :class:`~ClearMap.IO.workspace2.Workspace2`
+    reads this dictionary at construction time and builds the full set of
+    ``TypeSpec`` objects for the experiment.
+
+**Resource type → folder mapping** (:data:`~ClearMap.IO.assets_constants.RESOURCE_TYPE_TO_FOLDER`)
+    Controls where each resource type lives under the experiment root.
+    ``'raw'`` and ``'elastix'`` default to the root directory; ``'results'``,
+    ``'graphs'``, etc. go into sub-folders.  Advanced users can override this
+    mapping per-workspace via
+    :meth:`~ClearMap.IO.workspace2.Workspace2.sync_resource_type_to_folder`.
+
+**AssetCollection**
+    Groups all assets that belong to a single channel into one dict-like object.
+    A :class:`~ClearMap.IO.workspace2.Workspace2` holds one
+    :class:`AssetCollection` per channel (plus a global one keyed ``None`` for
+    logs and other non-channel assets).
+
+Asset sub-classes
+-----------------
+:class:`Asset.__new__` inspects the expression pattern and promotes the
+instance to the most specific subclass automatically:
+
+* :class:`TiledAsset` — expression contains ``<X…>`` and/or ``<Y…>`` tags
+  (2-D tile grid, e.g. light-sheet mosaic acquisitions).
+* :class:`StackedAsset` — expression contains only a ``<Z…>`` tag
+  (single z-stack stored as individual planes).
+* :class:`ExpressionAsset` — any other tagged expression (parent class of the
+  two above; also used directly for non-spatial series).
+* :class:`Asset` — plain file or folder, no expression tags.
+
+Typical usage
+-------------
+Assets are normally obtained through the workspace, not constructed directly::
+
+    ws = Workspace2('/path/to/experiment')
+    raw  = ws.get('raw',      channel='cfos')
+    stitched = ws.get('stitched', channel='cfos')
+
+    if raw.is_tiled:
+        print(raw.file_list[:5])      # list of matching files on disk
+        print(raw.tile_grid_shape)    # e.g. {'X': 3, 'Y': 4}
+
+    if stitched.exists:
+        data = stitched.read()        # returns numpy array
+    else:
+        print(stitched.path)          # where it will be written
 
 .. todo::
     * Add support for status (debug, ...) link workspace status to asset status
@@ -34,25 +99,52 @@ __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
-import copy
+import math
 import os
 import warnings
 from copy import deepcopy
 from functools import cached_property
 from pathlib import Path
+from typing import Protocol, Sequence, runtime_checkable, Any, Optional
 
 import natsort
 import numpy as np
 
-from ClearMap.Analysis.graphs.graph_gt import Graph
-from ClearMap.Analysis.graphs.graph_gt import load as load_graph
-from ClearMap.IO import IO as clearmap_io
+from ClearMap.IO import source_geometry
+from ClearMap.IO import conversion, dispatch, io_ops
 from ClearMap.IO import FileUtils as file_utils
 from ClearMap.IO.assets_constants import CONTENT_TYPE_TO_PIPELINE
-from ClearMap.IO.assets_specs import TypeSpec, ChannelSpec, StateManager, SubTypeSpec
+from ClearMap.IO.assets_specs import TypeSpec, ChannelSpec, StateManager, ChannelId
+from ClearMap.config.compound_keys import channel_file_name_token
+from ClearMap.IO.source.backends import file_list_backend, registry
 from ClearMap.Utils.tag_expression import Expression
-from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
 from ClearMap.Utils.exceptions import ClearMapAssetError, AssetNotFoundError
+
+
+def expression_is_tiled(expression: Expression | str | None) -> bool:
+    """
+    Whether a raw data path expression describes tiles, i.e. has an X and/or a Y tag.
+
+    Parameters
+    ----------
+    expression : Expression | str | None
+        The path expression (e.g. ``'tiles/Ex_<Y,2>_<X,2>.tif'``).
+
+    Returns
+    -------
+    bool
+
+    Raises
+    ------
+    ValueError
+        If ``expression`` is a string that is not a valid tag expression.
+    """
+    if not expression:
+        return False
+    if isinstance(expression, str):
+        expression = Expression(expression)
+    tags = {t.lower() for t in expression.tag_names()}
+    return 'x' in tags or 'y' in tags
 
 
 class Asset:
@@ -88,13 +180,16 @@ class Asset:
         in different directories. The key is the extension and the value is the directory.
     """
 
-    def __new__(cls, *args, **kwargs):  # Used to optionally return an ExpressionAsset
+    def __new__(cls, *args, **kwargs):  # Promote to the most specific subclass possible
         instance = super(Asset, cls).__new__(cls)
         instance.__init__(*args, **kwargs)
         if instance.is_tiled:
             instance = super(Asset, cls).__new__(TiledAsset)
             instance.__init__(*args, **kwargs)
-        elif instance.is_expression:  # TODO: maybe separate ExpressionAsset and TiledAsset
+        elif instance.is_stacked:
+            instance = super(Asset, cls).__new__(StackedAsset)
+            instance.__init__(*args, **kwargs)
+        elif instance.is_expression:  # Default case for expression assets
             instance = super(Asset, cls).__new__(ExpressionAsset)
             instance.__init__(*args, **kwargs)
         return instance
@@ -176,6 +271,9 @@ class Asset:
         else:
             return f'{hdr_str}: no file\n'
 
+    def __fspath__(self):  # pathlike interface
+        return str(self.path)
+
     @property
     def expression(self):
         return self._expression or (self.type_spec.basename if self.type_spec.is_expression() else None)
@@ -210,7 +308,8 @@ class Asset:
         sub_type: str or TypeSpec
             The sub type of the asset. This is used to create a variant of the asset with
              a different type specification.
-            If a string, it should be a valid sub type name in the type specification.
+            If a string, the name of a sub type of this asset's type. It need not be declared
+            (dynamic sub types, e.g. ``counts_weighted_<weights_column>``), but the type must have sub types.
             If a TypeSpec, it will be used as the type specification for the variant.
 
         Returns
@@ -232,30 +331,21 @@ class Asset:
                 expression = self.expression
         if sub_type:
             if isinstance(sub_type, str):
-                type_spec = self.type_spec.sub_types.get(sub_type)
-                if not type_spec:  # Not part of standard sub_types
-                    if self.type_spec.sub_types:
-                        warnings.warn(f'The sub type "{sub_type}" is not defined. It will be created dynamically'
-                                      f'but we cannot guarantee that it will be correct.')
-                        template_sub_type_spec = list(self.type_spec.sub_types.values())[0]
-                        new_type_spec = SubTypeSpec(
-                            resource_type=template_sub_type_spec.resource_type,
-                            type_name=f'{self.type_spec.name}_{sub_type}',
-                            file_format_category=template_sub_type_spec.file_format_category,
-                            relevant_pipelines=self.type_spec.relevant_pipelines,
-                        )
-                        self.type_spec.sub_types[sub_type] = new_type_spec
-                    else:
-                        raise ValueError(f'sub_type "{sub_type}" not found in {self.type_spec.sub_types.keys()}'
-                                         f'and this type has no sub_types defined to copy.')
+                if not self.type_spec.sub_types:
+                    raise ValueError(f'sub_type "{sub_type}" requested but type "{self.type_spec.name}" '
+                                     f'has no sub_types.')
+                # Dynamic sub-types (e.g. counts_weighted_<weights_column>) are derived from the parent type
+                # exactly like the declared ones (see workspace2._build_asset_types)
+                type_spec = self.type_spec.get_sub_type(sub_type)
             elif isinstance(sub_type, TypeSpec):
                 type_spec = sub_type
             else:
                 raise ValueError(f'sub_type must be a string or a TypeSpec, got "{type(sub_type)}".')
         else:
-            type_spec = deepcopy(self.type_spec)
+            type_spec = self.type_spec
+        type_spec = deepcopy(type_spec)  # (Sub-)type specs are shared: the variant changes its own copy
         if not self.is_expression and extension:
-            type_spec.extensions = list(dict.fromkeys([extension] + self.type_spec.extensions))
+            type_spec.extensions = list(dict.fromkeys([extension] + type_spec.extensions))
         # WARNING: long list, should use keyword arguments
         return Asset(self.base_directory, type_spec, self.channel_spec, expression,
                      sample_id or self.sample_id, self.subdirectory, version or self.version,
@@ -263,10 +353,12 @@ class Asset:
 
     @property
     def name_parts(self):
+        return self._name_parts_for(self.channel_spec.name if self.channel_spec else None)
+
+    def _name_parts_for(self, channel: ChannelId | None, with_status: bool = True):
         if self.type_spec.is_expression():
             return [self.type_spec.basename]
-        parts = (self.status, self.sample_id,
-                 self.channel_spec.name if self.channel_spec else None,
+        parts = (self.status if with_status else None, self.sample_id, channel,
                  self.type_spec.name)  # WARNING: if only basename, no asset_sub_type
         return [part for part in parts if part]
 
@@ -281,6 +373,25 @@ class Asset:
         str
             The base name of the asset.
         """
+        return self.base_name_for(self.channel_spec.name if self.channel_spec else None)
+
+    def base_name_for(self, channel: ChannelId | None, with_status: bool = True) -> str:
+        """
+        The base name this asset would have for another channel (e.g. when its channel is renamed),
+        everything else being equal.
+
+        Parameters
+        ----------
+        channel : ChannelId | None
+            The channel (a tuple for a compound channel) to name the asset after.
+        with_status : bool
+            Whether to start the name with the status of the workspace (e.g. ``debug``), if it has one.
+
+        Returns
+        -------
+        str
+            The base name of the asset, see :attr:`base_name`.
+        """
         if isinstance(self.type_spec.basename, str) and self.type_spec.basename.startswith('/'):  # If absolute path, use basename
             name = self.type_spec.basename
         elif isinstance(self.type_spec.basename, Expression):
@@ -294,9 +405,9 @@ class Asset:
             name = self.expression.string()
         else:  # Otherwise, build the name
             name = ''
-            for part in self.name_parts:
+            for part in self._name_parts_for(channel, with_status):
                 if isinstance(part, (list, tuple)):  # channel could be a tuple for compound assets
-                    part = '-'.join(part)
+                    part = channel_file_name_token(part)
                 if Expression(part).tags:
                     part = Expression(part)  # FIXME: substitute None width tags
                     values = {}
@@ -398,6 +509,27 @@ class Asset:
             return Path(file_name)
         else:
             return self.directory / file_name
+
+    def available_sub_types(self) -> list[str]:
+        """
+        The sub-types of this asset that exist on disk.
+
+        Sub-types can be dynamic (e.g. ``counts_weighted_<weights_column>`` for ``density``), so they are not
+        necessarily registered in the type spec: the files are the source of truth.
+
+        Returns
+        -------
+        list[str]
+            The sorted sub-type names (e.g. ``['counts', 'counts_wcrust', 'intensities']``).
+        """
+        prefix = f'{self.base_name}_'
+        sub_types = set()
+        for ext in self.type_spec.extensions:
+            for path in self.directory.glob(f'{prefix}*{ext}'):
+                sub_type = path.name[len(prefix):-len(ext)]
+                if sub_type:  # '*' can match nothing: '<prefix>.tif' is not a sub-type
+                    sub_types.add(sub_type)
+        return sorted(sub_types)
 
     @property
     def existing_path(self):
@@ -505,10 +637,14 @@ class Asset:
 
     @property
     def is_tiled(self):
+        return expression_is_tiled(self.expression)
+
+    @property
+    def is_stacked(self):
         if not self.is_expression:
             return False
         tags = [t.lower() for t in self.expression.tag_names()]
-        return 'x' in tags or 'y' in tags
+        return len(tags) == 1 and tags[0] == 'z'
 
     @property
     def is_regular_file(self):
@@ -529,7 +665,7 @@ class Asset:
         -------
         bool
         """
-        return self.exists and file_utils.is_clearmap_source_extension(self.existing_extension)
+        return self.exists and registry.supports_extension(self.existing_extension)
 
     @property
     def checksum(self):
@@ -549,36 +685,48 @@ class Asset:
     def size(self):
         return self.path.stat().st_size
 
+    def open_ro(self, *args, **kwargs):
+        return io_ops.open_ro(self.existing_path, *args, **kwargs)
+
+    @property
+    def data_model(self):
+        """The data model of the backend handling this asset's file: 'array', 'table' or 'graph'."""
+        return dispatch.location_to_backend(self.path).source_class.data_model
+
     def read(self, *args, **kwargs):
-        if self.type_spec.extensions[0] == '.gt':
-            return load_graph(self.existing_path, *args, **kwargs)
-        else:
-            return clearmap_io.read(self.existing_path, *args, **kwargs)
+        return io_ops.read(self.existing_path, *args, **kwargs)
+
+    def edit(self, *args, **kwargs):
+        if self.data_model == 'graph':
+            # Graphs have no edit mode (they are written whole). Kept for compatibility:
+            # return the loaded graph; the caller saves it with asset.write(graph). or graph.save()
+            return self.read(*args, **kwargs)
+        return io_ops.edit(self.existing_path, *args, **kwargs)
 
     def write(self, data, *args, **kwargs):
-        if isinstance(data, Graph):
-            data.save(self.path)
-        else:
-            clearmap_io.write(self.path, data, *args, **kwargs)
+        io_ops.write(self.path, data, *args, **kwargs)
 
     def create(self, *args, **kwargs):
-        clearmap_io.create(self.path, *args, **kwargs)
+        io_ops.create(self.path, *args, **kwargs)
 
-    def as_source(self, slicing=None, *args, **kwargs):
-        return clearmap_io.source(self.existing_path, slicing=slicing, *args, **kwargs)
+    def as_source(self, slicing=None, *args, **kwargs):  # FIXME: delegate to ``edit``
+        return dispatch.as_source(self.existing_path, slicing=slicing, *args, **kwargs)
 
     def shape(self):
         if not self.is_expression:
-            return clearmap_io.shape(self.existing_path)
+            return source_geometry.shape(self.existing_path)
 
     def dtype(self):
         if self.is_existing_source and not self.is_expression:
-            return clearmap_io.dtype(self.existing_path)
+            return source_geometry.dtype(self.existing_path)
 
     def convert(self, new_extension, processes=None, verbose=False, **kwargs):
         if self.is_existing_source:
-            clearmap_io.convert(self.existing_path, self.with_extension(new_extension),
-                                processes=processes, verbose=verbose, **kwargs)
+            if not new_extension.startswith('.'):
+                warnings.warn(f'New extension "{new_extension}" should start with a dot. Adding it automatically.')
+                new_extension = f'.{new_extension}'
+            conversion.convert(self.existing_path, self.with_extension(new_extension),
+                               processes=processes, verbose=verbose, **kwargs)
 
     def compress(self, algorithm=None):
         algorithm = algorithm or self.type_spec.compression_algorithms[0]
@@ -609,6 +757,7 @@ class Asset:
         return pipeline
 
     def plot(self, **kwargs):
+        from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
         if self.is_existing_source:
             q_plot_3d.plot(self.existing_path, **kwargs)
         else:
@@ -618,7 +767,7 @@ class Asset:
         if status is None:
             status = self.status_manager.status if self.status_manager.status is not None else 'debug'
         self.status_manager.status = False
-        source = self.as_source()
+        source = self.open_ro()
         self.status_manager.status = status
         return self.write(np.asarray(source[slicing], order='F'))
 
@@ -635,7 +784,36 @@ class Asset:
         return all_assets
 
 
-class ExpressionAsset(Asset):
+@runtime_checkable  # Allow isinstance checks
+class ExpressionDataset(Protocol):
+    """
+    Static contract for all expression-based / composite assets.
+
+    Implementations must provide:
+      - file_list   : list of files participating in the dataset
+      - n_present   : count of existing files
+      - n_expected  : count of files that *should* exist logically
+      - is_complete : all expected files are present
+      - exists      : same semantics as is_complete for composites
+    """
+
+    @property
+    def file_list(self) -> Sequence[Path]: ...
+    @property
+    def n_files_present(self) -> int: ...
+    @property
+    def n_files_expected(self) -> Optional[int]: ...
+    @property
+    def is_complete(self) -> bool: ...
+    @property
+    def exists(self) -> bool: ...
+
+    # Back-compat / convenience aliases
+    @property  # alias for n_files_expected
+    def n_tiles(self) -> int: ...
+
+
+class ExpressionAsset(Asset, ExpressionDataset):
     """
     An asset that is composed of a list of files
     (e.g. tiled or stacked).
@@ -683,6 +861,16 @@ class ExpressionAsset(Asset):
                      self.subdirectory, self.version, self._checksum, self.status_manager,
                      self.extensions_to_directories)
 
+    @property
+    def base_name(self):
+        return Path(self.expression.string()).stem
+
+    def delete(self, missing_ok=False):
+        if missing_ok and not self.exists:
+            return
+        for f in self.file_list:
+            os.remove(f)
+
     @cached_property
     def file_list(self):
         """
@@ -692,7 +880,133 @@ class ExpressionAsset(Asset):
         -------
 
         """
-        return clearmap_io.file_list(self.path)  # We need path to have the folder
+        return file_list_backend.file_list(self.path)  # We need path to have the folder
+    
+    @property
+    def existing_extension(self):
+        return file_utils.find_existing_extension(self.file_list[0],
+                                                  self.type_spec.extensions)
+
+    @property  # FIXME: make function to avoid confusion with pathlib.Path.exists() (parenthesis and no parenthesis)
+    def exists(self):
+        """
+        Whether all tiles exist on disk.
+
+        Returns
+        -------
+        bool
+            True if all tiles exist, False otherwise.
+        """
+        return self.is_complete
+
+    @property
+    def is_complete(self) -> bool:  # TODO: try with all known extensions
+        """
+        Whether all tiles exist on disk
+
+        Returns
+        -------
+        bool
+            True if all tiles exist, False otherwise.
+        """
+        # noinspection PyTypeChecker
+        if not self.file_list:
+            warnings.warn(f'No tiles found for channel {self.base_name} with expression {self.expression}')
+            return False
+
+        expected = self.n_files_expected
+        if expected is None: # Cannot infer expectation -> dataset cannot be considered complete
+            return False
+
+        return self.n_files_present == expected
+
+    @property
+    def n_files_present(self) -> int:
+        return len(self.file_list)
+
+    @property
+    def int_tag_names(self) -> list[str]:
+        """
+        Names of integer-valued tags in this expression, in tag order.
+        """
+        names: list[str] = []
+        for i, t in enumerate(self.expression.tags):
+            if t.dtype() is int:
+                names.append(t.label(i))
+        return names
+
+    @property
+    def file_tag_values(self) -> list[dict[str, Any]]:
+        """One {tag_name: value} dict per file of file_list (same order): the values of the tags of its name"""
+        return [self.expression.values(f) for f in self.file_list]
+
+    @property
+    def tag_ranges(self) -> dict[str, range]:
+        """The range of the values of each integer tag over the files, as in their names (none without files)"""
+        file_tag_values = self.file_tag_values
+        if not file_tag_values:
+            return {}
+        return {name: range(min(tag_values[name] for tag_values in file_tag_values),
+                            max(tag_values[name] for tag_values in file_tag_values) + 1)
+                for name in self.int_tag_names}
+
+    @property
+    def n_files_expected(self) -> Optional[int]:
+        """
+                Theoretical number of files implied by the integer tag ranges
+                of the expression.
+
+                We use the expression to parse tag values from all existing
+                filenames and infer a contiguous range per integer tag:
+
+                    range(tag) = [min(value), max(value)]   (inclusive)
+
+                Then:
+
+                    n_files_expected = Π_tag (max - min + 1)
+
+                If there are no files at all, we return 0 because the expression
+                itself (tag widths) does not encode finite bounds; without any
+                samples, we cannot infer how many files *ought* to exist.
+                """
+        if not self.file_list:
+            return None
+
+        ranges = self.tag_ranges
+        if not ranges:  # We cannot infer any ranges so we assume complete
+            return self.n_files_present
+        return math.prod(len(tag_range) for tag_range in ranges.values())
+
+    @property
+    def tile_shape(self):
+        """
+        The shape of single tiles.
+
+        Returns
+        -------
+        tuple(int)
+            The shape of the tiles.
+        """
+        return source_geometry.shape(self.file_list[0])
+
+    @property
+    def tag_names(self):
+        """
+        The tag names of the tiles.
+
+        Returns
+        -------
+        list(str)
+            The tag names of the tiles.
+        """
+        return self.expression.tag_names()
+
+    @property
+    def size(self):
+        total_size = 0
+        for f in self.file_list:
+            total_size += Path(f).stat().st_size
+        return total_size
 
     def read(self, *args, **kwargs):
         raise NotImplementedError('Cannot read a tiled asset. This needs to be implemented in the FileList module')
@@ -707,100 +1021,13 @@ class ExpressionAsset(Asset):
         if self.is_tiled:
             raise ValueError(f'Asset {self} is tiled. Cannot determine shape without stitching.')
         else:
-            tile_shape = clearmap_io.shape(self.file_list[0])
+            tile_shape = source_geometry.shape(self.file_list[0])
             return len(self.file_list), tile_shape[0], tile_shape[1]
 
     def convert(self, new_extension, processes=None, verbose=False, **kwargs):
         if self.is_existing_source:
-            clearmap_io.convert_files(self.file_list, extension=new_extension,
-                                      processes=processes, verbose=verbose, verify=True, **kwargs)
-
-    @property
-    def base_name(self):
-        return Path(self.expression.string()).stem
-    
-    @property
-    def existing_extension(self):
-        return file_utils.find_existing_extension(self.file_list[0],
-                                                  self.type_spec.extensions)
-
-    def delete(self, missing_ok=False):
-        if missing_ok and not self.exists:
-            return
-        for f in self.file_list:
-            os.remove(f)
-
-    @property  # FIXME: make function to avoid confusion with pathlib.Path.exists() (parenthesis and no parenthesis)
-    def exists(self):
-        """
-        Whether all tiles exist on disk.
-
-        Returns
-        -------
-        bool
-            True if all tiles exist, False otherwise.
-        """
-        return self.all_tiles_exist
-
-    @property
-    def size(self):
-        total_size = 0
-        for f in self.file_list:
-            total_size += Path(f).stat().st_size
-        return total_size
-
-    @property
-    def all_tiles_exist(self):  # TODO: try with all known extensions # REFACTOR: rename more generic (all images)
-        """
-        Whether all tiles exist on disk
-
-        Returns
-        -------
-        bool
-            True if all tiles exist, False otherwise.
-        """
-        # noinspection PyTypeChecker
-        if not self.file_list:
-            warnings.warn(f'No tiles found for channel {self.base_name} with expression {self.expression}')
-            return False
-        return len(self.file_list) == self.n_tiles
-
-    @property
-    def n_tiles(self):  # REFACTOR: rename more generic (n_images)
-        """
-        The number of tiles.
-
-        Returns
-        -------
-        int
-            The number of tiles.
-        """
-        n_tiles = len(self.file_list)
-        return n_tiles if n_tiles > 0 else -1  # FIXME: should be theoretical number of tiles, not actual to compare with len(self.file_list)
-
-    @property
-    def tile_shape(self):  # FIXME: wont't work for stacked
-        """
-        The shape of single tiles.
-
-        Returns
-        -------
-        tuple(int)
-            The shape of the tiles.
-        """
-        return clearmap_io.shape(self.file_list[0])
-
-    @property
-    def tag_names(self):
-        """
-        The tag names of the tiles.
-
-        Returns
-        -------
-        list(str)
-            The tag names of the tiles.
-        """
-        return self.expression.tag_names()
+            conversion.convert_files(self.file_list, extension=new_extension,
+                                     processes=processes, verbose=verbose, verify=True, **kwargs)
 
     def format_expression(self):
         """
@@ -818,10 +1045,11 @@ class ExpressionAsset(Asset):
         # find all existing expressions using self.extensions_to_directories
         header = getattr(self, 'header', '{} {}')
         hdr_str = header.format(self.type_spec.resource_type, self.type_spec.name)
-        tag_names = ', '.join(self.tag_names)
-        tile_lower = tuple(np.min(self.positions, axis=0))
-        tile_upper = tuple(np.max(self.positions, axis=0))
-        pattern_line = (f'{hdr_str}: {self.expression.string()} {{{self.n_tiles} files,'
+        ranges = self.tag_ranges
+        tag_names = ', '.join(ranges)
+        tile_lower = tuple(tag_range.start for tag_range in ranges.values())
+        tile_upper = tuple(tag_range[-1] for tag_range in ranges.values())
+        pattern_line = (f'{hdr_str}: {self.expression.string()} {{{self.n_files_present} files,'
                         f' {tag_names}: {tile_lower} -> {tile_upper}}}')
         if self.extensions_to_directories:
             for ext, directory in self.extensions_to_directories.items():
@@ -835,9 +1063,59 @@ class ExpressionAsset(Asset):
         return pattern_line
 
 
+class StackedAsset(ExpressionAsset):
+    # TODO: check if we should reimplement tile_shape to z, *tile[0].shape
+
+    @cached_property
+    def stack_tag(self):
+        """
+        The single integer tag driving the stack (currently, only z is supported).
+        """
+        int_tags = [t for t in self.expression.tags if t.dtype() is int and t.name is not None]
+        if len(int_tags) != 1:
+            raise ClearMapAssetError(f'StackedAsset expected exactly one integer tag; '
+                                     f'got {int_tags} for {self.expression}')
+        return int_tags[0]
+
+    @cached_property
+    def stack_indices(self) -> np.ndarray:
+        """
+        Values of the stack axis for each file.
+        """
+        vals = []
+        name = self.stack_tag.name
+        for f in self.file_list:
+            v = self.expression.values(f)
+            vals.append(v[name])
+        if not vals:
+            return np.empty((0,), dtype=int)
+        return np.asarray(vals, dtype=int)
+
+    @property
+    def n_files_expected(self) -> Optional[int]:
+        """
+        Theoretical number of slices for a contiguous 1D stack.
+        """
+        if self.n_files_present == 0:  # FIXME: why
+            return None
+        idx = self.stack_indices
+        lo, hi = idx.min(), idx.max()
+        return int(hi - lo + 1)
+
+
 class TiledAsset(ExpressionAsset):
     @property
-    def n_tiles(self):  # FIXME: fix for stacked or result sequences
+    def tile_grid_tag_names(self) -> list[str]:
+        """The names of the integer X and Y tags: the ones of the grid of tiles (not Z, time, channel...)"""
+        names: list[str] = []
+        for i, t in enumerate(self.expression.tags):
+            if t.dtype() is int and t.name is not None:
+                if t.name.lower() in ("x", "y"):
+                    names.append(t.label(i))
+        return names
+
+    @property
+    def n_files_expected(self) -> Optional[int]:
         """
         The number of tiles.
 
@@ -846,36 +1124,29 @@ class TiledAsset(ExpressionAsset):
         int
             The number of tiles.
         """
-        return self.tile_grid_shape.prod()
+        if self.n_files_present == 0:
+            return None
+        return math.prod(self.tile_grid_shape.values())
 
     @property
-    def tile_grid_shape(self):  # FIXME: wont't work for stacked or result sequences
-        """
-        The shape of the tile layout grid.
-
-        Returns
-        -------
-        tuple(int)
-            The shape of the tile grid.
-        """
-        # FIXME: limit to x and y
-        indices = [tuple(tv[n] for n in self.tag_names) for tv in self.positions]
-        if not indices:
-            raise ValueError(f'No indices found for asset {self}. with expression {self.expression}')
-        return np.array(indices).max(axis=0) + 1  # +1 because indexing from 0
+    def tile_grid_ranges(self) -> dict[str, range]:
+        """The range of the X and Y tag values of the files, as in their names (just 0 along an axis without tag)"""
+        if not self.file_list:
+            raise ValueError(f'No tiles found for asset {self} with expression {self.expression}')
+        ranges = self.tag_ranges
+        return {axis: ranges.get(axis, range(1)) for axis in 'XY'}
 
     @property
-    def positions(self):  # FIXME: wont't work for stacked
-        """
-        The positions of the tiles.
+    def tile_grid_indices(self) -> list[dict[str, int]]:
+        """One {'X': column, 'Y': row} dict per file of file_list (same order), counted from the start of the ranges"""
+        ranges = self.tile_grid_ranges
+        return [{axis: tag_values.get(axis, 0) - ranges[axis].start for axis in 'XY'}
+                for tag_values in self.file_tag_values]
 
-        Returns
-        -------
-        list(tuple)
-            The positions of the tiles
-        """
-        return [self.expression.values(f) for f in self.file_list]
-
+    @property
+    def tile_grid_shape(self) -> dict[str, int]:
+        """The {'X': n_columns, 'Y': n_rows} of the grid of tiles"""
+        return {axis: len(axis_range) for axis, axis_range in self.tile_grid_ranges.items()}
 
 
 class AssetCollection:  # FIXME: fix how assets are retrieved
@@ -906,12 +1177,39 @@ class AssetCollection:  # FIXME: fix how assets are retrieved
             The channel specification of the assets in the collection.
             If dict, it should have the keys 'channel_name' and 'content_type'.
         """
-        self.base_directory = base_directory
+        self._base_directory = base_directory
+        self._sample_id = None
         self.sample_id = sample_id
         if isinstance(channel_spec, dict):
             channel_spec = ChannelSpec(**channel_spec)
         self.channel_spec = channel_spec
         self.assets = {}
+
+    @property
+    def base_directory(self) -> str:
+        return self._base_directory
+
+    @base_directory.setter
+    def base_directory(self, value: str | Path):
+        new = str(value)
+        if self._base_directory != new:  # Update and propagate if different
+            self._base_directory = new
+            for asset in self.assets.values():
+                asset.base_directory = Path(new)
+
+    @property
+    def sample_id(self):
+        return self._sample_id
+
+    @sample_id.setter
+    def sample_id(self, value):
+        # if not isinstance(value, str):
+        #     raise ClearMapAssetError(f'sample_id must be a string. Got "{type(value)}" instead.')
+        if self._sample_id is not None and self._sample_id != value:
+            for asset in self.assets.values():
+                asset.sample_id = value
+
+        self._sample_id = value
 
     def __getitem__(self, item):
         try:
@@ -920,7 +1218,7 @@ class AssetCollection:  # FIXME: fix how assets are retrieved
             raise KeyError(f'Asset "{item}" not found in collection with "{self.sample_id=}"'
                            f'{self.base_directory=}, {self.channel_spec=}')
 
-    def get(self, item, default=None):
+    def get(self, item: str, default=None):
         try:
             return self.assets[item]
         except KeyError:
@@ -980,9 +1278,10 @@ class AssetCollection:  # FIXME: fix how assets are retrieved
         kwargs : dict
             Additional parameters to pass to the Asset constructor.
 
-        Returns
-        -------
 
+        Raises
+        ------
+        ClearMapAssetError :
         """
         if type_spec and asset is None:
             asset = Asset(self.base_directory, type_spec,

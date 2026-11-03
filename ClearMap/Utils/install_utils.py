@@ -15,6 +15,7 @@ from packaging.version import Version
 from pathlib import Path
 
 from ClearMap import Settings as clearmap_settings
+from ClearMap.Utils.utilities import ExitCode
 
 try:
     import yaml  # WARNING: Only guaranteed to be here in the tmp env
@@ -203,11 +204,12 @@ class PytorchVersionManager:  # TODO: inherit from condaparser ??
         cmd = 'nvidia-smi -L'
         try:
             subprocess.check_output(cmd, shell=True)
-            sys.exit(0)
+            sys.exit(ExitCode.SUCCESS)
         except subprocess.CalledProcessError as err:
             print('Error, a working installation of NVidia CUDA could not be detected on your computer.'
-                  ' This software is required to run ClearMap.')
-            sys.exit(err.returncode)
+                  f' It is required for the neural networks of ClearMap (vasculature analysis). ("{cmd}" exited with'
+                  f' status {err.returncode})')
+            sys.exit(ExitCode.FAILURE)
 
     @property
     def cuda_version(self):
@@ -226,8 +228,7 @@ class PytorchVersionManager:  # TODO: inherit from condaparser ??
     @staticmethod
     def check_pytorch():
         import torch
-        exit_code = int(not torch.cuda.is_available())
-        sys.exit(exit_code)
+        sys.exit(ExitCode.SUCCESS if torch.cuda.is_available() else ExitCode.FAILURE)
 
     @property
     def pytorch_info(self):
@@ -348,17 +349,18 @@ def patch_env(cfg_path, dest_path, use_cuda_torch=True, pip_mode=False, use_spyd
     if use_cuda_torch:
         if pip_mode:
             if platform.system().startswith('Linux'):
-                viable_versions = [Version(v) for v in ('11.8', '12.4', '12.6', '12.8')]
+                viable_versions = [Version(v) for v in ('11.8', '12.4', '12.6', '12.8', '13.0')]
                 actual_cuda = pytorch_v_mgr.cuda_version
-                for v in viable_versions[::-1]:
-                    if actual_cuda <= v:
-                        actual_cuda = v
+                for candidate_cuda in viable_versions[::-1]:
+                    if candidate_cuda <= actual_cuda:
+                        actual_cuda = candidate_cuda
                         break
                 else:
                     raise ValueError(f'No matching CUDA version found for {pytorch_v_mgr.pytorch_version} for PyTorch.'
                                      f'options are {viable_versions}.')
                 cuda_suffix = f"cu{str(actual_cuda).replace('.', '')}"
                 env_mgr.add_pip_option(f'--extra-index-url https://download.pytorch.org/whl/{cuda_suffix}')
+                env_mgr.add_pip_dependency(f'cuda-toolkit=={actual_cuda}.*')
             env_mgr.add_pip_dependency('torch')
             env_mgr.add_pip_dependency('torchvision')
         else:
@@ -396,9 +398,23 @@ def patch_env(cfg_path, dest_path, use_cuda_torch=True, pip_mode=False, use_spyd
         env_mgr.patch_env_var('TMP', tmp_dir)
 
 
+def ensure_config_folder():
+    """
+    Create the folder of the user configuration (``~/.clearmap``, or ``$CLEARMAP_CFG_DIR``) if it is missing
+
+    Returns
+    -------
+    pathlib.Path
+        The folder, absolute. The installation script asks for it, so that it never repeats the rule of Settings.
+    """
+    folder = clearmap_settings.clearmap_cfg_dir
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder
+
+
 def set_elastix_path(elastix_path):
     import configobj  # Local import to avoid dependency of whole module on configobj
-    machine_params_path = os.path.expanduser('~/.clearmap/machine_params_v3_0.cfg')
+    machine_params_path = str(clearmap_settings.clearmap_cfg_dir / 'machine_params_v3_0.cfg')
     cfg = configobj.ConfigObj(machine_params_path, encoding="UTF8", indent_type='    ', unrepr=True, file_error=True)
     cfg['elastix_path'] = elastix_path
     cfg.write()

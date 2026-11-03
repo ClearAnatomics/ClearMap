@@ -25,18 +25,6 @@
        </widget>
       </item>
       <item>
-       <widget class="QComboBox" name="groupsComboBox">
-        <property name="currentText">
-         <string>1</string>
-        </property>
-        <item>
-         <property name="text">
-          <string>1</string>
-         </property>
-        </item>
-       </widget>
-      </item>
-      <item>
        <widget class="QPushButton" name="addGroupPushButton">
         <property name="text">
          <string>Add</string>
@@ -45,6 +33,24 @@
          <iconset theme="add">
           <normaloff>.</normaloff>.</iconset>
         </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QComboBox" name="groupsComboBox">
+        <property name="minimumSize">
+         <size>
+          <width>60</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="currentText">
+         <string>1</string>
+        </property>
+        <item>
+         <property name="text">
+          <string>1</string>
+         </property>
+        </item>
        </widget>
       </item>
       <item>

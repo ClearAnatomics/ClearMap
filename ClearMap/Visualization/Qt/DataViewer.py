@@ -13,6 +13,8 @@ Note
 ----
 This viewer is based on the pyqtgraph package.
 """
+from __future__ import annotations
+
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>, Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
@@ -21,37 +23,39 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import time
 import functools as ft
+from datetime import datetime
 
 import numpy as np
 
 import pyqtgraph as pg
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import QEvent, QRect, QSize, pyqtSignal, Qt
-from PyQt5.QtGui import QPainter
-from PyQt5.QtWidgets import QWidget, QRadioButton, QLabel, QSplitter, QApplication, QSizePolicy, QPushButton, QCheckBox, \
-  QGraphicsPathItem, QGridLayout, QLineEdit, QScrollArea
+from PyQt5.QtGui import QPainter, QIcon
+from PyQt5.QtWidgets import (QWidget, QRadioButton, QLabel, QSplitter, QApplication, QSizePolicy, QPushButton,
+                             QCheckBox, QGraphicsPathItem, QGridLayout, QLineEdit, QScrollArea, QFileDialog, QSpinBox)
 
 from ClearMap.Utils.utilities import runs_on_spyder
-from ClearMap.Utils.array_utils import dtype_range
-from ClearMap.IO.IO import as_source
-from ClearMap.IO.Source import Source
+from ClearMap.IO import io_ops
+from ClearMap.IO.source.Source import Source
 from ClearMap.Visualization.Qt.data_viewer_luts import LUT, HighLowLUT
 
 pg.CONFIG_OPTIONS['useOpenGL'] = False  # set to False if trouble seeing data.
+
+#: Markers of the neighbouring slices (the "depth" of the markers, see ``Scatter3D.z_radius``) are only drawn
+#: when at most this many would be shown in the current view. The user can change it in the viewer (Depth spin box).
+DEPTH_MARKERS_MAX_POINTS = 50_000
+#: Markers are computed for the view enlarged by this fraction on each side so that small pans need no redraw.
+SCATTER_VIEW_PAD = 0.5
+#: Redraw (to cull again) once the view is this many times smaller than the region markers were computed for.
+SCATTER_MAX_OVERDRAW = 6.0
 
 if not pg.QAPP:
     pg.mkQApp()
 
 
 class DataViewer(QWidget):
+    #: Triggered when the mouse is clicked in the image view. The signal emits the x, y, and z coordinates of the click.
     mouse_clicked = pyqtSignal(int, int, int)
-
-    DEFAULT_SCATTER_PARAMS = {
-        'pen': 'red',
-        'brush': 'red',
-        'symbol': '+',
-        'size': 10
-    }
 
     def __init__(self, source,
                  points=None, vectors=None, orientations=None, annotation=None,
@@ -78,6 +82,7 @@ class DataViewer(QWidget):
         self.pals = []  # linked DataViewers
         self.scatter = None
         self.scatter_coords = None
+        self._scatter_drawn = None  # ((x range, y range) covered by the markers currently drawn, depth_skipped)
         self.atlas = None  # WARNING: overlap w/ self.anotation ??
         self.structure_names = None
 
@@ -85,7 +90,7 @@ class DataViewer(QWidget):
 
         self.points = points
         if self.points is not None:
-            self.points = as_source(points).array
+            self.points = io_ops.read(points)
         self.points_item = None
         self.points_style = dict(pen=None, brush='white')
         if points_style is not None:
@@ -93,7 +98,7 @@ class DataViewer(QWidget):
 
         self.vectors = vectors
         if self.vectors is not None:
-            self.vectors = as_source(vectors).array
+            self.vectors = io_ops.read(vectors)
         self.vectors_item = None
         self.vectors_base_item = None
         self.vectors_style = dict(pen=None, brush='lightblue')
@@ -102,7 +107,7 @@ class DataViewer(QWidget):
 
         self.orientations = orientations
         if self.orientations is not None:
-            self.orientations = as_source(orientations).array
+            self.orientations = io_ops.read(orientations)
         self.orientations_item = None
         self.orientations_style = dict(pen='gray')
         if orientations_style is not None:
@@ -198,13 +203,14 @@ class DataViewer(QWidget):
 
         self.sliceLine.sigPositionChanged.connect(self.updateSlice)
 
-        # Axis tools
+        # Axis tools  # FIXME: extract and make addWidget widget location incremental not absolute
         self.axis_buttons = []
         axis_tools_layout, axis_tools_widget = self.__setup_axes_controls()
 
         # max projection depth
         self.max_projection = max_projection
         self.max_projection_edit = QLineEdit()
+        self.max_projection_edit.setPlaceholderText('max projection')
         if self.max_projection is not None:
             self.max_projection_edit.setText('%d' % self.max_projection)
         # self.max_projection_edit.setValidator(pg.QtGui.QIntValidator())
@@ -216,12 +222,14 @@ class DataViewer(QWidget):
 
         # points color
         self.points_color_button = pg.ColorButton(color=self.points_style.get('brush'))
+        self.points_color_button.setVisible(False)
         self.points_color_button.setMaximumWidth(30)
         self.points_color_button.sigColorChanged.connect(self.change_points_color)
         axis_tools_layout.addWidget(self.points_color_button, 0, 4)
 
         # vectors color and threshold
         self.vectors_color_button = pg.ColorButton(color=self.vectors_style.get('brush'))
+        self.vectors_color_button.setVisible(False)
         self.vectors_color_button.setMaximumWidth(30)
         self.vectors_color_button.sigColorChanged.connect(self.change_vectors_color)
         axis_tools_layout.addWidget(self.vectors_color_button, 0, 5)
@@ -230,6 +238,7 @@ class DataViewer(QWidget):
         vectors_threshold = self.vectors_style.get('threshold', None)
         if vectors_threshold is not None:
             self.vectors_threshold_edit.setText('%.4f' % vectors_threshold)
+        self.vectors_threshold_edit.setVisible(False)
         self.vectors_threshold_edit.setMaxLength(6)
         self.vectors_threshold_edit.setAlignment(Qt.AlignRight)
         self.vectors_threshold_edit.setMaximumWidth(60)
@@ -238,11 +247,13 @@ class DataViewer(QWidget):
 
         # orientation threshold
         self.orientations_color_button = pg.ColorButton(color=self.orientations_style.get('pen'))
+        self.orientations_color_button.setVisible(False)
         self.orientations_color_button.setMaximumWidth(30)
         self.orientations_color_button.sigColorChanged.connect(self.change_orientations_color)
         axis_tools_layout.addWidget(self.orientations_color_button, 0, 7)
 
         self.orientations_threshold_edit = QLineEdit()
+        self.orientations_threshold_edit.setVisible(False)
         orientations_threshold = self.orientations_style.get('threshold', None)
         if orientations_threshold is not None:
             self.orientations_threshold_edit.setText('%.4f' % orientations_threshold)
@@ -263,6 +274,53 @@ class DataViewer(QWidget):
         self.source_label_scroll.setWidget(self.source_label)
 
         axis_tools_layout.addWidget(self.source_label_scroll, 0, 9)
+
+        self.screenshot_btn = QPushButton('📸')
+        icon = QIcon.fromTheme('camera-photo')
+        if not icon.isNull():
+            self.screenshot_btn.setIcon(icon)
+            self.screenshot_btn.setIconSize(QSize(20, 20))
+
+        self.screenshot_btn.setToolTip('Save screenshot')
+        self.screenshot_btn.setMaximumWidth(34)
+        self.screenshot_btn.clicked.connect(self.save_screenshot)
+        axis_tools_layout.addWidget(self.screenshot_btn, 1, 2)
+
+
+        # Controls for marker size
+        # FIXME: Invisible if no markers
+        self.marker_size_spin = QSpinBox()
+        self.marker_size_spin.setRange(1, 100)
+        self.marker_size_spin.setValue(10)
+        self.marker_size_spin.setPrefix("Marker: ")
+        self.marker_size_spin.valueChanged.connect(lambda: self.updateSlice(force_update=True))
+        axis_tools_layout.addWidget(self.marker_size_spin, 1, 3)
+
+        self.marker_scale_with_zoom = QCheckBox("Scale w/ zoom")
+        self.marker_scale_with_zoom.setChecked(False)
+        self.marker_scale_with_zoom.stateChanged.connect(lambda: self.updateSlice(force_update=True))
+        axis_tools_layout.addWidget(self.marker_scale_with_zoom, 1, 4)
+
+        self.depth_limit_spin = QSpinBox()
+        self.depth_limit_spin.setRange(0, 100_000)  # In thousands of markers. Max means no limit, 0 disables depth
+        self.depth_limit_spin.setSingleStep(10)
+        self.depth_limit_spin.setKeyboardTracking(False)
+        self.depth_limit_spin.setValue(max(1, round(DEPTH_MARKERS_MAX_POINTS / 1000)))
+        self.depth_limit_spin.setPrefix('Depth ≤ ')
+        self.depth_limit_spin.setSuffix(' k')
+        self.depth_limit_spin.setSpecialValueText('Depth: off')
+        self.depth_limit_spin.setToolTip('Markers of the neighbouring slices are drawn (smaller with distance) only if '
+                                         'there are at most this many (thousands) in view. Zoom in or raise the limit '
+                                         'to see them; the maximum removes the limit, 0 turns them off.')
+        self.depth_limit_spin.valueChanged.connect(lambda: self.updateSlice(force_update=True))
+        axis_tools_layout.addWidget(self.depth_limit_spin, 1, 5)
+
+        self.depth_status_label = QLabel('')
+        axis_tools_layout.addWidget(self.depth_status_label, 1, 6)
+
+        for widget in (self.marker_size_spin, self.marker_scale_with_zoom,
+                       self.depth_limit_spin, self.depth_status_label):
+            widget.setVisible(self.scatter is not None)
 
         self.graphicsView.scene().sigMouseMoved.connect(self.updateLabelFromMouseMove)
 
@@ -347,7 +405,7 @@ class DataViewer(QWidget):
         # initialize sources and axis settings
         source = self.__cast_source(source)
         self.n_sources = len(source)
-        self.sources = [as_source(s) for s in source]
+        self.sources = [io_ops.open_ro(s) for s in source]
         for s in self.sources:
             if s.ndim == 2:
                 s.shape = s.shape + (1,)  # Add empty z dimension # FIXME: see if works or need to expand_dims
@@ -382,11 +440,11 @@ class DataViewer(QWidget):
             source = self.__cast_source(source)
             if self.n_sources != len(source):
                 raise RuntimeError(f'Number of sources does not match! got {len(source)}, expected {self.n_sources}')
-            source = [as_source(s) for s in source]
+            source = [io_ops.open_ro(s) for s in source]
             index = range(self.n_sources)
         else:
             s = self.sources
-            s[index] = as_source(source)
+            s[index] = io_ops.open_ro(source)
             source = s
             index = [index]
 
@@ -635,44 +693,102 @@ class DataViewer(QWidget):
         for s, mM in enumerate(min_max):
             self.luts[s].lut.region.setRegion(mM)
 
+    def _view_rect(self):
+        (x0, x1), (y0, y1) = self.view.viewRange()
+        return (min(x0, x1), max(x0, x1)), (min(y0, y1), max(y0, y1))
+
+    def _padded_view_rect(self):
+        (x0, x1), (y0, y1) = self._view_rect()
+        pad_x, pad_y = (x1 - x0) * SCATTER_VIEW_PAD, (y1 - y0) * SCATTER_VIEW_PAD
+        return (x0 - pad_x, x1 + pad_x), (y0 - pad_y, y1 + pad_y)
+
     def onRangeChanged(self):
-        if self.scatter is not None:
-            ax = self.scroll_axis
-            index = min(max(0, int(self.sliceLine.value())), self.source_shape[ax] - 1)
-            self.plot_scatter_markers(ax, index)
+        if self.scatter is None or self.scatter_coords is None:
+            return
+        if self._scatter_drawn is not None and not self.marker_scale_with_zoom.isChecked():
+            # Markers are computed for a region larger than the view: skip the redraw while the view stays in it,
+            # unless it is zoomed in enough that markers should be culled again or that hidden depth may now fit.
+            (x0, x1), (y0, y1) = self._view_rect()
+            (dx0, dx1), (dy0, dy1) = self._scatter_drawn[0]
+            depth_skipped = self._scatter_drawn[1]
+            covered = dx0 <= x0 and x1 <= dx1 and dy0 <= y0 and y1 <= dy1
+            max_overdraw = (1 + 2 * SCATTER_VIEW_PAD) * 1.1 if depth_skipped else SCATTER_MAX_OVERDRAW
+            if covered and (dx1 - dx0) <= max_overdraw * (x1 - x0):
+                return
+        ax = self.scroll_axis
+        index = min(max(0, int(self.sliceLine.value())), self.source_shape[ax] - 1)
+        self.plot_scatter_markers(ax, index)
+
+    def _scale_markers(self):
+        base_size = self.marker_size_spin.value()
+        if self.marker_scale_with_zoom.isChecked():
+            x_range, y_range = self.view.viewRange()
+            scale_x = self.source_range_x / (x_range[1] - x_range[0])
+            scale_y = self.source_range_y / (y_range[1] - y_range[0])
+            zoom_factor = (scale_x + scale_y) / 2.0
+            scaled_size = round(base_size * zoom_factor)
+        else:
+            scaled_size = base_size
+            zoom_factor = 1.0  # for the surrounding-slice path
+
+        return scaled_size, zoom_factor
 
 
     def plot_scatter_markers(self, ax, index):
-        if self.scatter_coords is None:
+        coords = self.scatter_coords
+        if coords is None:
             return
-        self.scatter.clear()
-        self.scatter_coords.axis = ax
-        pos = self.scatter_coords.get_pos(index)
-        x_range, y_range = self.view.viewRange()
-        # Compute scale from the ratio between original and current view range
+        has_depth = bool(coords.z_radius)
+        self.marker_size_spin.setVisible(True)
+        self.marker_scale_with_zoom.setVisible(True)
+        self.depth_limit_spin.setVisible(has_depth)
+        self.depth_status_label.setVisible(has_depth)
+        coords.axis = ax
+        if not coords.is_prepared(ax):
+            self._prepare_scatter_index(ax, has_depth)
 
-        scale_x = self.source_range_x / (x_range[1] - x_range[0])
-        scale_y = self.source_range_y / (y_range[1] - y_range[0])
-        zoom_factor = (scale_x + scale_y) / 2.0
+        scaled_size, zoom_factor = self._scale_markers()
+        limit_k = self.depth_limit_spin.value()
+        if limit_k == self.depth_limit_spin.maximum():
+            depth_limit = None  # no limit
+        else:
+            depth_limit = limit_k * 1000  # 0 disables depth
+        view_rect = self._padded_view_rect()
+        data, info = coords.build_draw_data(index, base_size=self.marker_size_spin.value(), main_size=scaled_size,
+                                            zoom_factor=zoom_factor, view_rect=view_rect, depth_limit=depth_limit)
+        if data is None:
+            self.scatter.clear()
+        else:
+            self.scatter.setData(**data)  # Replaces the previous points
+        self._scatter_drawn = (view_rect, info['depth_skipped'])
+        self._update_depth_status(info, depth_limit)
 
-        scaled_size = round(self.scatter_coords.marker_size * zoom_factor)
+    def _prepare_scatter_index(self, ax, keep_label_visible):
+        """
+        Build the slice index of the markers (one-off per axis, ~1 s for 8M markers)
+        while telling the user that the viewer is busy rather than hanging.
+        """
+        self.depth_status_label.setText('indexing markers…')
+        self.depth_status_label.setToolTip('')
+        self.depth_status_label.setVisible(True)
+        self.depth_status_label.repaint()  # Not processEvents: we are inside a slot, avoid re-entrancy
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        try:
+            self.scatter_coords.prepare(ax)
+        finally:
+            QApplication.restoreOverrideCursor()
+            self.depth_status_label.setText('')
+            self.depth_status_label.setVisible(keep_label_visible)
 
-        if all(pos.shape):
-            if self.scatter_coords.has_colours:
-                self.scatter.setData(pos=pos,
-                                     symbol=(self.scatter_coords.get_symbols(index)),
-                                     size=scaled_size,
-                                     **self.scatter_coords.get_draw_params(index))
-            else:
-                self.scatter.setData(pos=pos, **DataViewer.DEFAULT_SCATTER_PARAMS.copy())  # TODO: check if copy required
-        try:  # TODO: check why some markers trigger errors
-            if self.scatter_coords.half_slice_thickness is not None and self.scatter_coords.half_slice_thickness > 0:
-                marker_params = self.scatter_coords.get_all_data(index)
-                if marker_params['pos'].shape[0]:
-                    marker_params['size'] *= zoom_factor
-                    self.scatter.addPoints(brush=pg.mkBrush((0, 0, 0, 0)), **marker_params)
-        except KeyError as err:
-            print(f'DataViewer error: {err}')
+    def _update_depth_status(self, info, depth_limit):
+        if info['depth_skipped']:
+            n, limit = info['n_depth_candidates'], depth_limit
+            self.depth_status_label.setText(f'depth hidden ({n / 1000:.0f} k)')
+            self.depth_status_label.setToolTip(f'{n:,} neighbouring markers in view exceed the limit of {limit:,}. '
+                                               f'Zoom in or raise the "Depth" limit to display them.')
+        else:
+            self.depth_status_label.setText('')
+            self.depth_status_label.setToolTip('')
 
     def change_max_projection(self, value=None):
         if value is not None:
@@ -697,9 +813,10 @@ class DataViewer(QWidget):
     def set_points(self, points):
         self.points = points
         if self.points is not None:
-            self.points = as_source(points)
+            self.points = io_ops.open_ro(points)  # TODO: see if read is better
         self.initialize_points_item()
         self.update_points()
+        self.points_color_button.setVisible(True)
 
     def update_points(self):
         if self.points is not None:
@@ -734,6 +851,8 @@ class DataViewer(QWidget):
     def set_vectors(self, vectors):
         self.vectors = vectors
         self.update_vectors()
+        self.vectors_color_button.setVisible(True)
+        self.vectors_threshold_edit.setVisible(True)
 
     def update_vectors(self):
         if self.vectors is not None:
@@ -777,7 +896,6 @@ class DataViewer(QWidget):
         if value is not None:
             self.vectors_threshold_edit.setText('%d' % value)
         text = self.vectors_threshold_edit.text()
-        # print('text=',text)
         try:
             value = float(text)
         except ValueError:
@@ -794,6 +912,8 @@ class DataViewer(QWidget):
     def set_orientations(self, orientations):
         self.orientations = orientations
         self.update_orientations()
+        self.orientations_color_button.setVisible(True)
+        self.orientations_threshold_edit.setVisible(True)
 
     def update_orientations(self):
         if self.orientations is not None:
@@ -836,7 +956,6 @@ class DataViewer(QWidget):
         if value is not None:
             self.orientations_threshold_edit.setText('%d' % value)
         text = self.orientations_threshold_edit.text()
-        # print('text=',text)
         try:
             value = float(text)
         except ValueError:
@@ -864,11 +983,45 @@ class DataViewer(QWidget):
 
         x_axis, y_axis = self.getXYAxes()
         scaled_x, scaled_y = self.scale_coords(x, x_axis, y, y_axis)
-        self.mouse_clicked.emit(scaled_x, scaled_y, self.source_index[self.scroll_axis])
+        position = [0, 0, 0]  # (x, y, z) of the source, whichever axis the view scrolls through (as _updateCoords)
+        position[x_axis] = scaled_x
+        position[y_axis] = scaled_y
+        position[self.scroll_axis] = self.source_index[self.scroll_axis]
+        self.mouse_clicked.emit(*(int(coordinate) for coordinate in position))
 
     def padded_shape(self, shape):
         pad_size = max(3, len(shape))
         return (shape + (1,) * pad_size)[:pad_size]
+
+    def save_screenshot(self, *_):
+        """
+        Save a PNG/JPEG/TIFF screenshot of the current viewer.
+        By default, captures just the central image area (graphicsView).
+        Switch to `self.grab()` below if you want the whole window (incl. LUTs).
+        """
+        # Grab the rendered view (image + overlays)
+        # TODO: full/image_only combobox to select between self.graphicsView.grab() and self.grab() for full window
+        pixmap = self.graphicsView.grab()
+
+        # Build a friendly default name with title, slice index, timestamp
+        try:
+            title = self.windowTitle() or "DataViewer"
+        except Exception:
+            title = "DataViewer"
+        for forbidden_char in ['<', '>', ':', '"', '/', '\\', '|', '?', '*', ' ']:
+            title = title.replace(forbidden_char, "_")
+        z = str(int(self.source_index[self.scroll_axis])).zfill(4)
+        now = datetime.now().strftime("%Y%m%d_%H%M%S")
+        suggested = f"{title}_z{z}_{now}.png"
+
+        dest_path, _ = QFileDialog.getSaveFileName(self, 'Save screenshot', suggested,
+                                                   'PNG (*.png);;JPEG (*.jpg *.jpeg);;TIFF (*.tif *.tiff)')
+        if not dest_path:
+            return
+
+        ok = pixmap.save(dest_path)
+        if not ok:
+            pixmap.save(dest_path, 'PNG')
 
     # def __cast_bools(self):
     #     for i, s in enumerate(self.sources):

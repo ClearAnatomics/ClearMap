@@ -1,0 +1,32 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://clearmap.org/schemas/v3/group_analysis"
+
+type: object
+additionalProperties: true
+properties:
+  clearmap_schema:   { type: integer }
+  clearmap_version:  { type: string }
+  pipeline: { type: string, enum: ["CellMap", "TractMap", "TubeMap", "Colocalization"] }
+
+  paths:
+    type: object
+    additionalProperties: true
+    properties:
+      results_folder: { type: "string" }
+
+  groups:
+    type: object
+    # For the moment, group names must follow same rules as channel names
+    propertyNames: { $ref: "./typedefs.schema.yaml#/$defs/channelName" }
+    additionalProperties:
+      type: array
+      items: { type: string }  # list of samples (strings)
+
+  comparisons:
+    type: object
+    description: "Named pairwise group comparisons: name -> [group_a, group_b]"
+    additionalProperties:
+      type: array
+      minItems: 2
+      maxItems: 2
+      items: { type: string }   # two group names, order matters (A vs B)

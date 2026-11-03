@@ -3,9 +3,6 @@
 PROG_NAME=$0
 
 BASEDIR=$(dirname "$0")
-if [ -z "$1" ]; then
-    set -- -f ClearMap3.yml
-fi
 
 
 function red(){  #  From https://stackoverflow.com/a/57096493
@@ -40,14 +37,14 @@ usage() {
   cat << EOF >&2
   Usage: $PROG_NAME [-h] [-f <env-file-path>] [-s]
 
-  --file, -f <env-file-path>: The environment file to use. Defaults to ClearMapUi.yml in the current folder
+  --file, -f <env-file-path>: The environment file to use. Defaults to ClearMap3.yml in the current folder
   --spyder, -s : Whether to install the appropriate spyder kernel
 EOF
   exit 1
 }
 
 USE_SPYDER="False"
-ENV_FILE_PATH=''
+ENV_FILE_PATH='ClearMap3.yml'  # Unless -f says otherwise (with or without the other options)
 while [[ $# -gt 0 ]]; do
   case $1 in
     -h|--help)
@@ -69,6 +66,11 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [ ! -f "$ENV_FILE_PATH" ]; then
+    red "Environment file '$ENV_FILE_PATH' not found (from $(pwd))"
+    usage
+fi
 
 
 # Get the current commit number and save it to a file
@@ -125,7 +127,6 @@ esac
 fi
 
 
-config_folder="$HOME/.clearmap"
 prep_python="import os, sys; sys.path.append(os.getcwd()); sys.path.append(os.path.join(os.getcwd(), 'ClearMap'));"
 
 eval "$(conda shell.bash hook)"  # Required to activate conda envs
@@ -162,26 +163,31 @@ green "Done"
 
 
 if  [[ "$OSTYPE" == "linux-gnu"* ]]; then  # FIXME: or "$OSTYPE" == "msys"
-    green "ClearMap uses neural networks to perform vasculature analysis.
+    # Look before asking: someone without an nVIDIA GPU (or its drivers) is not asked whether to use CUDA.
+    # assert_cuda exits with a status instead of raising, and prints on stdout only what the status already says
+    green "Checking nVIDIA drivers and system CUDA installation"
+    if python -c "$prep_python import ClearMap; \
+                  from ClearMap.Utils.install_utils import PytorchVersionManager; \
+                  PytorchVersionManager.assert_cuda()" > /dev/null; then
+        green "ClearMap uses neural networks to perform vasculature analysis.
       The implementation of these networks relies on proprietary technology
       from nVIDIA called CUDA. To perform vasculature analysis, you will
       need a compatible graphics card and drivers."
-    read -r -p "Do you wish to use this feature ([y]/n)?" answer
-    case "$answer" in
-        [nN][oO]|[nN])
-            yellow "Skipping";
-            USE_TORCH="False";
-            ;;
-        *)
-            # Verify CUDA is functional
-            green "Checking nVIDIA drivers and system CUDA installation";
-            python -c "$prep_python import ClearMap; \
-                       from ClearMap.Utils.install_utils import PytorchVersionManager; \
-                       PytorchVersionManager.assert_cuda()" || exit 1
-            green "OK";
-            USE_TORCH="True";
-            ;;
-    esac
+        read -r -p "Do you wish to use this feature ([y]/n)?" answer
+        case "$answer" in
+            [nN][oO]|[nN])
+                yellow "Skipping";
+                USE_TORCH="False";
+                ;;
+            *)
+                USE_TORCH="True";
+                ;;
+        esac
+    else
+        yellow "No working nVIDIA GPU and drivers were found (nvidia-smi failed), the vasculature analysis
+      (neural networks, CUDA) will not be available. To use it, install the nVIDIA drivers and run this script again."
+        USE_TORCH="False";
+    fi
 else
     USE_TORCH="False";
 fi
@@ -225,6 +231,14 @@ if  [[ "$OSTYPE" == "msys"* ]]; then
     export tmp_dir="C:/Users/$USERNAME/AppData/Local/Temp"
 fi
 green "Using temp folder: $tmp_dir"
+
+green_n "ClearMap keeps its configuration (machine parameters, user defaults) in a folder of its own.
+Press Enter for the default (~/.clearmap, or the folder of CLEARMAP_CFG_DIR if it is set), or give an other path
+(on a cluster, a folder of the project that the jobs can write to). Default: ~/.clearmap"
+read -r cfg_dir
+if [ -n "$cfg_dir" ]; then
+    export CLEARMAP_CFG_DIR="$cfg_dir"  # Settings reads it (and expands "~"); the folder is created below
+fi
 
 python -c "$prep_python \
 from ClearMap.Utils.install_utils import patch_env; \
@@ -275,11 +289,20 @@ green "Done"
 echo
 echo "========================="
 echo
-# Create config folder if missing
-green "Checking if ClearMap configuration directory exists at \"$config_folder\""
-if [ ! -d "$config_folder" ]; then
-    yellow "Config folder missing, creating it"
-    mkdir "$config_folder" || exit 1
+# Create config folder if missing (~/.clearmap, or $CLEARMAP_CFG_DIR given above: Settings decides, not this script)
+config_folder=$(python -c "$prep_python \
+from ClearMap.Utils.install_utils import ensure_config_folder; \
+print(ensure_config_folder())" | tail -n 1)
+if [ -z "$config_folder" ]; then
+    red "ERROR: could not create the ClearMap configuration directory"
+    exit 1
+fi
+green "ClearMap configuration directory: \"$config_folder\""
+if [ -n "$CLEARMAP_CFG_DIR" ]; then
+    # Absolute path, for the python processes below (they run from $HOME) and for the ones started in this environment:
+    # the folder cannot be a setting of ClearMap, since the machine parameters are read from it
+    export CLEARMAP_CFG_DIR="$config_folder"
+    conda env config vars set "CLEARMAP_CFG_DIR=$config_folder" || exit 1
 fi
 
 # Install or update ClearMap config
@@ -314,6 +337,18 @@ if [[ "$OSTYPE" != "linux-gnu"* ]]; then
         set_elastix_path('$elastix_path')" || exit 1
     fi
 fi
+
+chmod u+x "$clearmap_install_path/ClearMap/External/elastix/build/bin/"* || exit 1
+
+# Configure environment to amend LD_LIBRARY_PATH to point to custom Elastix binary shipped with ClearMap
+if  [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    lib_path_name="LD_LIBRARY_PATH"
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+    lib_path_name="DYLD_LIBRARY_PATH"
+fi
+conda env config vars set "$lib_path_name=$clearmap_install_path/ClearMap/External/elastix/build/bin/:$LD_LIBRARY_PATH" || exit 1
+
+# FIXME: not for MaxOS
 
 # Create Linux desktop menus
 echo "Do you want to create a desktop menu entry.
@@ -351,18 +386,6 @@ StartupNotify=true"
         green "Skipping menu entry";
         ;;
 esac
-
-chmod u+x "$clearmap_install_path/ClearMap/External/elastix/build/bin/"* || exit 1
-
-# Configure environment to amend LD_LIBRARY_PATH to point to custom Elastix binary shipped with ClearMap
-if  [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    lib_path_name="LD_LIBRARY_PATH"
-elif [[ "$OSTYPE" == "darwin"* ]]; then
-    lib_path_name="DYLD_LIBRARY_PATH"
-fi
-conda env config vars set "$lib_path_name=$clearmap_install_path/ClearMap/External/elastix/build/bin/:$LD_LIBRARY_PATH" || exit 1
-
-# FIXME: not for MaxOS
 
 green "
 $ENV_NAME installed

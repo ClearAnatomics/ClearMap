@@ -9,6 +9,7 @@ from ClearMap.Analysis.vasculature.geometry_utils import cartesian_to_polar, ang
 from ClearMap.Analysis.vasculature.vasc_graph_utils import set_artery_vein_if_missing, combine_arteries_and_veins, \
     vertex_to_edge_property, edge_to_vertex_property, filter_graph_degrees, \
     parallel_get_vessels_lengths, graph_gt_to_igraph, n_kinds, get_vertex_coordinates, vertex_filter_to_edge_filter
+from ClearMap.IO import io_ops
 
 CORRECTED_GRAPH_BASE_NAME = 'data_graph_correcteduniverse'
 
@@ -466,7 +467,7 @@ def avg_streamlines_grid(work_dir, reference_samples, mode='bigvessels', group_n
     flow_vectors_avgs = np.nanmean(np.array(all_samples_flow_vectors), axis=0)
     dest_path = Path(work_dir) / f'streamline_grid_avg_{group_name}{mode}.npy'
     np.save(dest_path, flow_vectors_avgs)
-    clearmap_io.write(str(dest_path.with_suffix('.tif')), flow_vectors_avgs)
+    io_ops.write(str(dest_path.with_suffix('.tif')), flow_vectors_avgs)
 
 
 # ############################################################################################################

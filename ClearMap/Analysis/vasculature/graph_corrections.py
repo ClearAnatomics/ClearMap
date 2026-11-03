@@ -1,4 +1,3 @@
-import multiprocessing
 import os.path
 import sys
 
@@ -11,8 +10,7 @@ from ClearMap.Analysis.vasculature.vasc_graph_utils import remove_surface, verte
 
 print('Loading ClearMap modules, please wait ...')
 import ClearMap.Analysis.graphs.graph_gt as ggt
-
-CPU_COUNT = multiprocessing.cpu_count()
+from ClearMap.Utils.utilities import sanitize_n_processes
 
 
 def join_neighbouring_degrees_1(graph, min_radius=5, dest_path='', reduction_compatible=True):
@@ -41,7 +39,7 @@ def join_neighbouring_degrees_1(graph, min_radius=5, dest_path='', reduction_com
     df['vertex_id'] = degree_1_indices
     # find the nearest degree 1 for each degree 1 vertex
     knn = NearestNeighbors(n_neighbors=2, radius=min_radius + 1,
-                           n_jobs=CPU_COUNT - 2)  # we take the two nearest "neighbors" : itself and the nearest degree1
+                           n_jobs=sanitize_n_processes(-2))  # we take the two nearest "neighbors" : itself and the nearest degree1
     knn.fit(df[["x", "y", "z"]])
     dist, indices = knn.kneighbors(df[["x", "y", "z"]], return_distance=True)
     dist = dist[:, 1]  # throw away the vertex itself

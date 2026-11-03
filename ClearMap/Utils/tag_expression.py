@@ -49,7 +49,7 @@ See also
 :mod:`~ClearMap.Utils.RegularExpression`
 """
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__ = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
@@ -134,17 +134,23 @@ class Tag:
         return ttype_to_dtype(self.ttype)
 
     def tag(self):
-        t = TAG_START
-        if self.name is not None:
-            t += self.name + TAG_SEPARATOR
+        """
+        The tag as a string, in the format that :meth:`parse` reads back (``<Name,Type,Width>``).
+
+        An unnamed tag keeps an empty name field (e.g. ``<,I,2>``) so that it is not read back as a
+        tag named after its type (``<I,2>`` would be a tag named "I").
+        """
+        fields = []
         if self.ttype is not None:
-            t += self.ttype + TAG_SEPARATOR
+            fields.append(self.ttype)
         if self.width is not None:
-            t += str(self.width) + TAG_SEPARATOR
-        if len(t) > len(TAG_START):
-            t = t[:-len(TAG_SEPARATOR)]
-        t += TAG_END
-        return t
+            fields.append(str(self.width))
+
+        if self.name is None and not fields:
+            return TAG_START + TAG_END  # '<>'
+
+        name = self.name or ''
+        return TAG_START + TAG_SEPARATOR.join([name, *fields]) + TAG_END
 
     def glob_pattern(self):
         e = ''
@@ -173,7 +179,7 @@ class Tag:
             else:
                 e += '('
             if self.ttype == TAG_INT or self.ttype is None:
-                e += '\d'
+                e += r'\d'
             else:  # self.ttype == TAG_STR:
                 e += '.'
             if self.width is not None:
@@ -255,8 +261,7 @@ class Tag:
 
         body = tag[len(TAG_START):-len(TAG_END)]
         if not body:  # Use default values
-            self.name = self.width = None
-            self.ttype = TAG_INT
+            self.__init__(name=None, ttype=TAG_INT, width=None)
             return
 
         parts = body.split(TAG_SEPARATOR)
@@ -328,6 +333,23 @@ class Expression:
             else:
                 e += p
         return e
+
+    def without_tag(self, tag_name):
+        """
+        The expression without the tag tag_name, the rest of the pattern as it is.
+
+        Examples
+        --------
+        Tiles of one file per Z plane, and one file per tile without the Z tag (their columns):
+
+        >>> planes = Expression('tile_<Y,2>_<X,2>_Z<Z,4>.tif')
+        >>> planes.string({'Y': 0, 'X': 1})  # Before: the planes of tile (0, 1), one file each
+        'tile_00_01_Z<Z,I,4>.tif'
+        >>> planes.without_tag('Z').string({'Y': 0, 'X': 1})  # After: the one file of tile (0, 1)
+        'tile_00_01_Z.tif'
+        """
+        return Expression(''.join(p.tag() if isinstance(p, Tag) else p for p in self.pattern
+                                  if not (isinstance(p, Tag) and p.name == tag_name)))
 
     def tag_max(self, tag_name):
         """
@@ -741,6 +763,33 @@ class Expression:
         self.pattern = pattern
         self.tags = [q for q in pattern if isinstance(q, Tag) and not q.reference]
 
+    def __eq__(self, other):
+        """
+        Two expressions are equal if they have the same canonical string (e.g. ``<X,2>`` equals ``<X,I,2>``).
+
+        A str or Path is compared as the expression it parses to; one that is not a valid expression is
+        simply not equal (this never raises). Anything else is not comparable.
+        """
+        if isinstance(other, (str, Path)):
+            try:
+                other = Expression(other)
+            except ValueError:  # Malformed tag
+                return False
+        elif not isinstance(other, Expression):
+            return NotImplemented
+        return str(self) == str(other)
+
+    def __hash__(self):
+        """
+        Consistent with ``__eq__`` between expressions.
+
+        .. warning::
+            Expressions are mutable (:meth:`parse`, :meth:`detect`): do not change one while it is a
+            dict key or set member. A str that equals an expression does not have the same hash,
+            so do not mix them in the same set or dict.
+        """
+        return hash(str(self))
+
     def __str__(self):
         return f'{self.tag()}'
 
@@ -794,8 +843,9 @@ def _test():
 
     # glob
     import ClearMap.Tests.Files as tf
+    from ClearMap.IO import FileUtils as file_utils
 
-    s = tf.io.join(tf.tif_sequence, 'sequence<I,4>.tif')
+    s = file_utils.join(tf.tif_sequence, 'sequence<I,4>.tif')
     t = te.parse(s)
     f = t.glob()
 

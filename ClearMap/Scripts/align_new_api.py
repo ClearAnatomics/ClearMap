@@ -1,53 +1,32 @@
+import sys
 
-from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
-from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
-from ClearMap.processors.sample_preparation import StitchingProcessor, RegistrationProcessor
+from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
+from ClearMap.pipeline_orchestrators.utils import init_sample_manager_and_processors
 
 
 def plot_registration_results(aligner: RegistrationProcessor, channel: str, composite: bool = False):
-    img_paths = [
-        aligner.get_fixed_image(channel).path,
-        aligner.get_aligned_image(channel),
-    ]
-    if not all([p.exists() for p in img_paths]):
-        raise ValueError(f'Missing requirements {img_paths}')
-    # image_sources = copy.deepcopy(list(img_paths))
-    # for i, im_path in enumerate(image_sources):
-    #     if im_path.endswith('.mhd'):
-    #         image_sources[i] = mhd_read(im_path)
-    titles = [img.parent.stem if 'aligned_to' in str(img) else img.stem for img in img_paths]
-    if composite:
-        img_paths = [img_paths, ]
-    dvs = q_plot_3d.plot(img_paths, title=titles, arrange=True, sync=True, lut='white')
+    # Imported here, not at the top: a headless job (cluster) stitches and registers without Qt installed
+    from ClearMap.Visualization.Qt.utils import link_dataviewers_cursors
+    dvs, titles = aligner.plot_registration_results(channel=channel, composite=composite)
     if not composite:
         link_dataviewers_cursors(dvs)
 
 
-def register(aligner: RegistrationProcessor):
-    print('Registering')
-    aligner.setup_atlases()
-    for channel in aligner.channels_to_resample():
-        aligner.resample_channel(channel)
-    print('Aligning')
-    aligner.align()
-    print('Registered')
+def main(src_directory, show_plots=True):
+    """Stitch, then register to the atlas, the sample of the experiment folder `src_directory`."""
+    orchestrators = init_sample_manager_and_processors(src_directory)
+    sample_manager = orchestrators['sample_manager']
+    stitcher = orchestrators['stitcher']
+    registration_processor = orchestrators['registration_processor']
+
+    stitcher.stitch()
+    if show_plots:
+        stitcher.plot_stitching_results(mode='overlay')
+
+    registration_processor.register()
+    if show_plots:
+        plot_registration_results(registration_processor, sample_manager.alignment_reference_channel)
 
 
-def stitch(stitcher: StitchingProcessor):  # FIXME: part of stitcher object
-    sample_manager = stitcher.sample_manager
-    for channel in sample_manager.channels:
-        if not sample_manager.is_tiled(channel):
-            stitcher.copy_or_stack(channel)
-
-    for stitching_tree in stitcher.get_stitching_order(strict=True).values():
-        for channel in stitching_tree:
-            config = stitcher.config['channels'][channel]
-            if not config['run']:
-                continue
-            if config['use_npy'] and not sample_manager.has_npy(channel):
-                    stitcher.convert_tiles()
-            if channel == config['layout_channel']:
-                stitcher.stitch_channel_rigid(channel, _force=True)
-                stitcher.stitch_channel_wobbly(channel, _force=True)  # TODO: check if force
-            else:
-                stitcher._stitch_layout_wobbly(channel)
+if __name__ == '__main__':
+    main(sys.argv[1])

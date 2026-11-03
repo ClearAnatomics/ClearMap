@@ -5,21 +5,6 @@ utilities
 
 Various utilities that do not have a specific category
 """
-import multiprocessing
-import os
-import re
-import shutil
-import subprocess
-import sys
-import tempfile
-import warnings
-from collections import deque
-from concurrent.futures import ProcessPoolExecutor
-from functools import reduce
-from operator import getitem
-
-import numpy as np
-import psutil
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
@@ -27,16 +12,31 @@ __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
+import inspect
+import os
+import platform
+import re
+import sys
+import threading
+import warnings
+from concurrent.futures import ProcessPoolExecutor
+from enum import IntEnum
 import functools
+from typing import List
 
-from configobj import ConfigObj
-
-from ClearMap.Utils.tag_expression import Expression
-from ClearMap.Utils.exceptions import MissingRequirementException, SmiError, ParamsOrientationError
+from ClearMap.Utils.exceptions import ClearMapTypeError, ClearMapValueError
 
 
-DEFAULT_ORIENTATION = (0, 0, 0)
+# The environment variables with which Slurm tells a job how many CPUs it may use (the cores of the node are not its own)
+CPU_LIMIT_ENV_VARS = ('SLURM_CPUS_PER_TASK', 'SLURM_CPUS_ON_NODE')
+PROCESSES_EXPECTED = 'None (all the CPUs), n, -n (all but n) or 0 (in the calling process)'
 
+
+class ExitCode(IntEnum):
+    """The exit status of a command line program, which a shell or a job scheduler reads"""
+    SUCCESS = 0
+    FAILURE = 1
+    USAGE_ERROR = 2  # What argparse exits with for a wrong command line
 
 colors = {
     "WHITE": '\033[1;37m',
@@ -67,38 +67,35 @@ def runs_on_ui():
     return 'CLEARMAP_GUI_HOSTED' in os.environ
 
 
-def smi_query(var_name, units=False):
-    cmd = f'nvidia-smi --query-gpu={var_name} --format=noheader,csv'
-    if not units:
-        cmd += ',nounits'
-    output = subprocess.check_output(cmd, shell=True)
-    if "Failed to initialize NVML: Driver/library version mismatch" in output.decode('ascii'):
-        raise SmiError(output)
-    return output
-
-
-def get_free_v_ram():
-    return int(smi_query('memory.free'))
-
-
-def get_percent_v_ram_use():
-    percent = float(smi_query('memory.used')) / float(smi_query('memory.total'))
-    return percent * 100
-
-
-def gpu_util():
-    gpu_percent = smi_query('utilization.gpu', units=True).decode('ascii').replace('%', '').strip()
-    return int(gpu_percent)
-
-
-def gpu_params(dest_file_path):  # Uses 1 query instead of 3 because too time-consuming
-    cmd = 'nvidia-smi --query-gpu=memory.used,memory.total,utilization.gpu --format=noheader,csv,nounits'
-    cmd += f' > {dest_file_path}'
-    subprocess.Popen(cmd, shell=True)
+def is_headless() -> bool:
+    # Best-effort heuristics for “don’t prompt”
+    return os.environ.get('CLEARMAP_HEADLESS') == '1' or (
+            platform.system().lower() == 'linux'
+            and not os.environ.get('DISPLAY')
+            and os.environ.get('QT_QPA_PLATFORM', '').lower() not in ('wayland', 'xcb')
+    )
 
 
 class CancelableProcessPoolExecutor(ProcessPoolExecutor):
+    """
+    A :class:`~concurrent.futures.ProcessPoolExecutor` that can be shut down by another thread than the one using it.
+
+    The GUI cancels a step from its own thread (``stop_process`` calls ``shutdown(cancel_futures=True)``), while the
+    thread running the step leaves its ``with`` block, which calls ``shutdown`` again. The standard
+    ``shutdown`` is not safe against that: both threads close the reader of the result queue and the second one closes
+    a file descriptor that is already closed (``OSError: [Errno 9] Bad file descriptor``) or, worse, already reused.
+    The shutdowns are therefore serialized: the later ones wait for the first and find nothing left to do.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._shutdown_serializer = threading.Lock()
+
+    def shutdown(self, wait=True, *, cancel_futures=False):
+        with self._shutdown_serializer:
+            super().shutdown(wait=wait, cancel_futures=cancel_futures)
+
     def immediate_shutdown(self):
+        import psutil  # Not at the top: the installation script imports this module before psutil is installed
         with self._shutdown_lock:
             self._shutdown_thread = True
             # statuses = [psutil.Process(_proc.pid).status() for _proc in self._processes.values()]
@@ -113,118 +110,67 @@ class CancelableProcessPoolExecutor(ProcessPoolExecutor):
                     proc.terminate()
 
 
-def is_in_range(src_array, value_range):
-    return np.logical_and(src_array >= value_range[0], src_array <= value_range[1])
-
-
-def is_iterable(obj):
-    try:
-        _ = iter(obj)
-        return True
-    except TypeError:
-        return False
-
-
 def title_to_snake(string):
-    out = re.sub('(?!^)([A-Z]+)', r'_\1', string).lower()
-    out = out.replace(' ', '_')
-    return out
+    """
+        Convert a human/TitleCase/mixed string into canonical snake_case.
+
+        Rules:
+        - Inserts underscores at CamelCase boundaries (e.g., "TubeMap" -> "tube_map").
+        - Keeps acronyms together (e.g., "HTTPServer" -> "http_server", "ROI3D" -> "roi3d").
+        - Normalizes spaces, hyphens, slashes, and other punctuation to single underscores.
+        - Collapses multiple underscores and trims leading/trailing underscores.
+        - Lowercases the final result.
+
+        Parameters
+        ----------
+        s : str
+            Input string (e.g., tab title, pipeline name, or file-ish label).
+
+        Returns
+        -------
+        str
+            Snake_case version of the input. Empty string if input is None/empty.
+
+        Examples
+        --------
+        >>> title_to_snake("TubeMap")
+        'tube_map'
+        >>> title_to_snake("Sample Info")
+        'sample_info'
+        >>> title_to_snake("Tract-Map")
+        'tract_map'
+        >>> title_to_snake("ROI3D")
+        'roi3_d'  # FIXME: ideally 'roi3d' but hard to do robustly
+        >>> title_to_snake("HTTPServerError")
+        'http_server_error'
+        """
+    if not string:
+        return ''
+
+    string = string.strip()
+
+    # Insert underscore between:
+    # 1) a lowercase/digit and an uppercase letter: "version2File" -> "version2_File"
+    string = re.sub(r'([a-z0-9])([A-Z])', r'\1_\2', string)
+
+    # 2) acronym and the next CamelCase word: "HTTPServer" -> "HTTP_Server"
+    #    (one or more capitals) followed by (Capital + lowercase)
+    string = re.sub(r'([A-Z]+)([A-Z][a-z])', r'\1_\2', string)
+
+    # Normalize any non-alphanumeric runs to underscores (keeps underscores too)
+    string = re.sub(r'[^0-9A-Za-z]+', '_', string)
+
+    # Collapse repeated underscores and trim
+    string = re.sub(r'_+', '_', string).strip('_')
+
+    return string.lower()
+    # out = re.sub('(?!^)([A-Z]+)', r'_\1', string).lower()
+    # out = out.replace(' ', '_')
+    # return out
 
 def snake_to_title(string):
     return string.replace('_', ' ').title()
 
-
-def backup_file(file_path):  # REFACTOR: put in workspace or IO
-    base_path, ext = os.path.splitext(file_path)
-    new_path = base_path + '.bcp' + ext
-    shutil.copy(file_path, new_path)
-
-
-def make_abs(directory, file_name):
-    """Make file_name absolute if it is not"""
-    if os.path.isabs(file_name):
-        f_path = file_name
-    else:
-        f_path = os.path.join(directory, file_name)
-    return f_path
-
-
-def get_item_recursive(container, keys):
-    try:
-        return reduce(getitem, keys, container)
-    except (TypeError, KeyError) as err:
-        err_type = type(err).__name__
-        err_msg = f'{err_type} attempting to read "{keys}"'
-        if isinstance(container, ConfigObj):
-            err_msg += f' path: {container.filename}'
-        print(f'{err_msg} from "{container}"')
-        raise err
-
-
-def set_item_recursive(dictionary, keys_list, val, fix_missing_keys=True):
-    def add_keys(d, keys):
-        if not keys:
-            return
-        if keys[0] not in d.keys():
-            d[keys[0]] = {}
-        if keys[1:]:  # if keys left
-            add_keys(d[keys[0]], keys[1:])
-
-    if fix_missing_keys:
-        add_keys(dictionary, keys_list[:-1])  # Fix missing keys recursively
-    get_item_recursive(dictionary, keys_list[:-1])[keys_list[-1]] = val
-
-
-def requires_assets(asset_specs):
-    """
-    Decorator to check if the required files exist before running the function.
-    For the case of channel, it can be extracted (in this order) from
-    - the kwargs
-    - the FilePath object
-    - the instance to which the wrapped function belongs
-
-    Parameters
-    ----------
-    asset_specs: List[FilePath]
-        List of FilePath objects
-    """
-    def decorator(func):
-        def wraps(*args, **kwargs):
-            instance = args[0]
-            workspace = instance.workspace
-            for f_p in asset_specs:
-                channel = kwargs.get('channel')  # Get directly from the kwargs
-                if channel is None:
-                    if hasattr(f_p, 'channel'):  # Get from FilePath object
-                        channel = f_p.channel
-                    else:  # Get the global value from the instance
-                        channel = getattr(instance, 'channel', None)
-                f_path = workspace.filename(f_p.base, channel=channel, sample_id=f_p.prefix, asset_sub_type=f_p.postfix,
-                                            extension=f_p.extension)
-                msg = f'{type(instance).__name__}.{func.__name__} missing path: "{f_path}"'
-                if Expression(f_path).tags:
-                    file_list = workspace.file_list(f_p.base, sample_id=f_p.prefix, asset_sub_type=f_p.postfix,
-                                                    extension=f_p.extension)
-                    if not file_list:
-                        raise MissingRequirementException(msg + ' Pattern but no file')
-                    for f in file_list:
-                        if not os.path.exists(f):
-                            raise MissingRequirementException(msg + f' Missing tile {f}')
-                elif not os.path.exists(f_path):
-                    raise MissingRequirementException(msg)
-            return func(*args, **kwargs)
-        return wraps
-    return decorator
-
-
-def check_enough_temp_space(min_temp_space=200):
-    free = get_free_temp_space()
-    return free // (2**30) > min_temp_space  # GB
-
-
-def get_free_temp_space():
-    _, _, free = shutil.disk_usage(tempfile.gettempdir())
-    return free
 
 def bytes_to_human(num):
     """
@@ -247,15 +193,6 @@ def bytes_to_human(num):
     else:
         warnings.warn(f'Unable to convert {num} bytes to human-readable format. ')
         return f"{num:.2f} bytes"
-
-
-# FIXME: move to io and rename to smth similar to AssetSpec (without conflicting with the existing AssetSpec)
-class FilePath:
-    def __init__(self, base, prefix=None, postfix=None, extension=None, asset_sub_type=None):
-        self.base = base
-        self.prefix = prefix
-        self.postfix = asset_sub_type or postfix
-        self.extension = extension
 
 
 def handle_deprecated_args(deprecated_args_map):  # FIXME: add a version_changed argument
@@ -315,30 +252,6 @@ def validate_arg(arg_name, value, valid_values):
     return value
 
 
-def clear_cuda_cache():
-    import torch
-    torch.cuda.empty_cache()
-
-
-# def topological_sort(graph, in_degree):
-#     queue = deque([node for node in in_degree if in_degree[node] == 0])
-#     sorted_list = []
-#
-#     while queue:
-#         node = queue.popleft()
-#         sorted_list.append(node)
-#
-#         for neighbor in graph[node]:
-#             in_degree[neighbor] -= 1
-#             if in_degree[neighbor] == 0:
-#                 queue.append(neighbor)
-#
-#     if len(sorted_list) != len(in_degree):
-#         raise ValueError("Cycle detected in channel dependencies")
-#
-#     return sorted_list
-
-
 def check_stopped(func):
     """
     Decorator to check if the object is stopped (self.stopped) before running the function.
@@ -355,48 +268,78 @@ def check_stopped(func):
     return wrapper
 
 
-def validate_orientation(orientation, channel, raise_error=True):
+def available_cpu_count():
     """
-    Check that the orientation does not have redundant axes
+    The number of CPUs this process may use, which is not the number of CPUs of the machine on a cluster (or in
+    a container): ``multiprocessing.cpu_count()`` gives the cores of the node, and a job that starts that many
+    processes on the few cores Slurm gave it fights with itself (and with the jobs of the others).
 
-    Parameters
-    ----------
-    orientation: tuple(int)
-        The orientation to check
+    This is the smallest of what each source says:
+
+    * the CPUs the process is allowed to run on (``taskset``, the cpuset of a Slurm job with the cgroup plugin),
+      or the CPUs of the machine where the system does not say (macOS, Windows)
+    * the ``SLURM_CPUS_PER_TASK`` and ``SLURM_CPUS_ON_NODE`` of the job, which are all there is where Slurm
+      does not restrict the CPUs the process can run on. A value that is not a positive integer is ignored.
+
+    Returns
+    -------
+    int
+        At least 1: every limit is, by construction.
     """
-    defined_axes = [abs(e) for e in orientation if e != 0]
-    if len(defined_axes) != len(set(defined_axes)):
-        if raise_error:
-            raise ParamsOrientationError(f'Number of different defined axes in {orientation} is'
-                                         f'{len(set(defined_axes))}. Defined axes cannot be duplicated. '
-                                         f'Please amend duplicate axes.', channel=channel)
-        else:
-            warnings.warn(f'Invalid orientation {orientation} for {channel},'
-                          f' using default {DEFAULT_ORIENTATION}')
-            return DEFAULT_ORIENTATION
-    return orientation
+    return min([cpus_the_process_may_run_on(), *slurm_cpu_limits()])
 
 
-def sanitize_n_processes(processes):
-    if processes is None:
-        processes = multiprocessing.cpu_count()
-    elif isinstance(processes, str):
-        warnings.warn(f'Using a string to specify the number of processes is deprecated. '
-                      f'Please use an integer (positive or negative) or None.', DeprecationWarning)
+def cpus_the_process_may_run_on():
+    """The CPUs taskset, or Slurm with its affinity or cgroup plugin, lets this process run on"""
+    try:
+        return len(os.sched_getaffinity(0))
+    except AttributeError:  # No such function on macOS and Windows: the CPUs of the machine
+        return os.cpu_count() or 1
+
+
+def slurm_cpu_limits():
+    """What SLURM_CPUS_PER_TASK and SLURM_CPUS_ON_NODE say, where they are positive integers"""
+    values = (os.environ.get(name, '').strip() for name in CPU_LIMIT_ENV_VARS)
+    return [int(value) for value in values if value.isdecimal() and int(value) > 0]
+
+
+def sanitize_n_processes(processes, can_run_in_calling_process=False):
+    """
+    The number of processes to use: None for all the CPUs of the job (:func:`available_cpu_count`), -n for all
+    but n (at least 1) and n for n, but never more than the CPUs of the job: the number of a configuration written
+    for a larger machine does not make a small job fight with itself.
+
+    0 is no subprocess: the calling process does the work, one item after the other (to debug). It stays 0 for
+    the code that can run that way (``can_run_in_calling_process``) and is 1 for the code that only needs a count
+    (the threads of compiled code...). The former 'serial' is 0 and '!serial' -1, but they are deprecated.
+
+    Raises
+    ------
+    ClearMapValueError
+        If processes is a string other than the former ones.
+    ClearMapTypeError
+        If processes is neither None, an integer nor a string.
+    """
+    if isinstance(processes, str):
+        warnings.warn('Using a string to specify the number of processes is deprecated. Please use an integer '
+                      '(positive, negative, or 0 for the calling process) or None.', DeprecationWarning, stacklevel=2)
         if processes.lower() == 'serial':
-            processes = 1
+            processes = 0
         elif processes.lower() == '!serial':
-            processes = multiprocessing.cpu_count() - 1
+            processes = -1
         else:
-            raise ValueError(f'Unknown string value for processes: {processes}. '
-                             f'Use None, "serial" or an integer.')
-    if isinstance(processes, int):
-        if processes < 0:
-            processes = multiprocessing.cpu_count() - processes
-        processes = max(1, processes)
-        return processes
-    else:
-        raise ValueError(f'Processes must be an integer or None, got {processes} of type {type(processes)}')
+            raise ClearMapValueError(f'Unknown string value for processes: {processes!r}', value=processes,
+                                     expected=PROCESSES_EXPECTED)
+    if processes is None:
+        return available_cpu_count()
+    if not isinstance(processes, int):
+        raise ClearMapTypeError(f'processes must be None or an integer ({PROCESSES_EXPECTED}), got {processes!r} '
+                                f'of type {type(processes).__name__}')
+    if processes == 0:
+        return 0 if can_run_in_calling_process else 1
+    available = available_cpu_count()
+    requested = available + processes if processes < 0 else processes
+    return min(max(1, requested), available)  # A number relative to the CPUs never means the calling process
 
 
 def get_ok_n_ok_symbols():
@@ -415,3 +358,47 @@ def get_ok_n_ok_symbols():
         return '✓', '✗'
     except (UnicodeEncodeError, TypeError):
         return '[OK]', '[FAIL]'
+
+
+def infer_origin_from_caller() -> str:
+    """
+    Infer an **origin** string from the caller's module, class and function name.
+    This is typically the method that is mutating the config.
+
+    Returns
+    -------
+    str
+        The inferred origin string in the format "module.class.function" or "module.function" if
+    """
+    frame = inspect.stack()[1]
+    mod = frame.frame.f_globals.get('__name__', '')
+    func = frame.function
+    cls = type(frame.frame.f_locals['self']).__name__ if 'self' in frame.frame.f_locals else ''
+    origin = f"{mod}.{cls + '.' if cls else ''}{func}"
+    return origin
+
+
+def trim_or_pad(lst: List, target_len: int, pad_value=0):
+    """
+    Strip or pad a list to a target length.
+
+    Parameters
+    ----------
+    lst: list
+        The list to strip or pad
+    target_len: int
+        The target length
+    pad_value: any
+        The value to use for padding
+
+    Returns
+    -------
+    list
+        The stripped or padded list
+    """
+    if len(lst) > target_len:
+        return lst[:target_len]
+    elif len(lst) < target_len:
+        return lst + [pad_value] * (target_len - len(lst))
+    else:
+        return lst

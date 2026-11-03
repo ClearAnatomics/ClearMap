@@ -225,7 +225,8 @@ def orient_points(points, orientation, shape=None, inverse=False):
     # reorient points
     orientation = format_orientation(orientation)
 
-    oriented = points
+    # Make a mutable copy of the input points to avoid modifying the original array
+    oriented = np.array(points)
 
     if orientation is not None:
         # reverse

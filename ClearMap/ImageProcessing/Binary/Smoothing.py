@@ -16,16 +16,17 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
-import os
 import functools
+from pathlib import Path
 
 import numpy as np
 import scipy.ndimage as ndi
 
 import multiprocessing as mp
 
-import ClearMap.IO.IO as io
+from ClearMap.IO.source import Source as source_mod
 import ClearMap.IO.FileUtils as fu
+from ClearMap import Settings as settings
 
 import ClearMap.ImageProcessing.Topology.Topology3d as t3d
 
@@ -33,6 +34,9 @@ import ClearMap.ParallelProcessing.BlockProcessing as bp
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
 
 import ClearMap.Utils.Timer as tmr
+from ClearMap.Utils.utilities import sanitize_n_processes
+from ClearMap.IO import source_initialization, io_ops
+
 
 ###############################################################################
 # Smoothing by number of neighbours
@@ -73,7 +77,7 @@ def smooth_by_counting(source, sink = None, low = 5, high = 10, shape = None):
   for d in range(ndim):
     weights = np.ones(shape[d], dtype = int)
     temp = np.zeros(source.shape, dtype = 'uint8')
-    ap.correlate1d(filtered, weights, sink=temp, axis=d, mode='constant', cval=0)
+    ap.correlate1d(filtered, weights, sink=temp, axis=d)  # zero padded borders (mode='constant', cval=0)
     filtered = temp
 
   if sink is None:
@@ -286,17 +290,15 @@ def generate_lookup_table(function = index_to_smoothing, verbose = True, process
   if verbose:
     print('Smoothing: Generating look-up table!')
     
-  if processes is None:
-    processes = mp.cpu_count()
-
-  if processes == 'serial':
+  processes = sanitize_n_processes(processes, can_run_in_calling_process=True)
+  if processes == 0:
     lut = [function(i) for i in range(2**27)]
   else:
     #import concurrent.futures as cf
     #with cf.ProcessPoolExecutor(max_workers=processes) as executor:
     #  lut = executor.map(function, range(2**27));
-    pool = mp.Pool(mp.cpu_count())
-    lut = pool.map(function, range(2**27), chunksize=2**27//8//mp.cpu_count())
+    pool = mp.Pool(processes)
+    lut = pool.map(function, range(2**27), chunksize=2**27//8//processes)
     pool.close()
     pool.join()
     lut = list(lut)
@@ -308,25 +310,32 @@ smooth_by_configuration_filename = "Smoothing.npy"
 """Filename for the look up table mapping a cube configuration to the smoothing action for the center pixel."""
 
 
+SMOOTHING_FOLDER = Path(__file__).resolve().parent
+"""The folder of this module, where the compressed look up table is shipped (and possibly a prepared one)."""
+
+
 def initialize_lookup_table(function = index_to_smoothing, filename = smooth_by_configuration_filename, verbose = True, processes = None):
-  """Initialize the lookup table"""
-  
-  filename = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
+    """Load the lookup table, making it first if it is not in the folder of this module nor in the cache folder.
 
-  #uncompress if only zip file exists.
-  fu.uncompress(filename)
+    The table is made from the compressed one shipped with the program if there is one, else computed (slow).
+    It is made in :data:`ClearMap.Settings.clearmap_cache_dir`, never in the folder of the program (read-only on a
+    cluster).
+    """
 
-  #load lookup table
-  if os.path.exists(filename):
+    def make_table(path):
+        compressed_path = SMOOTHING_FOLDER / f'{filename}.zip'
+        if compressed_path.exists():
+            fu.decompress_file(compressed_path, path)
+        else:
+            if verbose:
+                print('Smoothing: Look-up table does not exists! Pre-calculating it!')
+            np.save(path, generate_lookup_table(function=function, verbose=verbose, processes=processes))
+
+    path = fu.find_or_build(filename, source_dir=SMOOTHING_FOLDER, cache_dir=settings.clearmap_cache_dir,
+                            build=make_table)
     if verbose:
-      print('Smoothing: Loading look-up table from %s!' % filename)
-    return np.load(filename)
-  else:
-    if verbose:
-      print('Smoothing: Look-up table does not exists! Pre-calculating it!')
-    lut = generate_lookup_table(function = function, verbose=verbose, processes=processes)
-    np.save(filename, lut)
-    return lut
+        print(f'Smoothing: Loading look-up table from {path}')
+    return np.load(path)
 
 
 def smooth_by_configuration_block(source, iterations = 1, verbose = False):
@@ -347,7 +356,7 @@ def smooth_by_configuration_block(source, iterations = 1, verbose = False):
     The smoothed binary array.
   """
   try:
-    if isinstance(source, io.src.Source):
+    if isinstance(source, source_mod.Source):
       smoothed = source.array
     else:
       smoothed = source
@@ -408,13 +417,13 @@ def smooth_by_configuration(source, sink=None, iterations=1, processing_paramete
     print('Binary smoothing: initialized!')
     timer = tmr.Timer()
 
-  #smoothing function
+  # smoothing function
   smooth = functools.partial(smooth_by_configuration_block, iterations=iterations, verbose=False)
   smooth.__name__ = 'smooth_by_configuration'
   
-  #initialize sources and sinks
-  source = io.as_source(source)
-  sink   = io.initialize(sink, shape_=source.shape, dtype_=bool, order_=source.order)
+  # initialize sources and sinks
+  source = io_ops.open_ro(source)
+  sink   = source_initialization.initialize(sink, shape_=source.shape, dtype_=bool, order_=source.order)
 
   #block processing parameter
   block_processing_parameter = dict(axes = bp.block_axes(source), 
@@ -467,7 +476,7 @@ def _test():
   
   noisy = binary.copy()
   noisy[np.logical_and(border, np.random.rand(*shape) > 0.925)] = True
-  smoothed  = sm.smooth_by_configuration(noisy, iterations=3, verbose=True, processes='serial')
+  smoothed  = sm.smooth_by_configuration(noisy, iterations=3, verbose=True, processes=0)
   
   import ClearMap.Visualization.Plot3d as p3d
   p3d.plot([noisy, smoothed])

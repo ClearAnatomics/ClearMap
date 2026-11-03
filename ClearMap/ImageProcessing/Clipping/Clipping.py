@@ -19,6 +19,8 @@ pyximport.install(setup_args={"include_dirs":np.get_include()},
                   reload_support=True)
 
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
+from ClearMap.IO import dtypes
+import ClearMap.Utils.array_checks as ac
 
 from . import ClippingCode as code
 
@@ -55,16 +57,26 @@ def clip(source, sink = None, clip_min = None, clip_max = None, clip_norm = None
     raise ValueError('Source assumed to be 3d found %dd!' % source.ndim);
   
   if clip_min is None:
-    clip_min = ap.io.min_value(source);
+    clip_min = dtypes.min_value(source);
   
   if clip_max is None:
-    clip_max = ap.io.max_value(source);
+    clip_max = dtypes.max_value(source);
+
+  if not clip_max > clip_min:  # the kernel divides by clip_max - clip_min
+    raise ValueError(f'clip_max ({clip_max}) must be larger than clip_min ({clip_min})!')
   
   if clip_norm is None:
     clip_norm = clip_max - clip_min;
 
   sink, sink_buffer = ap.initialize_sink(sink = sink, source = source);
-                                            
+
+  # dtypes of source_t and sink_t in ClippingCode.pyx
+  valid_dtypes = (np.int32, np.int64, np.uint8, np.uint16, np.uint32, np.uint64, np.float32, np.float64)
+  ac.check_dtype(source_buffer, valid_dtypes, name='source')
+  ac.check_dtype(sink_buffer, valid_dtypes, name='sink')
+  if sink_buffer.shape != source_buffer.shape:
+    raise ValueError(f'The sink shape {sink_buffer.shape!r} does not match the source shape {source_buffer.shape!r}!')
+
   code.clip(source_buffer, sink_buffer, clip_min, clip_max, clip_norm, processes);
   
   return sink;
@@ -86,5 +98,3 @@ def _test():
     timer = tmr.Timer();
     clipped = clp.clip(data, clip_max = 0.5, processes = p);  
     timer.print_elapsed_time('Clipping');
-    
-    

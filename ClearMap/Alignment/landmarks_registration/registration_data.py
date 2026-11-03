@@ -1,19 +1,31 @@
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from dataclasses import dataclass
 
 import itk
 import numpy as np
 
+from ClearMap.IO.FileUtils import normalize_location_spec
 
 # WARNING: required to have access to module
 #  We execute two commands to force itk to load subpackages, so as to have the following type available.
 #  types hidden by itk lazy loading:
 #    - itk.itkImagePython
 #    - itk.elxParameterObjectPython.elastixParameterObject
-from itk.elxParameterObjectPython import elastixParameterObject
-from itk import itkImagePython
-itk.ParameterObject.New()
+if TYPE_CHECKING:
+    from itk.elxParameterObjectPython import elastixParameterObject
+    from itk import itkImagePython
+
+_itk_warmed = False
+
+def ensure_itk_warmed() -> None:
+    global _itk_warmed
+    if _itk_warmed:
+        return
+    print('Initialising ITK and loading subpackages...')
+    itk.ParameterObject.New()
+    print('Loaded elastixParameterObject')
+    _itk_warmed = True
 
 
 # Warning: below, the geometric dimension of the image is merely inferred from np.array shape,
@@ -61,8 +73,8 @@ class ITKImage:
             ValueError: _description_
             ValueError: _description_
         """
-        if isinstance(source, (str, Path)):
-            source = str(source)
+        source = normalize_location_spec(source)
+        if isinstance(source, str):
             if source.endswith('.npy'):
                 self.image = np.load(source)  # TODO: see if same as below
             else:
@@ -171,6 +183,6 @@ class RegistrationData:
     moving_image: ITKImage
     fixed_points: Optional[np.array] = None
     moving_points: Optional[np.array] = None
-    reg_params: Optional[elastixParameterObject] = None
-    pullback_image: Optional[itkImagePython] = None
-    transform_params: Optional[elastixParameterObject] = None
+    reg_params: Optional['elastixParameterObject'] = None
+    pullback_image: Optional['itkImagePython'] = None
+    transform_params: Optional['elastixParameterObject'] = None

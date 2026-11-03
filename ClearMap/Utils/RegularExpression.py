@@ -588,7 +588,7 @@ def replace(expression, replace = None, ignore = None):
           else:
             rr = '%r' % r;
           newpattern += [(TEXT, rr)];
-          replace_group[rid] = rr;
+          replace_group[rid] = rr;  # FXIME: cannot use unhashable type
         else:
           newpattern.append(p);
       else:
@@ -747,7 +747,7 @@ def _test():
   """Test RegularExpression module"""
   import ClearMap.Utils.RegularExpression as cre
   #reload(cre);
-  expression = '/path/to/files/image_file_(?P<row>\d{2})_(?P<col>\d{2})_(?P<z>\d{4}).tif'
+  expression = r'/path/to/files/image_file_(?P<row>\d{2})_(?P<col>\d{2})_(?P<z>\d{4}).tif'
   filename = '/path/to/files/image_file_05_01_0012.tif'
   
   cre.group_names(expression)
@@ -764,7 +764,7 @@ def _test():
   
   
   #reload(cre)  
-  expression = '/test/test_(?P<row>\d{4})_(?P<col>\d{3}).tif';
+  expression = r'/test/test_(?P<row>\d{4})_(?P<col>\d{3}).tif';
   pattern = cre.expression_to_pattern(expression);
   expression_new = cre.pattern_to_expression(pattern);
   print(pattern)
@@ -774,7 +774,7 @@ def _test():
   cre.group_names(expression)
 
   #reload(cre)  
-  expression = '/test/test_(?:\d)_(?P<col>\d{3})_.(?P=col)tif[00 x 01]$';
+  expression = r'/test/test_(?:\d)_(?P<col>\d{3})_.(?P=col)tif[00 x 01]$';
   pattern = cre.expression_to_pattern(expression, ignore = '.[]');
   expression_new = cre.pattern_to_expression(pattern)  
   expression == expression_new
@@ -795,7 +795,7 @@ def _test():
   
   
   #reload(cre)
-  cre.expression_to_pattern('/home/test(?P<z>\d{3}).tif', ignore = '.[]')
+  cre.expression_to_pattern(r'/home/test(?P<z>\d{3}).tif', ignore = '.[]')
   
   #reload(cre);
-  cre.subpatterns_to_groups('/home/test\d{3}.tif', ignore = '.')
+  cre.subpatterns_to_groups(r'/home/test\d{3}.tif', ignore = '.')

@@ -1,0 +1,145 @@
+clearmap_schema: 3
+clearmap_version: "3.1.0"
+
+binarization:
+  templates:
+    vessels_template:
+      binarize:
+        run: true
+        save: true
+        clip_range: [350, 1000]
+        threshold: null
+      smooth:
+        run: true
+        save: true
+      binary_fill:
+        run: true
+        save: true
+      deep_fill:
+        run: true
+        save: true
+        resample_factor: 1
+      step_order:
+        - binarize
+        - smooth
+        - binary_fill
+        - deep_fill
+    large_vessels_template:  # same params for arteries and veins
+      binarize:
+        run: true
+        save: true
+        clip_range: [1000, 8000]
+        threshold: 450
+      smooth:
+        run: true
+        save: true
+      binary_fill:
+        run: true
+        save: true
+      deep_fill:
+        run: true
+        save: true
+        resample_factor: 2
+      step_order:
+        - binarize
+        - smooth
+        - binary_fill
+        - deep_fill
+  combined:
+    binary_fill: true
+    compress: false
+graph_construction:
+  skeletonize: true
+  build: true
+  clean: true
+  reduce: true
+  transform: true
+  annotate: true
+  use_arteries: true
+vessel_type_postprocessing:
+  pre_filtering:
+    vein_intensity_range_on_arteries_ch: [0, 2500]
+    restrictive_vein_radius_um: 15.0  # 6 vox × max(2.5 µm)
+    permissive_vein_radius_um:  16.25 # 6.5 × 2.5
+    final_vein_radius_um:        12.5  # 5 × 2.5
+    arteries_min_noise_edges: 2   # discard artery components with fewer edges than this
+  tracing:
+    max_arteries_iterations: 5
+    max_veins_iterations: 5
+    artery_trace_radius_um: 6.4  # 4vx × 1.6 µm/vox
+    vein_trace_radius_um: 8.0            # 5 vox × max(1.6, 1.6, 2.5)
+    distance_to_surface_min: 15.0
+    vein_intensity_min: 150.0
+    artery_intensity_min: 200.0
+  capillaries_removal:
+    min_artery_component_edges: 30
+    min_vein_component_edges: 30
+visualization:
+  voxelization:
+    size: [15, 15, 15]
+  slicing:
+    dim_0: [0, 200]
+    dim_1: [0, 300]
+    dim_2: [0, 400]
+  display: {}
+
+performance:
+  binarization:
+    templates:
+      vessels_template:
+        binarize:
+          block_processing:
+            n_processes: 10
+            size_min: 10
+            size_max: 16
+            overlap: 5
+        smooth:
+          block_processing:
+            n_processes: -1
+            size_min: null
+            size_max: 50
+            overlap: null
+        binary_fill:
+          n_processes: -1
+        deep_fill:
+          block_processing:
+            n_processes: 1
+            size_min: null
+            size_max: 500
+            overlap: 50
+      large_vessels_template:
+        binarize:
+          block_processing:
+            n_processes: 10
+            size_min: 10
+            size_max: 16
+            overlap: 5
+        smooth:
+          block_processing:
+            n_processes: -1
+            size_min: null
+            size_max: 50
+            overlap: null
+        binary_fill:
+          n_processes: -1
+        deep_fill:
+          block_processing:
+            n_processes: 1
+            size_min: null
+            size_max: 1000
+            overlap: 100
+    combine:
+      block_processing:
+        n_processes: -1
+        size_min: null
+        size_max: 500
+        overlap: 0
+  graph_construction:
+    skeletonize:
+      n_processes: -1
+    build:
+      n_processes: -1
+    clean:
+      n_processes: -1
+    reduce:
+      n_processes: -1

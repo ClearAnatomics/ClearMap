@@ -24,8 +24,9 @@ import numpy as np
 
 import cv2
 
-import ClearMap.IO.IO as io
-import ClearMap.IO.FileList as fl
+from ClearMap.IO import conversion, source_initialization, io_ops, source_geometry, FileUtils as file_utils
+from ClearMap.IO.source.backends import sma_backend, mmp_backend
+import ClearMap.IO.source.backends.file_list_backend as fl
 
 import ClearMap.ParallelProcessing.ProcessWriter as pw
 import ClearMap.ParallelProcessing.ParallelTraceback as ptb
@@ -36,7 +37,7 @@ from ClearMap.Utils.tag_expression import Expression
 from .Transformations.Transformation import TransformationBase
 from ClearMap.Alignment.orientation import (format_orientation, orientation_to_transposition, orient_resolution,
                                             orient_shape, orient, orient_points)
-from ClearMap.Utils.utilities import handle_deprecated_args
+from ClearMap.Utils.utilities import handle_deprecated_args, sanitize_n_processes
 
 
 def resample_shape_from_resolution(original_shape, original_resolution, resampled_resolution,
@@ -226,11 +227,11 @@ def resample_information(original_shape=None, resampled_shape=None,
 
     # shapes form sources
     if original_shape is None and original is not None:
-        original_shape = io.shape(original)
+        original_shape = source_geometry.shape(original)
 
     if resampled_shape is None:
         try:
-            resampled_shape = io.shape(resampled)
+            resampled_shape = source_geometry.shape(resampled)
         except FileNotFoundError:
             pass
 
@@ -507,9 +508,9 @@ def resample(original, resampled=None,
     method : 'shared' or 'memmap'
       Method to handle intermediate resampling results. If 'shared' use shared
       memory, otherwise use a memory map on disk.
-    processes : int, None or 'serial'
+    processes : int or None
       Number of processes to use for parallel resampling, if None use maximal
-      processes available, if 'serial' process in serial.
+      processes available, if 0 in the calling process (no subprocess).
     verbose : bool
       If True, display progress information.
 
@@ -549,12 +550,12 @@ def resample(original, resampled=None,
         for tag in exp.tags:
             exp = Expression(exp.pattern[0].replace(str(tag), ''))
         new_path = exp.pattern[0] + '.npy'
-        io.convert(original, new_path)
+        conversion.convert(original, new_path)
         original = new_path
     else:
         new_path = None
 
-    original = io.as_source(original)
+    original = io_ops.open_ro(original)
     dtype = original.dtype
     order = original.order
 
@@ -563,7 +564,7 @@ def resample(original, resampled=None,
                                                                         original_resolution, resampled_resolution,
                                                                         original, resampled,
                                                                         orientation, consistent=True)
-        original_shape = io.shape(original)
+        original_shape = source_geometry.shape(original)
         resampled_shape = None
     else:
         original_shape = original.shape
@@ -581,8 +582,7 @@ def resample(original, resampled=None,
 
     interpolation = _interpolation_to_cv2(interpolation, dtype=dtype)
 
-    if not isinstance(processes, int) and processes != 'serial':
-        processes = io.mp.cpu_count()
+    processes = sanitize_n_processes(processes, can_run_in_calling_process=True)
 
     # determine order of resampling
     axes_order, shape_order = _axes_order(axes_order, original_shape, resampled_shape_in_original_orientation,
@@ -595,7 +595,7 @@ def resample(original, resampled=None,
         if verbose:
             print('Resampling: no resampling necessary, source has same size as sink!')
         if original != resampled:  # TODO: this should be handled by Source functionality !
-            return io.write(resampled, original)
+            return io_ops.write(resampled, original)
         else:
             return original
 
@@ -607,13 +607,13 @@ def resample(original, resampled=None,
         delete_files.append(new_path)
     for step, axes, shape in zip(range(n_steps), axes_order, shape_order):
         if step == n_steps - 1 and orientation is None:  # Create final resampled file for last step
-            resampled_data = io.initialize(resampled, shape_=resampled_shape, dtype_=dtype, as_source=True)
+            resampled_data = source_initialization.initialize(resampled, shape_=resampled_shape, dtype_=dtype, as_source=True)
         else:
             if method == 'shared':
-                resampled_data = io.sma.create(shape, dtype=dtype, order=order, as_source=True)
+                resampled_data = sma_backend.create(shape=shape, dtype=dtype, order=order, as_source=True)
             else:
                 location = tempfile.mktemp(suffix='.npy')
-                resampled_data = io.mmp.create(location, shape=shape, dtype=dtype, order=order, as_source=True)
+                resampled_data = mmp_backend.create(location=location, shape=shape, dtype=dtype, order=order, as_source=True)
                 delete_files.append(location)
 
         # indices for non-resampled axes
@@ -627,7 +627,7 @@ def resample(original, resampled=None,
         _resample = ft.partial(_resample_2d, source=last_virtual, sink=resampled_data_virtual, axes=axes, shape=shape,
                                interpolation=interpolation, n_indices=n_indices, verbose=verbose)
 
-        if processes == 'serial':
+        if processes == 0:
             for index in indices:
                 _resample(index=index)
         else:
@@ -644,12 +644,12 @@ def resample(original, resampled=None,
 
     if orientation is not None:
         resampled_data = orient(resampled_data, orientation)
-        resampled = io.write(resampled, resampled_data)
+        resampled = io_ops.write(resampled, resampled_data)
     else:
         resampled = resampled_data
 
     for f in delete_files:
-        io.delete_file(f)
+        file_utils.delete_file(f)
 
     if verbose:
         timer.print_elapsed_time('Resampling')
@@ -693,9 +693,9 @@ def resample_inverse(resampled, original=None,
     method : 'shared' or 'memmap'
       Method to handle intermediate resampling results. If 'shared' use shared
       memory, otherwise use a memory map on disk.
-    processes : int, None or 'serial'
+    processes : int or None
       Number of processes to use for parallel resampling, if None use maximal
-      processes available, if 'serial' process in serial.
+      processes available, if 0 in the calling process (no subprocess).
     verbose : bool
       If True, display progress information.
 
@@ -709,7 +709,7 @@ def resample_inverse(resampled, original=None,
     * All arguments, except source and sink should be passed as :func:`resample`
       to invert the resampling.
     """
-    resampled = io.as_source(resampled)
+    resampled = io_ops.open_ro(resampled)
 
     # invert orientation
     resampled = orient(resampled, orientation, inverse=True)
@@ -802,10 +802,9 @@ def resample_points(original_points, resampled_points=None,
                        original, resampled,
                        orientation, consistent=True)
 
-    resampled = io.as_source(original_points)
-    resampled = resampled[:] * factor
+    resampled = io_ops.read(original_points) * factor
     resampled = orient_points(resampled, orientation, shape=orient_shape(resampled_shape, orientation, inverse=True))
-    return io.write(resampled_points, resampled)
+    return io_ops.write(resampled_points, resampled)
 
 
 def resample_points_inverse(resampled_points, original_points=None,
@@ -859,10 +858,10 @@ def resample_points_inverse(resampled_points, original_points=None,
                        original, resampled,
                        orientation, consistent=True)
 
-    resampled_points = io.as_source(resampled_points)
+    resampled_points = io_ops.open_ro(resampled_points)
     original = orient_points(resampled_points, orientation, shape=resampled_shape, inverse=True)
     original = original[:] / factor
-    return io.write(original_points, original)
+    return io_ops.write(original_points, original)
 
 
 ########################################################################################
@@ -943,11 +942,11 @@ class OrientationTransformation(TransformationBase):
 
     def transform_data(self, source, sink=None, inverse=False):
         inverse = self.get_inverse(inverse)
-        return io.write(sink, orient(source, orientation=self.orientation, inverse=inverse))
+        return io_ops.write(sink, orient(source, orientation=self.orientation, inverse=inverse))
 
     def transform_points(self, source, sink=None, inverse=False, **kwargs):
         inverse = self.get_inverse(inverse)
-        return io.write(sink, orient_points(source, orientation=self.orientation, shape=self.shape, inverse=inverse))
+        return io_ops.write(sink, orient_points(source, orientation=self.orientation, shape=self.shape, inverse=inverse))
 
     def transform_shape(self, shape, inverse=False, **kwargs):
         return orient_shape(self.orientation, shape, inverse=inverse)
@@ -1061,7 +1060,7 @@ def _axes_order(axes_order, original_shape, resampled_shape, order=None, source=
     # determine axes order automatically
     if axes_order is None:
         axes_order = 'order'
-    if axes_order == 'order' and order is None and not isinstance(source, fl.Source):
+    if axes_order == 'order' and order is None and not isinstance(source, fl.FileListSource):
         axes_order = 'size'
 
     # only select axes that need resampling
@@ -1073,7 +1072,7 @@ def _axes_order(axes_order, original_shape, resampled_shape, order=None, source=
         return _order_axes(original_shape, resampled_shape, resample_axes, resample_factors, None, minimize_size)
     elif axes_order == 'order':  # order axes according to file or array order for faster io
         # determine order according to file structure (i.e. resample individual files first)
-        if isinstance(source, fl.Source):
+        if isinstance(source, fl.FileListSource):
             axes_list = source.axes_list  # axes for individual files
             shift = -(np.max(resample_factors) + 1)  # make file factors the smallest
             if not minimize_size:
@@ -1160,7 +1159,7 @@ def _test():
     """Tests"""
     import numpy as np
     import ClearMap.Settings as settings
-    import ClearMap.IO.IO as io
+    from ClearMap.IO import FileUtils as file_utils
 
     import ClearMap.Alignment.Resampling as res
     from ClearMap.Alignment.orientation import orient, orient_points
@@ -1201,22 +1200,22 @@ def _test():
     # original = x + y + z
     original = np.array(x + y + z, dtype=float)
 
-    resampled = res.resample(original, original_resolution=(1, 1, 1), resampled_shape=(10, 10, 10), processes='serial')
+    resampled = res.resample(original, original_resolution=(1, 1, 1), resampled_shape=(10, 10, 10), processes=0)
     print(resampled.shape)
     upsampled = res.resample_inverse(resampled, original_resolution=(1, 1, 1), original_shape=original.shape,
-                                     processes='serial')
+                                     processes=0)
     print(upsampled.shape)
     import ClearMap.Visualization.Plot3d as p3d
     p3d.plot([resampled])
     p3d.plot([original, upsampled])
 
-    source = io.join(settings.test_data_path, 'Resampling/test.tif')
-    sink = io.join(settings.test_data_path, "Resampling/resampled.npy")
+    source = file_utils.join(settings.test_data_path, 'Resampling/test.tif')
+    sink = file_utils.join(settings.test_data_path, "Resampling/resampled.npy")
 
-    source = io.join(settings.test_data_path, 'Tif/sequence/sequence<Z,4>.tif')
-    sink = io.join(settings.test_data_path, "Resampling/resampled_sequence.tif")
+    source = file_utils.join(settings.test_data_path, 'Tif/sequence/sequence<Z,4>.tif')
+    sink = file_utils.join(settings.test_data_path, "Resampling/resampled_sequence.tif")
 
-    source_shape, sink_shape, source_res, sink_res = res.resample_shape(source_shape=io.shape(source),
+    source_shape, sink_shape, source_res, sink_res = res.resample_shape(source_shape=source_geometry.shape(source),
                                                                         source_resolution=(1., 1., 1.),
                                                                         sink_resolution=(1.6, 1.6, 2))
     axes_order = res._axes_order(None, source_shape, sink_shape)
@@ -1227,7 +1226,7 @@ def _test():
     p3d.plot(source)
 
     inverse = res.resample_inverse(resampled, sink=None, resample_source=source, source_resolution=(1, 1, 1),
-                                   sink_resolution=(10, 10, 2), orientation=None, processes='serial')
+                                   sink_resolution=(10, 10, 2), orientation=None, processes=0)
     p3d.plot([source, inverse])
 
     resampled = res.resample(source, sink, source_resolution=(1, 1, 1), sink_resolution=(10, 10, 2),
@@ -1257,9 +1256,9 @@ def _test():
     reload(res)
 
     source = np.random.rand(20, 30, 40)
-    resampled = res.resample(source, source_resolution=(1, 1, 1), sink_shape=(10, 11, 12), processes='serial')
+    resampled = res.resample(source, source_resolution=(1, 1, 1), sink_shape=(10, 11, 12), processes=0)
     print(resampled.shape)
-    upsampled = res.resample_inverse(resampled, source_resolution=(1, 1, 1), resample_source=source, processes='serial')
+    upsampled = res.resample_inverse(resampled, source_resolution=(1, 1, 1), resample_source=source, processes=0)
     print(upsampled.shape)
     import ClearMap.Visualization.Plot3d as p3d
     p3d.plot([resampled])
@@ -1286,7 +1285,7 @@ def _test():
 #     else:  # determine automatically
 #         if axes_order is None:
 #             axes_order = 'order'
-#         if axes_order == 'order' and order is None and not isinstance(source, fl.Source):
+#         if axes_order == 'order' and order is None and not isinstance(source, FileListSource):
 #             axes_order = 'size'
 #
 #         if axes_order == 'size':  # order to reduce size as much as possible in each sub-resampling step
@@ -1333,7 +1332,7 @@ def _test():
 #
 #         elif axes_order == 'order':  # order axes according to array order for faster io
 #
-#             if isinstance(source, fl.Source):
+#             if isinstance(source, FileListSource):
 #                 # FileList determine order according to file structure
 #                 axes_list = source.axes_list
 #                 # axes_file = source.axes_file;

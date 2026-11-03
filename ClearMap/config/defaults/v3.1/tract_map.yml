@@ -1,0 +1,42 @@
+clearmap_schema: 3
+clearmap_version: "3.1.0"
+
+templates:
+  channel:
+    binarization:
+      decimation_ratio: 10
+      percentage_range: [70, 99.999]
+      clip_range: [180, 5000]
+    test_set_slicing:
+      dim_0: [0, 200]  # FIXME: scale before save
+      dim_1: [0, 300]
+      dim_2: [0, 400]
+    display:
+      decimation_ratio: 100  # For the "cells.feather" file
+    voxelization:
+      radii: [5, 5, 5]
+    steps:
+      binarize: true
+      extract_coordinates: true
+      transform_coordinates: true
+      label_coordinates: true
+      voxelize: true
+      export_df: true
+
+performance:
+  binarization:
+    n_processes: 15
+  where:
+    n_processes: 23      # mask_to_coordinates
+  transform:
+    block_processing:
+      n_processes: 23
+      size_min: 1000000    # min_point_list_size
+      size_max: 10000000   # max_point_list_size
+      overlap: null        # unused
+  label:
+    block_processing:
+      n_processes: 23
+      size_min: 1000000    # min_point_list_size
+      size_max: 10000000   # max_point_list_size
+      overlap: null        # unused

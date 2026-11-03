@@ -21,6 +21,7 @@ import ClearMap.ImageProcessing.Differentiation.Hessian as cur
 import ClearMap.ImageProcessing.Topology.Topology3d as t3d
 
 import ClearMap.Visualization.Plot3d as p3d
+from ClearMap.Utils.utilities import sanitize_n_processes
 
 
 def extractNeighbourhood(data, center, radius):
@@ -201,8 +202,8 @@ def tracePointToMask(data, mask, center, radius, points = None, plot = False, sk
   
   distance_nbh = ndi.distance_transform_edt(np.logical_not(mask_nbh))
   
-  path, quality = trc.traceToMask(np.asarray(data_nbh, dtype = float), tubeness_nbh, center_nbh, distance_nbh, 
-                                  maxSteps = maxSteps, verbose = verbose, returnQuality = True, **trace_parameter);
+  path, quality = trc.trace_to_mask(np.asarray(data_nbh, dtype = float), tubeness_nbh, center_nbh, distance_nbh,
+                                    maxSteps = maxSteps, verbose = verbose, returnQuality = True, **trace_parameter)
   
   if verbose:
     if len(path) > 0:
@@ -341,8 +342,8 @@ def connectPoint(data, mask, endpoints, start_index, radius,
   distance_nbh = ndi.distance_transform_edt(np.logical_not(mask_nbh))
   distance_nbh = np.asarray(distance_nbh, order = 'F');
   
-  path, quality = trc.traceToMask(data_nbh, tubeness_nbh, center_nbh_xyz, distance_nbh, 
-                                  verbose = False, returnQuality = True, **trace_parameter);
+  path, quality = trc.trace_to_mask(data_nbh, tubeness_nbh, center_nbh_xyz, distance_nbh,
+                                    verbose=False, returnQuality=True, **trace_parameter)
   
   if len(path) > 0:
     if quality / len(path) < min_quality:
@@ -460,9 +461,10 @@ def addConnections(data, mask, skeleton, points, radius = 20,
                    start_points = None, 
                    remove_local_mask = True, min_quality = 15.0,
                    add_to_skeleton = True, add_to_mask = False,
-                   verbose = True, processes = mp.cpu_count(), block_size = 5000, debug = False):
+                   verbose = True, processes = None, block_size = 5000, debug = False):
   global temporary_folder;
   
+  processes = sanitize_n_processes(processes)
   timer = tmr.Timer();
   timer_total = tmr.Timer();
   
@@ -823,7 +825,7 @@ def _test():
   
   # write image
   
-  import ClearMap.IO.IO as io
+  from ClearMap.IO import io_ops
   
   #r = np.asarray(128 * binary_new, dtype = 'uint8');
   #g = r.copy(); b = r.copy();
@@ -835,7 +837,7 @@ def _test():
   img = np.asarray(128 * binary_new, dtype = 'uint8');
   img[:] = img + 127 * skel_2[0];
   
-  io.writeData('/home/ckirst/Desktop/3d.tif', img)
+  io_ops.write('/home/ckirst/Desktop/3d.tif', img)
   
   
   #%%

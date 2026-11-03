@@ -13,13 +13,15 @@ Reference
   Graphical Models and Image Processing 61, 199-221 (1999)
 """
 __author__    = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
-__license__   = 'GPLv3 - GNU General Pulic License v3 (see LICENSE.txt)'
+__license__   = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 
-import os
+import functools
+from pathlib import Path
+
 import numpy as np
 import multiprocessing as mp
 
@@ -31,6 +33,9 @@ import ClearMap.ParallelProcessing.DataProcessing.ConvolvePointList as cpl
 import ClearMap.Utils.Timer as tmr
 
 import ClearMap.IO.FileUtils as fu
+from ClearMap import Settings as settings
+from ClearMap.IO import io_ops
+from ClearMap.Utils.utilities import sanitize_n_processes, available_cpu_count
 
 
 ###############################################################################
@@ -237,8 +242,8 @@ def match_non_removable(index, verbose = True):
 def generate_lookup_table(function = match_index, verbose = True):
   """Generates lookup table for templates"""
    
-  pool = mp.Pool(mp.cpu_count());
-  lut = pool.map(function, range(2**26),chunksize=2**26/8/mp.cpu_count())
+  pool = mp.Pool(available_cpu_count());
+  lut = pool.map(function, range(2**26),chunksize=2**26/8/available_cpu_count())
   lut = list(lut)
   
   return np.array(lut, dtype = bool);
@@ -247,43 +252,71 @@ def generate_lookup_table(function = match_index, verbose = True):
 filename = "PK12.npy";
 """Filename for the look up table mapping a cube configuration to the deleatability of the center pixel"""
 
+PK12_FOLDER = Path(__file__).resolve().parent
+"""The folder of this module, where the compressed look up tables are shipped (and possibly prepared ones)."""
+
+
 def initialize_lookup_table(function = match_index, filename = filename):
-  """Initialize the lookup table"""
-  
-  filename = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename);
-  
-  #check if only compressed file exists
-  fu.uncompress(filename)
-  
-  if os.path.exists(filename):
-    return np.load(filename);
-  else:
-    lut = generate_lookup_table(function=function);
-    np.save(filename, lut);
-    return lut;
+  """Load the lookup table, making it first if it is not in the folder of this module nor in the cache folder.
+
+  The table is made from the compressed one shipped with the program if there is one, else computed (slow).
+  It is made in :data:`ClearMap.Settings.clearmap_cache_dir`, never in the folder of the program (read-only on a
+  cluster).
+  """
+
+  def make_table(path):
+    compressed_path = PK12_FOLDER / f'{filename}.zip'
+    if compressed_path.exists():
+      fu.decompress_file(compressed_path, path)
+    else:
+      np.save(path, generate_lookup_table(function=function));
+
+  path = fu.find_or_build(filename, source_dir=PK12_FOLDER, cache_dir=settings.clearmap_cache_dir, build=make_table)
+  return np.load(path);
 
 
 base = t3d.cube_base_2(center=False);
 """Base kernel to multiply with cube to obtain index of cube"""
 
-delete = initialize_lookup_table();
-"""Lookup table mapping cube index to its deleteability"""
-
-keep = np.logical_not(delete);
-"""Lookup table mapping cube index to its non-deleteability"""
-
 
 filename_non_removable = "PK12nr.npy";
 """Filename for the lookup table mapping a cube configuration to the non-removeability of the center pixel"""
 
-non_removable = initialize_lookup_table(filename = filename_non_removable, function = match_non_removable);
-"""Lookup table mapping cube index to its non-removeability"""
-
-consider = np.logical_not(non_removable);
-"""Lookup table mapping cube index to whether it needs to be considered further"""
-
 rotations = t3d.rotations12(base);
 """Rotations of the base cube for the sub-iterations"""
+
+
+# The tables have 2**26 entries: they are loaded when first needed, not when this module is imported.
+
+@functools.lru_cache(maxsize=None)
+def get_delete_table():
+  """Lookup table mapping cube index to its deleteability"""
+  return initialize_lookup_table();
+
+
+@functools.lru_cache(maxsize=None)
+def get_consider_table():
+  """Lookup table mapping cube index to whether it needs to be considered further"""
+  return np.logical_not(get_non_removable_table());
+
+
+@functools.lru_cache(maxsize=None)
+def get_non_removable_table():
+  """Lookup table mapping cube index to its non-removeability"""
+  return initialize_lookup_table(filename = filename_non_removable, function = match_non_removable);
+
+
+def __getattr__(name):
+  """Keep the former module level tables (``delete``, ``keep``, ``non_removable``, ``consider``) available."""
+  if name == 'delete':
+    return get_delete_table();
+  if name == 'keep':
+    return np.logical_not(get_delete_table());
+  if name == 'non_removable':
+    return get_non_removable_table();
+  if name == 'consider':
+    return get_consider_table();
+  raise AttributeError(f'module {__name__!r} has no attribute {name!r}')
 
 
 ###############################################################################
@@ -291,7 +324,7 @@ rotations = t3d.rotations12(base);
 ###############################################################################
 
 def skeletonize(binary, points = None, steps = None, removals = False, radii = False,
-                check_border = True, delete_border = False, return_points = False, verbose = True):
+                check_border = True, delete_border = False, return_points = False, n_processes=None, verbose = True):
   """Skeletonize a binary 3d array using PK12 algorithm.
   
   Arguments
@@ -326,6 +359,7 @@ def skeletonize(binary, points = None, steps = None, removals = False, radii = F
   The skeletonization is done in place on the binary. Copy the binary if
   needed for further processing.
   """
+  n_processes = sanitize_n_processes(n_processes)
   
   if verbose:    
     print('#############################################################'); 
@@ -372,7 +406,7 @@ def skeletonize(binary, points = None, steps = None, removals = False, radii = F
       print('Iteration %d' % step);
       timer_iter = tmr.Timer();
   
-    border = cpl.convolve_3d_points(binary, t3d.n6, points) < 6;
+    border = cpl.convolve_3d_points(binary, t3d.n6, points, processes=n_processes) < 6;
     borderpoints = points[border];
     borderids    = np.nonzero(border)[0];
     keep         = np.ones(len(border), dtype = bool);
@@ -392,7 +426,7 @@ def skeletonize(binary, points = None, steps = None, removals = False, radii = F
         print('Sub-Iteration %d' % i);
         timer_sub_iter = tmr.Timer();
       
-      remborder = delete[cpl.convolve_3d_points(binary, rotations[i], borderpoints)];
+      remborder = get_delete_table()[cpl.convolve_3d_points(binary, rotations[i], borderpoints, processes=n_processes)];
       rempoints = borderpoints[remborder];
       if verbose:
         timer_sub_iter.print_elapsed_time('Matched points: %d' % (len(rempoints),));
@@ -439,7 +473,7 @@ def skeletonize(binary, points = None, steps = None, removals = False, radii = F
     result.append(death);
   if radii is True:
     #calculate average diameter as average death of neighbourhood
-    radii = cpl.convolve_3d(death, np.array(t3d.n18, dtype = 'uint16'), points);
+    radii = cpl.convolve_3d(death, np.array(t3d.n18, dtype='uint16'), points, processes=n_processes);
     result.append(radii);
   
   if len(result) > 1:
@@ -448,7 +482,9 @@ def skeletonize(binary, points = None, steps = None, removals = False, radii = F
     return result[0];
 
 
-def skeletonize_index(binary, points = None, steps = None, removals = False, radii = False, return_points = False, check_border = True, delete_border = False, verbose = True):
+def skeletonize_index(binary, points = None, steps = None, removals = False,
+                      radii = False, return_points = False, check_border = True,
+                      delete_border = False, n_processes=None, verbose = True):
   """Skeletonize a binary 3d array using PK12 algorithm via index coordinates.
   
   Arguments
@@ -472,6 +508,7 @@ def skeletonize_index(binary, points = None, steps = None, removals = False, rad
   points : nxd array
     The point coordinates of the skeleton.
   """
+  n_processes = sanitize_n_processes(n_processes)
   
   if verbose:    
     print('#############################################################'); 
@@ -525,8 +562,8 @@ def skeletonize_index(binary, points = None, steps = None, removals = False, rad
       timer_iter = tmr.Timer();
   
   
-    print(type(points), points.dtype, binary.dtype)
-    border = cpl.convolve_3d_indices_if_smaller_than(binary, t3d.n6, points, 6);
+    # print(type(points), points.dtype, binary.dtype)
+    border = cpl.convolve_3d_indices_if_smaller_than(binary, t3d.n6, points, 6, processes=n_processes);
     borderpoints = points[border];
     #borderids    = np.nonzero(border)[0];
     borderids    = ap.where(border).array;
@@ -547,7 +584,8 @@ def skeletonize_index(binary, points = None, steps = None, removals = False, rad
         print('Sub-Iteration %d' % i);
         timer_sub_iter = tmr.Timer();
       
-      remborder = delete[cpl.convolve_3d_indices(binary, rotations[i], borderpoints)];
+      remborder = get_delete_table()[cpl.convolve_3d_indices(
+        binary, rotations[i], borderpoints, processes=n_processes)];
       rempoints = borderpoints[remborder];
       if verbose:
         timer_sub_iter.print_elapsed_time('Matched points  : %d' % (len(rempoints),));
@@ -573,7 +611,7 @@ def skeletonize_index(binary, points = None, steps = None, removals = False, rad
     
     if step % 3 == 0:   
       npts = len(points);
-      points = points[consider[cpl.convolve_3d_indices(binary, base, points)]]; 
+      points = points[get_consider_table()[cpl.convolve_3d_indices(binary, base, points, processes=n_processes)]];
       nnonrem += npts - len(points)
       if verbose:
         print('Non-removable points: %d' % (npts - len(points)));
@@ -602,7 +640,7 @@ def skeletonize_index(binary, points = None, steps = None, removals = False, rad
   
   if radii is True:
     #calculate average diameter as death average death of neighbourhood     
-    radii = cpl.convolve_3d_indices(death, t3d.n18, points, out_dtype = 'uint16');
+    radii = cpl.convolve_3d_indices(death, t3d.n18, points, out_dtype='uint16', processes=n_processes);
   else:
     radii = None;
   
@@ -625,8 +663,8 @@ def skeletonize_index(binary, points = None, steps = None, removals = False, rad
 ###############################################################################
 
 def _test():
-  import numpy as np;
-  import ClearMap.IO.IO as io
+  import numpy as np
+
   import ClearMap.Visualization.Plot3d as p3d
   import ClearMap.Tests.Files as tsf
   import ClearMap.ImageProcessing.Skeletonization.PK12 as PK12;
@@ -644,8 +682,8 @@ def _test():
   
   #Skeletonization
   reload(PK12)
-  binary = tsf.skeleton_binary;
-  binary_array = np.array(io.as_source(binary));
+  binary = tsf.skeleton_binary
+  binary_array = np.array(io_ops.read(binary))
   
   #default version
   skeleton = PK12.skeletonize(binary_array.copy(), delete_border=True, verbose=True);

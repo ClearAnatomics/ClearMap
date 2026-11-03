@@ -12,7 +12,8 @@ from PyQt5 import QtWidgets
 from PyQt5.uic.Compiler import compiler
 
 
-def loadUiType(uifile, from_imports=False, resource_suffix='_rc', import_from='.', patch_parent_class='', replace_pairs=None):
+def loadUiType(uifile, from_imports=False, resource_suffix='_rc', import_from='.',
+               patch_parent_class='', replace_pairs=None,  customWidgets=None):
     """
     loadUiType(uifile, from_imports=False, resource_suffix='_rc', import_from='.') -> (form class, base class)
 
@@ -34,6 +35,8 @@ def loadUiType(uifile, from_imports=False, resource_suffix='_rc', import_from='.
     winfo = compiler.UICompiler().compileUi(uifile, code_string, from_imports, resource_suffix, import_from)
 
     ui_globals = {}
+    if customWidgets:
+        ui_globals.update(customWidgets)
     if patch_parent_class:
         winfo['baseclass'] = patch_parent_class
         cls_list = code_string.getvalue().splitlines()

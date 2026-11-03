@@ -62,7 +62,6 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
-import copy
 import os
 import sys
 import subprocess
@@ -72,24 +71,27 @@ import shutil
 import re
 from io import UnsupportedOperation
 from pathlib import Path
-import multiprocessing as mp
 
 import numpy as np
-
+from packaging.version import InvalidVersion, Version
 
 import ClearMap.Settings as settings
-from ClearMap.Utils.exceptions import ClearMapException
+from ClearMap.Utils.utilities import sanitize_n_processes
+from ClearMap.IO import conversion, io_ops
+from ClearMap.IO.FileUtils import atomic_write
+from ClearMap.IO.source.backends.tif_backend import TifSource
+from ClearMap.Utils.exceptions import ClearMapIoException, ClearMapValueError, ClearMapRuntimeError
 
-import ClearMap.IO.IO as io
 from ClearMap.IO.elastix_config import ElastixParser
 
 from ClearMap.Alignment.Transformations.Transformation import TransformationBase
 
 try:
     import itk
-    dir(itk)  #  force read
+    dir(itk)  #  WARNING: required for force read
     from ClearMap.Alignment.landmarks_registration.engine import AlignmentTool
-    from ClearMap.Alignment.landmarks_registration.registration_data import ITKImage
+    from ClearMap.Alignment.landmarks_registration.registration_data import ITKImage, ensure_itk_warmed
+
     itk_imported = True
 except ImportError:
     itk_imported = False
@@ -97,6 +99,20 @@ except ImportError:
 ##############################################################################
 # Initialization and Settings
 ##############################################################################
+
+TRANSFORMIX_WORKING_DIRECTORY_PREFIX = 'clearmap_transformix_'
+"""The prefix of the private folders, in the temp folder, that hold the input and output of one transformix run."""
+
+BIN_POINT_FILE_INTEGER_DTYPE = np.int64
+"""The type of the two integers (index flag, number of points) that start a ``.bin`` point file, the format of the
+patched elastix build shipped with ClearMap."""
+
+BIN_POINT_FILE_HEADER_LENGTH = 2
+"""The number of integers (index flag, number of points) that start a ``.bin`` point file."""
+
+ELASTIX_EXECUTABLE_FOLDERS = ('bin', '')
+"""The folders of an elastix installation that hold the executables, relative to its root: ``bin`` in the Linux
+and macOS releases, the root itself in the Windows release."""
 
 elastix_binary = None
 """The elastix executable.
@@ -135,7 +151,7 @@ class ElastixConfigPatcher:
     def __init__(self, config_paths, modified_sections=None):
         self.config_paths = config_paths
         if modified_sections is None:
-            raise ValueError('modified_sections must be a dictionary of sections to modify')
+            raise ClearMapValueError('modified_sections must be a dictionary of sections to modify')
         self.modified_sections = modified_sections
         self.original_sections = {p: self.get_original_sections(p) for p in config_paths}
 
@@ -195,7 +211,7 @@ def check_success(result_directory):
     log_path = result_directory / 'elastix.log'
     with open(log_path) as f:
         if 'fail' in f.read():
-            raise RuntimeError(f'Elastix failed, check log file: "{log_path}"')
+            raise ClearMapRuntimeError(f'Elastix failed, check log file: "{log_path}"')
 
 
 def set_elastix_library_path(elastix_lib_path=None):
@@ -208,12 +224,14 @@ def set_elastix_library_path(elastix_lib_path=None):
       If None :const:`ClearMap.Settings.elastix_path` is used.
     """
     os_name = platform.system().lower()
+    if os_name.startswith('windows'):
+        return  # Windows looks for the DLLs in the folder of the executable first: there is no variable to set
     if os_name.startswith('linux'):
         lib_var_name = 'LD_LIBRARY_PATH'
     elif os_name.startswith('darwin'):
         lib_var_name = 'DYLD_LIBRARY_PATH'
     else:
-        raise ValueError(f'Unknown OS {os_name}')
+        raise ClearMapValueError(f'Unknown OS {os_name}')
 
     print(f'OS: {os_name}, library variable name: {lib_var_name}')
 
@@ -242,10 +260,11 @@ def initialize_elastix(path=None):
     """
     global elastix_binary, elastix_lib, transformix_binary, initialized
 
-    if path is None and settings.elastix_path is not None:
+    if path is None:
         path = settings.elastix_path
-    else:
-        raise RuntimeError('Cannot find elastix path!')
+    if path is None:
+        raise ClearMapRuntimeError('Cannot find the elastix path: give it to initialize_elastix(path) or set '
+                                   'elastix_path in the machine parameters')
 
     elastix_binary = search_elx_bin(path, 'elastix')
     transformix_binary = search_elx_bin(path, 'transformix')
@@ -259,20 +278,22 @@ def initialize_elastix(path=None):
 
 
 def search_elx_lib(path):
-    for sub_dir in ('lib', 'bin'):
-        lib_path = os.path.join(path, sub_dir)
-        if os.path.exists(lib_path):
-            return lib_path
+    for sub_dir in ('lib', 'bin', ''):
+        lib_path = Path(path) / sub_dir
+        if lib_path.exists():
+            return str(lib_path)
     else:
-        raise ClearMapException(f'Cannot find elastix libs in {lib_path} set path in Settings.py accordingly!')
+        raise ClearMapRuntimeError(f'Cannot find elastix libs in {lib_path} set path in Settings.py accordingly!')
 
 
 def search_elx_bin(path, bin_type):
-    elx = os.path.join(path, 'bin', bin_type)
-    if os.path.exists(elx):
-        return elx
-    else:
-        raise RuntimeError(f'Cannot find elastix binary {elx}, set path in Settings.py accordingly!')
+    file_name = f'{bin_type}.exe' if platform.system() == 'Windows' else bin_type
+    candidates = [Path(path) / folder / file_name for folder in ELASTIX_EXECUTABLE_FOLDERS]
+    for elx in candidates:
+        if elx.exists():
+            return str(elx)
+    raise ClearMapRuntimeError(f'Cannot find elastix binary {file_name} in {" or ".join(map(str, candidates))}, '
+                               f'set path in Settings.py accordingly!')
 
 
 def get_elastix_version():
@@ -280,16 +301,19 @@ def get_elastix_version():
 
     Returns
     -------
-    version : str
-      The elastix version.
+    version : Version
+      The elastix version, from "elastix version: 5.3.1" (stock releases) or "elastix version: 4.900" (the patched
+      build shipped with ClearMap).
     """
     check_elastix_initialized()
 
     cmd = [elastix_binary, '--version']
-    res = subprocess.check_output(cmd)
-    res = res.decode('utf-8')
-    version = float(res.splitlines()[0].split(':')[-1].strip())
-    return version
+    output = subprocess.check_output(cmd).decode('utf-8')
+    try:
+        return Version(output.splitlines()[0].split(':')[-1].strip())
+    except (IndexError, InvalidVersion) as err:
+        raise ClearMapRuntimeError(f'Could not read the elastix version from the output of "{elastix_binary} '
+                                   f'--version": {output!r}; expected a line like "elastix version: 5.3.1"') from err
 
 
 if 'sphinx' in sys.modules.keys():
@@ -307,7 +331,7 @@ def check_elastix_initialized():
       True if elastix paths are set.
     """
     if not initialized:
-        raise RuntimeError("Elastix not initialized: run initialize_elastix(path) with proper path to elastix first")
+        raise ClearMapRuntimeError("Elastix not initialized: run initialize_elastix(path) with proper path to elastix first")
 
     return True
 
@@ -338,7 +362,7 @@ def transform_file(result_directory):
     files = sorted(Path(result_directory).glob('TransformParameters.*.txt'))
 
     if not files:
-        raise RuntimeError(f'Cannot find a valid transformation file in "{result_directory}"')
+        raise ClearMapRuntimeError(f'Cannot find a valid transformation file in "{result_directory}"')
 
     return str(files[-1])
 
@@ -367,7 +391,7 @@ def transform_directory_and_file(transform_parameter_file=None, transform_direct
 
     if not transform_parameter_file:
         if not transform_directory:
-            raise ValueError('Neither the alignment directory nor the transformation parameter file is specified!')
+            raise ClearMapValueError('Neither the alignment directory nor the transformation parameter file is specified!')
         transform_parameter_dir = transform_directory
         transform_parameter_file = transform_file(transform_parameter_dir)
     else:
@@ -393,36 +417,46 @@ def set_path_transform_files(result_directory):
     """
 
     files = os.listdir(result_directory)
-    files = [x for x in files if re.match('TransformParameters.\d.txt', x)]
+    files = [x for x in files if re.match(r'TransformParameters.\d.txt', x)]
     files.sort()
 
     if not files:
-        raise RuntimeError(f'Cannot find a valid transformation file in {result_directory}!')
+        raise ClearMapRuntimeError(f'Cannot find a valid transformation file in {result_directory}!')
 
-    rec = re.compile("\(InitialTransformParametersFileName \"(?P<parname>.*)\"\)")
+    rec = re.compile(r'\(InitialTransformParametersFileName "(?P<parname>.*)"\)')
 
     for f in files:
-        fh, tmpfn = tempfile.mkstemp()
         ff = os.path.join(result_directory, f)
-
-        with open(tmpfn, 'w') as newfile, open(ff) as parfile:
+        lines = []
+        with open(ff) as parfile:
             for line in parfile:
-                # print line
                 m = rec.match(line)
                 if m is not None:
                     pn = m.group('parname')
                     if pn != 'NoInitialTransform':
                         pathn, filen = os.path.split(pn)
                         filen = os.path.join(result_directory, filen)
-                        newfile.write(line.replace(pn, filen))
-                    else:
-                        newfile.write(line)
-                else:
-                    newfile.write(line)
+                        line = line.replace(pn, filen)
+                lines.append(line)
+        _replace_text_of_file(ff, ''.join(lines))
 
-        os.close(fh)
-        os.remove(ff)
-        shutil.move(tmpfn, ff)
+
+def _replace_text_of_file(path, text):
+    """
+    Replace the content of the file at path by text, keeping its permissions.
+
+    The text is written to a temporary file next to it, which is then moved over it (atomic_write):
+    we do not use the temp folder, since a move across file systems fails, and a temp file is private.
+    The temporary file is gone after the move, or removed if writing fails.
+    """
+    atomic_write(_write_text_with_mode_of, path, text, mode_source=path)
+
+
+def _write_text_with_mode_of(tmp_path, text, *, mode_source):
+    """Write text to tmp_path, with the permissions of mode_source (the file that tmp_path will replace)"""
+    with open(tmp_path, 'w') as new_file:
+        new_file.write(text)
+    shutil.copymode(mode_source, tmp_path)
 
 
 def set_metric_parameter_file(parameter_file_path, new_metric):
@@ -442,28 +476,18 @@ def set_metric_parameter_file(parameter_file_path, new_metric):
     metric_pattern = re.compile(r'\(Metric "(?P<metric_name>.*)"\)')
     metric_set = False
 
-    try:
-        with tempfile.NamedTemporaryFile('w', delete=False) as temp_file:
-            temp_file_path = temp_file.name
-            with open(parameter_file_path, 'r') as parameter_file:
-                for line in parameter_file:
-                    match = metric_pattern.match(line)
-                    if match:
-                        current_metric = match.group('metric_name')
-                        temp_file.write(line.replace(current_metric, new_metric))
-                        metric_set = True
-                    else:
-                        temp_file.write(line)
-            if not metric_set:
-                temp_file.write(f'(Metric "{new_metric}")\n')
-
-        shutil.move(temp_file_path, parameter_file_path)
-
-    except Exception as error:
-        print(f"Error setting metric in parameter file: {error}")
-        if os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
-        raise error
+    lines = []
+    with open(parameter_file_path, 'r') as parameter_file:
+        for line in parameter_file:
+            match = metric_pattern.match(line)
+            if match:
+                current_metric = match.group('metric_name')
+                line = line.replace(current_metric, new_metric)
+                metric_set = True
+            lines.append(line)
+    if not metric_set:
+        lines.append(f'(Metric "{new_metric}")\n')
+    _replace_text_of_file(parameter_file_path, ''.join(lines))
 
 
 def result_data_file(result_directory):
@@ -484,7 +508,7 @@ def result_data_file(result_directory):
     files.sort()
 
     if not files:
-        raise RuntimeError('Cannot find a valid result data file in ' + result_directory)
+        raise ClearMapRuntimeError(f'Cannot find a valid result data file in {result_directory=}')
 
     return os.path.join(result_directory, files[0])
 
@@ -504,8 +528,8 @@ def transform_file_size_and_spacing(transform_file):
     spacing : tuple
       The image spacing.
     """
-    resi = re.compile("\(Size (?P<size>.*)\)")
-    resp = re.compile("\(Spacing (?P<spacing>.*)\)")
+    resi = re.compile(r'\(Size (?P<size>.*)\)')
+    resp = re.compile(r'\(Spacing (?P<spacing>.*)\)')
 
     si = None
     sp = None
@@ -542,8 +566,8 @@ def set_transform_file_size_and_spacing(transform_file, size, spacing):
       The new image spacing.
     """
 
-    resi = re.compile("\(Size (?P<size>.*)\)")
-    resp = re.compile("\(Spacing (?P<spacing>.*)\)")
+    resi = re.compile(r'\(Size (?P<size>.*)\)')
+    resp = re.compile(r'\(Spacing (?P<spacing>.*)\)')
 
     fh, tmpfn = tempfile.mkstemp()
 
@@ -612,7 +636,7 @@ def align_from_dict(align_parameters, landmarks_files, landmarks_weights=None):
         tmp_registration_params = {p: {} for p in align_parameters['parameter_files']}
     for k, v in align_parameters.items():
         if not v:
-            raise ValueError(f'Registration missing parameter "{k}"')
+            raise ClearMapValueError(f'Registration missing parameter "{k}"')
     # TODO: check which files to patch
     with ElastixConfigPatcher(align_parameters['parameter_files'], tmp_registration_params):
         align(**align_parameters)  # WARNING: if using itk_mode, should use it to patch the files too
@@ -660,9 +684,9 @@ def align(fixed_image, moving_image, affine_parameter_file=None, bspline_paramet
         parameter_files = [f for f in parameter_files if f is not None]
     else:
         if affine_parameter_file or bspline_parameter_file:
-            raise ValueError('Cannot specify both parameter_files and affine_parameter_file or bspline_parameter_file')
+            raise ClearMapValueError('Cannot specify both parameter_files and affine_parameter_file or bspline_parameter_file')
 
-    processes = processes if processes is not None else mp.cpu_count()
+    processes = sanitize_n_processes(processes)
 
     check_elastix_initialized()
 
@@ -679,8 +703,7 @@ def align(fixed_image, moving_image, affine_parameter_file=None, bspline_paramet
                 dir(itk)  # WARNING: itk uses lazy loading
                 from itk import ParameterObject
             except ImportError as err:
-                raise ImportError(f'Could not import itk, please select itk_mode=False or install itk. '
-                                  f'Details: {err}')
+                raise ImportError(f'Could not import itk, please select itk_mode=False or install itk. Details: {err}')
         from itk import ParameterObject
         from ClearMap.Alignment.landmarks_registration.engine import AlignmentTool
         from ClearMap.Alignment.landmarks_registration.registration_data import ITKImage
@@ -689,6 +712,7 @@ def align(fixed_image, moving_image, affine_parameter_file=None, bspline_paramet
                              moving_image=ITKImage(moving_image),
                              fixed_landmarks_name=fixed_landmarks_path.name,
                              moving_landmarks_name=moving_landmarks_path.name)
+        ensure_itk_warmed()
         for param_file in parameter_files:  # TODO: use option to combine the different transforms if no intermediate results are needed
             elx_params = ParameterObject.New()
             elx_params.AddParameterFile(str(param_file))
@@ -723,9 +747,9 @@ def align(fixed_image, moving_image, affine_parameter_file=None, bspline_paramet
                     if workspace is not None:
                         workspace.process = proc
             except (subprocess.SubprocessError, OSError) as err:
-                raise ClearMapException(f'Align: failed executing: {" ".join(cmd)}') from err
+                raise ClearMapRuntimeError(f'Align: failed executing: {" ".join(cmd)}', command=' '.join(cmd)) from err
         except (subprocess.SubprocessError, OSError) as err:
-            raise ClearMapException(f'Align: failed executing: {" ".join(cmd)}') from err
+            raise ClearMapRuntimeError(f'Align: failed executing: {" ".join(cmd)}', command=' '.join(cmd)) from err
         finally:
             if workspace is not None:
                 workspace.process = None
@@ -739,7 +763,19 @@ def align(fixed_image, moving_image, affine_parameter_file=None, bspline_paramet
 def check_spaces(*paths):
     for p in paths:
         if p is not None and ' ' in str(p):
-            raise ValueError(f'Could not run elastix with path containing spaces: {p}')
+            raise ClearMapValueError(f'Could not run elastix with path containing spaces: {p}')
+
+
+def _remove_working_directory(directory):
+    """Delete the private folder of one transformix run, and refuse any other folder.
+
+    Those folders are created by :func:`tempfile.mkdtemp` with the prefix :const:`TRANSFORMIX_WORKING_DIRECTORY_PREFIX`.
+    """
+    directory = Path(directory)
+    if not directory.name.startswith(TRANSFORMIX_WORKING_DIRECTORY_PREFIX):
+        raise ClearMapRuntimeError(f'Refusing to delete "{directory}": it is not a transformix working folder, '
+                                   f'its name does not start with "{TRANSFORMIX_WORKING_DIRECTORY_PREFIX}"')
+    shutil.rmtree(directory)
 
 
 def transform(source, sink='transformix', transform_parameter_file=None, transform_directory=None,
@@ -775,20 +811,23 @@ def transform(source, sink='transformix', transform_parameter_file=None, transfo
     """
     check_elastix_initialized()
 
+    # A private folder for this run: jobs and processes may call transformix at the same time
+    working_directory = tempfile.mkdtemp(prefix=TRANSFORMIX_WORKING_DIRECTORY_PREFIX)
+
     # image
-    source = io.as_source(source)
-    if isinstance(source, io.tif.Source):
+    source = io_ops.open_ro(source)
+    if isinstance(source, TifSource):
         img_name = source.location
         delete_image = None
     else:
-        img_name = os.path.join(tempfile.gettempdir(), 'elastix_input.tif')
-        io.write(img_name, source)
+        img_name = os.path.join(working_directory, 'elastix_input.tif')
+        io_ops.write(img_name, source)
         delete_image = img_name
 
     # result directory
     delete_result_directory = None
     if result_directory is None:
-        result_dirname = os.path.join(tempfile.gettempdir(), 'elastix_output')
+        result_dirname = working_directory
         delete_result_directory = result_dirname
     else:
         result_dirname = result_directory
@@ -809,25 +848,27 @@ def transform(source, sink='transformix', transform_parameter_file=None, transfo
     res = os.system(cmd)
 
     if res != 0:
-        raise RuntimeError('transform_data: failed executing: ' + cmd)
+        raise ClearMapRuntimeError('transform_data: failed executing: ', command=cmd)
 
     # read data and clean up
     if delete_image is not None:
         os.remove(delete_image)
+    if result_dirname != working_directory:  # it only held the input image
+        _remove_working_directory(working_directory)
 
     if sink == 'transformix':
         return result_data_file(result_dirname)
     elif sink is None:
         result_file = result_data_file(result_dirname)
-        result = io.read(result_file)
+        result = io_ops.read(result_file)
     elif isinstance(sink, str):
         result_file = result_data_file(result_dirname)
-        result = io.convert(result_file, sink)
+        result = conversion.convert(result_file, sink)
     else:
-        raise RuntimeError('transform_data: sink not valid!')
+        raise ClearMapRuntimeError('transform_data: sink not valid!')
 
     if delete_result_directory is not None:
-        shutil.rmtree(delete_result_directory)
+        _remove_working_directory(delete_result_directory)
 
     return result
 
@@ -861,10 +902,10 @@ def deformation_field(sink='transformix', transform_parameter_file=None, transfo
     """
     check_elastix_initialized()
 
-    # result directory
+    # result directory, private to this run: jobs and processes may call transformix at the same time
     delete_result_directory = None
     if result_directory is None:
-        result_dirname = os.path.join(tempfile.gettempdir(), 'elastix_output')
+        result_dirname = tempfile.mkdtemp(prefix=TRANSFORMIX_WORKING_DIRECTORY_PREFIX)
         delete_result_directory = result_dirname
     else:
         result_dirname = result_directory
@@ -884,22 +925,22 @@ def deformation_field(sink='transformix', transform_parameter_file=None, transfo
     res = os.system(cmd)
 
     if res != 0:
-        raise RuntimeError(f'deformation_field: failed executing: {cmd}')
+        raise ClearMapRuntimeError(f'deformation_field: failed executing: {cmd}', command=' '.join(cmd))
 
     # read result and clean up
     if sink == 'transformix':
         return result_data_file(result_dirname)
     elif sink is None:
         result_file = result_data_file(result_dirname)
-        result = io.read(result_file)
+        result = io_ops.read(result_file)
     elif isinstance(sink, str):
         result_file = result_data_file(result_dirname)
-        result = io.convert(result_file, sink)
+        result = conversion.convert(result_file, sink)
     else:
-        raise RuntimeError('deformation_field: sink not valid!')
+        raise ClearMapRuntimeError('deformation_field: sink not valid!')
 
     if delete_result_directory is not None:
-        shutil.rmtree(delete_result_directory)
+        _remove_working_directory(delete_result_directory)
 
     return result
 
@@ -922,7 +963,7 @@ def deformation_distance(deformation_field, sink=None, scale=None):
       Array or file name of the deformation distance data.
     """
 
-    deformation_field = io.read(deformation_field)
+    deformation_field = io_ops.read(deformation_field)
 
     df = np.square(deformation_field)
     if scale is not None:
@@ -930,7 +971,7 @@ def deformation_distance(deformation_field, sink=None, scale=None):
             df[:, :, :, i] = df[:, :, :, i] * (scale[i] * scale[i])
     df = np.sqrt(np.sum(df, axis=3))
 
-    return io.write(sink, df)
+    return io_ops.write(sink, df)
 
 
 ###############################################################################
@@ -956,21 +997,12 @@ def write_points(filename, points, indices=False, binary=True):
     """
 
     if not isinstance(points, np.ndarray):
-        points = io.read(points)
+        points = io_ops.read(points)
 
     if binary:
         with open(filename, 'wb') as point_file:
-            if get_elastix_version() < 5:
-                dtype = np.int64
-            else:
-                dtype = np.uint64
-            if indices:
-                np.array(1, dtype=dtype).tofile(point_file)
-            else:
-                np.array(0, dtype=dtype).tofile(point_file)
-
-            num_points = np.array(len(points), dtype=np.int64)
-            num_points.tofile(point_file)
+            np.array(1 if indices else 0, dtype=BIN_POINT_FILE_INTEGER_DTYPE).tofile(point_file)
+            np.array(len(points), dtype=BIN_POINT_FILE_INTEGER_DTYPE).tofile(point_file)
 
             points = np.asarray(points, dtype=np.double)
             points.tofile(point_file)
@@ -985,6 +1017,29 @@ def write_points(filename, points, indices=False, binary=True):
             np.savetxt(point_file, points, delimiter=' ', newline='\n', fmt='%.5e')
 
     return filename
+
+
+def _check_bin_point_file_header(filename, header):
+    """Raise if the size of a ``.bin`` point file is not the one its header implies.
+
+    The file is the header (index flag, number of points) followed by 3 float64 per point. A header or coordinates
+    of another width break this. A different signedness of the header integers does not: the bytes are the same
+    for every value below 2**63.
+    """
+    point_dtype_size = np.dtype(np.double).itemsize
+    header_size = BIN_POINT_FILE_HEADER_LENGTH * np.dtype(BIN_POINT_FILE_INTEGER_DTYPE).itemsize
+    if len(header) != BIN_POINT_FILE_HEADER_LENGTH:
+        raise ClearMapIoException(f'{filename} is too short to be a .bin point file: expected a header of '
+                                  f'{BIN_POINT_FILE_HEADER_LENGTH} {np.dtype(BIN_POINT_FILE_INTEGER_DTYPE)} integers '
+                                  f'({header_size} bytes), found {len(header)}')
+    index_flag, num_points = (int(value) for value in header)
+    expected_size = header_size + num_points * 3 * point_dtype_size
+    actual_size = Path(filename).stat().st_size
+    if index_flag not in (0, 1) or actual_size != expected_size:
+        raise ClearMapIoException(f'{filename} is not a valid .bin point file: its header reads as index flag '
+                                  f'{index_flag} and {num_points} points, which would make {expected_size} bytes '
+                                  f'(a {np.dtype(BIN_POINT_FILE_INTEGER_DTYPE)} header, float64 coordinates), '
+                                  f'but the file has {actual_size}')
 
 
 def read_points(filename, indices=False, binary=True):
@@ -1005,17 +1060,10 @@ def read_points(filename, indices=False, binary=True):
 
     if binary:
         with open(filename) as f:
-            if get_elastix_version() < 5:
-                dtype = np.int64
-            else:
-                dtype = np.uint64
-            _ = np.fromfile(f, dtype=dtype, count=1)[0]  # Discard the index flag
-            num_points = np.fromfile(f, dtype=dtype, count=1)[0]
-            if num_points == 0:
-                points = np.zeros((0, 3))
-            else:
-                points = np.fromfile(f, dtype=np.double)
-                points = np.reshape(points, (num_points, 3))
+            header = np.fromfile(f, dtype=BIN_POINT_FILE_INTEGER_DTYPE, count=BIN_POINT_FILE_HEADER_LENGTH)
+            _check_bin_point_file_header(filename, header)
+            num_points = int(header[1])
+            points = np.fromfile(f, dtype=np.double).reshape(num_points, 3)
     else:  # text file
         with open(filename) as f:
             lines = f.readlines()
@@ -1036,13 +1084,97 @@ def read_points(filename, indices=False, binary=True):
     return points
 
 
+def write_vtk_points(filename, points):
+    """Write points as a binary legacy VTK file, the binary point file of a stock transformix (elastix >= 5.3)
+
+    Arguments
+    ---------
+    filename : str
+      File name of the point file; transformix recognises it by its ``.vtk`` extension.
+    points : array or str
+      Source of the points, in physical coordinates (VTK point files have no pixel index mode).
+
+    Returns
+    -------
+    filename: str
+      File name of the point file.
+    """
+    if not isinstance(points, np.ndarray):
+        points = io_ops.read(points)
+    points = np.ascontiguousarray(points, dtype='>f8')  # ITK reads the binary legacy VTK format as big-endian
+    header = ('# vtk DataFile Version 2.0\nClearMap points\nBINARY\nDATASET POLYDATA\n'
+              f'POINTS {len(points)} double\n')
+    with open(filename, 'wb') as point_file:
+        point_file.write(header.encode('ascii'))
+        points.tofile(point_file)
+    return filename
+
+
+def read_vtk_points(filename):
+    """Read the points of a binary legacy VTK file, as written by transformix (elastix >= 5.3)
+
+    Arguments
+    ---------
+    filename : str
+      File name of the point file.
+
+    Returns
+    -------
+    points : array
+      The point coordinates, as float64. Transformix keeps the precision of its input (double or float).
+    """
+    coordinate_dtypes = {b'double': np.dtype('>f8'), b'float': np.dtype('>f4')}  # ITK writes VTK as big-endian
+    with open(filename, 'rb') as point_file:
+        for line in iter(point_file.readline, b''):
+            if line.startswith(b'POINTS'):
+                _, n_points, coordinate_type = line.split()
+                n_points = int(n_points)
+                if coordinate_type not in coordinate_dtypes:
+                    raise ClearMapValueError(f'Unsupported coordinate type {coordinate_type.decode()} in "{filename}", '
+                                             f'expected one of {[name.decode() for name in coordinate_dtypes]}')
+                dtype = coordinate_dtypes[coordinate_type]
+                data = point_file.read(3 * n_points * dtype.itemsize)
+                if len(data) != 3 * n_points * dtype.itemsize:
+                    raise ClearMapIoException(f'"{filename}" announces {n_points} points but holds '
+                                              f'{len(data) // (3 * dtype.itemsize)}: the file is truncated')
+                return np.frombuffer(data, dtype=dtype).reshape(n_points, 3).astype(np.double)
+    return np.zeros((0, 3))  # ITK writes no POINTS line for an empty mesh
+
+
+def point_file_extension(*, binary, indices):
+    """The point file format to give transformix, by extension: 'vtk', 'bin' or 'txt'
+
+    Arguments
+    ---------
+    binary : bool
+      Use a binary format if the configured elastix reads one, otherwise text.
+    indices : bool
+      The points are pixel indices. Only the .bin and text formats hold indices.
+
+    Returns
+    -------
+    extension : str
+      'vtk' with elastix >= 5.3 (binary VTK in, binary VTK out, elastix pull request #1253), 'bin' with an earlier
+      elastix on Linux (assumed to be the patched build shipped with ClearMap: a stock elastix < 5.3 reads no binary
+      point file), 'txt' otherwise.
+    """
+    if not binary:
+        return 'txt'
+    has_binary_vtk = get_elastix_version() >= Version('5.3')
+    if has_binary_vtk and not indices:
+        return 'vtk'
+    if not has_binary_vtk and platform.system() == 'Linux':
+        return 'bin'
+    return 'txt'
+
+
 def transform_points(source, sink=None, transform_parameter_file=None, transform_directory=None, indices=False,
                      result_directory=None, temp_file=None, binary=True, n_processes=None):
     """Transform coordinates math:`x` via elastix estimated transformation to :math:`T(x)`.
 
     Arguments
     ---------
-    source : str
+    source : str | np.ndarray
       Source of the points.
     sink : str or None
       Sink for transformed points.
@@ -1057,7 +1189,10 @@ def transform_points(source, sink=None, transform_parameter_file=None, transform
     result_directory : str or None
       Elastic result directory.
     temp_file : str or None
-      Optional file name for the elastix point file.
+      Optional file name for the elastix point file. Its extension must be the one of the chosen format
+      (:func:`point_file_extension`), from which transformix reads the format.
+    binary : bool
+      Use a binary point file if the configured elastix reads one (:func:`point_file_extension`), otherwise text.
 
     Returns
     -------
@@ -1069,32 +1204,33 @@ def transform_points(source, sink=None, transform_parameter_file=None, transform
     The transformation is from the fixed image coordinates to the moving image coordinates.
     """
     check_elastix_initialized()
+    if not isinstance(source, (str, np.ndarray)):
+        raise ClearMapRuntimeError(f'transform_points: source not string or array but "{type(source)}"!')
+    is_point_file = isinstance(source, str) and source[-3:] in ('txt', 'bin', 'vtk')  # given to transformix as is
+    extension = source[-3:] if is_point_file else point_file_extension(binary=binary, indices=indices)
+    if not is_point_file and temp_file is not None and not temp_file.endswith(f'.{extension}'):
+        raise ClearMapValueError(f'transform_points: temp_file "{temp_file}" must end with ".{extension}", the '
+                                 f'point format chosen for this elastix: transformix reads the format from it')
+
+    # A private folder for this run: jobs and processes may call transformix at the same time
+    working_directory = tempfile.mkdtemp(prefix=TRANSFORMIX_WORKING_DIRECTORY_PREFIX)
 
     # input point file
-    if temp_file is None:
-        extension = "bin" if binary else "txt"
-        temp_file = os.path.join(tempfile.gettempdir(), f'elastix_input.{extension}')
-
     delete_point_file = None
-    if isinstance(source, str):
-        if len(source) > 3 and source[-3:] in ['txt', 'bin']:
-            binary = source[-3:] == 'bin'
-            point_file = source
-        else:
-            points = io.read(source)
-            point_file = temp_file
-            delete_point_file = temp_file
-            write_points(point_file, points, indices=indices, binary=binary)
-    elif isinstance(source, np.ndarray):
-        point_file = temp_file
-        delete_point_file = temp_file
-        write_points(point_file, source, indices=indices, binary=binary)
+    if is_point_file:
+        point_file = source
     else:
-        raise RuntimeError(f'transform_points: source not string or array but "{type(source)}"!')
+        points = source if isinstance(source, np.ndarray) else io_ops.read(source)
+        point_file = temp_file or os.path.join(working_directory, f'elastix_input.{extension}')
+        delete_point_file = point_file
+        if extension == 'vtk':
+            write_vtk_points(point_file, points)
+        else:
+            write_points(point_file, points, indices=indices, binary=extension == 'bin')
 
     # result directory
     if result_directory is None:
-        out_dirname = os.path.join(tempfile.gettempdir(), 'elastix_output')
+        out_dirname = working_directory
         delete_result_directory = out_dirname
     else:
         out_dirname = result_directory
@@ -1118,24 +1254,27 @@ def transform_points(source, sink=None, transform_parameter_file=None, transform
     res = os.system(cmd)
 
     if res != 0:
-        raise RuntimeError(f'failed executing {cmd}, return code: {res}')
+        raise ClearMapRuntimeError(f'failed executing {cmd}, return code: {res}')
 
     # read data and clean up
     if delete_point_file is not None:
         os.remove(delete_point_file)
+    if out_dirname != working_directory:  # it only held the input point file
+        _remove_working_directory(working_directory)
 
     # read data / file
-    extension = 'bin' if binary else 'txt'
-    output_file = f'outputpoints.{extension}'
+    output_file = os.path.join(out_dirname, f'outputpoints.{extension}')
     if sink == []:  # return sink as file name
-        return os.path.join(out_dirname, output_file)
+        return output_file
+    elif extension == 'vtk':
+        transformed_points = read_vtk_points(output_file)
     else:
-        transformed_points = read_points(os.path.join(out_dirname, output_file), indices=indices, binary=binary)
+        transformed_points = read_points(output_file, indices=indices, binary=extension == 'bin')
 
     if delete_result_directory:
-        shutil.rmtree(delete_result_directory)
+        _remove_working_directory(delete_result_directory)
 
-    return io.write(sink, transformed_points)
+    return io_ops.write(sink, transformed_points)
 
 
 def inverse_transform(fixed_image, affine_parameter_file, bspline_parameter_file=None, transform_parameter_file=None,
@@ -1208,7 +1347,7 @@ def inverse_transform(fixed_image, affine_parameter_file, bspline_parameter_file
     res = os.system(cmd)
 
     if res != 0:
-        raise RuntimeError(f'inverse_transform: failed executing: {cmd}')
+        raise ClearMapRuntimeError(f'inverse_transform: failed executing: {cmd}')
 
     return result_directory
 

@@ -6,7 +6,6 @@ pytestmark = pytest.mark.skipif(skip, reason="This is a very slow test")
 import copy
 import os
 import tempfile
-from shutil import rmtree
 
 import numpy as np
 import pandas as pd
@@ -14,6 +13,7 @@ import tifffile
 
 from ClearMap.Settings import clearmap_path
 from ClearMap.IO import IO as clearmap_io
+from ClearMap.IO import io_ops
 from ClearMap.Alignment import Annotation as annotation
 import ClearMap.Analysis.Measurements.Voxelization as voxelization
 from ClearMap.Analysis.Statistics.data_frame_operations import fix_df_column_names
@@ -22,8 +22,8 @@ if not skip:
 
 BASE_SHIFTS = [-30, -10, 0, 30, -20, -10, 25]
 
-atlas = clearmap_io.read(annotation.default_annotation_file)
-hemispheres_atlas = clearmap_io.read(annotation.default_hemispheres_file)
+atlas = io_ops.read(annotation.default_annotation_file)
+hemispheres_atlas = io_ops.read(annotation.default_hemispheres_file)
 rng = np.random.default_rng()  # seed=42
 
 

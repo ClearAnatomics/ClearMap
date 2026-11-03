@@ -1,4 +1,3 @@
-#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 """
 GraphProcessing
@@ -14,20 +13,21 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://www.github.com/ChristophKirst/ClearMap2'
 
 import functools
-import multiprocessing
 import warnings
-from typing import Dict, Callable, List, Sequence
+from typing import Dict, Callable, List, Sequence, runtime_checkable, Protocol
 
 import numpy as np
 
-import ClearMap.IO.IO as io
+from ClearMap.IO import io_ops
 
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
 import ClearMap.ImageProcessing.Topology.Topology3d as t3d
 import ClearMap.Utils.Timer as tmr
+import ClearMap.Utils.array_checks as ac
 
 from ClearMap.Analysis.graphs import graph_gt
 from ClearMap.Analysis.graphs.fast_graph_reduce import find_degree2_branches, cy_reduce
+from ClearMap.Utils.utilities import sanitize_n_processes
 
 SENTINEL = -1
 
@@ -61,6 +61,80 @@ def medoid_vertex_coordinates(coordinates):
     return median
 
 
+@runtime_checkable
+class TwoPhaseReducer(Protocol):
+    """
+    Protocol for reducers that require an intermediate dtype different
+    from the output dtype — e.g. computing float means before thresholding
+    to a binary output.
+
+    Implementors must define:
+        __name__   : str        — maps to Cython reducer enum
+        tmp_dtype  : np.dtype   — dtype for intermediate Cython accumulation
+        finalise() : method     — converts intermediate result to final output
+    """
+    __name__: str
+    tmp_dtype: np.dtype
+
+    def __call__(self, x: np.ndarray) -> any: ...
+
+    def finalise(self, intermediate: np.ndarray, offsets: np.ndarray, arr_dtype: np.dtype) -> np.ndarray: ...
+
+    def is_compatible(self, prop_name: str, arr: np.ndarray) -> None: ...
+
+
+class Percentile:
+    """
+    Reducer that returns True if the p-th percentile of a **binary** array is 1.
+
+    For binary arrays this is equivalent to mean >= (1 - p/100),
+    implemented as a parallel Cython mean + single vectorised threshold.
+
+    .. warning::
+        Only valid for binary (0/1) arrays. For quantitative properties
+        use np.percentile directly.
+
+    Parameters
+    ----------
+    p : float
+        Percentile threshold in [0, 100].
+        p=33 means at least 67% of values must be 1 (consensus vote).
+        p=50 means at least 50% of values must be 1 (simple majority).
+    """
+    __name__ = 'vote'   # maps to RED_MEAN in get_reducer_enum
+    tmp_dtype = np.float64   # Cython accumulates means in float
+
+    def __init__(self, p: float = 33.33):
+        self.p = p
+        self.threshold = (100.0 - p) / 100.0
+
+    def __call__(self, x):
+        # Python fallback only
+        return float(np.mean(x)) >= self.threshold
+
+    # TODO: check if we want to improve this check
+    def is_compatible(self, prop_name, arr):
+        if not (np.issubdtype(arr.dtype, np.integer) and arr.max() <= 1 and arr.min() >= 0):
+            raise ValueError(
+                f'Percentile reducer applied to non-binary property "{prop_name}". '
+                f'Use np.percentile for quantitative properties.')
+
+    def finalise(self, means: np.ndarray, offsets: np.ndarray, arr_dtype: np.dtype) -> np.ndarray:
+        """
+        Convert Cython-computed means to a binary result.
+
+        Parameters
+        ----------
+        means : np.ndarray
+            Float means computed by cy_reduce (one per chain).
+        offsets : np.ndarray
+            Chain boundary offsets (length n_chains + 1).
+        arr_dtype : np.dtype
+            dtype of the source binary array — used for output dtype.
+        """
+        return (means >= self.threshold).astype(arr_dtype)
+
+
 DEFAULT_EDGE_TO_EDGE = {
     'length': np.sum,
     'chain_id': np.mean   # We use mean as a sanity check (float outputs would be a tell-tale sign of a bug)
@@ -75,16 +149,56 @@ DEFAULT_VERTEX_TO_VERTEX = {
     'length': np.sum,
     'radii': np.max,
     'radius_units': np.max,
-    # 'chain_id': functools.partial(np.quantile, 0.5, method='nearest', axis=0),
+    'radii_axial': np.max,  # (k,3) → (3,) max per axis ✓
+    'radius_units_axial': np.max,  # (k,3) → (3,) max per axis ✓
     'chain_id': np.mean,
+    # 'chain_id': functools.partial(np.quantile, 0.5, method='nearest', axis=0),
     '_vertex_id_': np.min
+}
+
+
+def incident_edges_max(connectivity: np.ndarray, edge_values: np.ndarray, n_vertices: int) -> np.ndarray:
+    """
+    The maximum of the values of the edges incident to each vertex (0 for a vertex without edges).
+
+    Parameters
+    ----------
+    connectivity: np.ndarray
+        (n_edges, 2) end vertices of each edge, in edge id order like edge_values
+        (graph.edge_connectivity(order='eid')).
+    edge_values: np.ndarray
+        One non-negative value per edge.
+    n_vertices: int
+    """
+    vertex_values = np.zeros(n_vertices, dtype=edge_values.dtype)
+    np.maximum.at(vertex_values, connectivity[:, 0], edge_values)
+    np.maximum.at(vertex_values, connectivity[:, 1], edge_values)
+    return vertex_values
+
+
+def incident_edges_half_sum(connectivity: np.ndarray, edge_values: np.ndarray, n_vertices: int) -> np.ndarray:
+    """
+    Half the sum of the values of the edges incident to each vertex: every edge has two ends, so each
+    end gets half of it and the vertex values add up to the edge values (e.g. the total length),
+    whatever the degrees. A self loop gives its whole value to its vertex.
+
+    Parameters: see incident_edges_max
+    """
+    ends_values = np.repeat(edge_values, 2)  # Aligned with connectivity.ravel(): [src_0, dst_0, src_1, ...]
+    return np.bincount(connectivity.ravel(), weights=ends_values, minlength=n_vertices) / 2
+
+
+DEFAULT_EDGE_TO_VERTEX = {  # f(connectivity, edge_values, n_vertices) -> vertex_values
+    'radii': incident_edges_max,
+    'radius_units': incident_edges_max,
+    'length': incident_edges_half_sum,
 }
 
 ###############################################################################
 # ## Graphs from skeletons
 ###############################################################################
 
-def neighbours(indices: np.ndarray, offset: int) -> np.ndarray:  # TODO: check if remove
+def neighbours(indices: np.ndarray, offset: int) -> np.ndarray:
     """
     indices  – sorted 1-D array of flat voxel indices (int64)
     offset   – neighbour offset in *elements* (signed)
@@ -201,8 +315,10 @@ def get_distance_map_27(resolution):
     return distance_table
 
 
-def graph_from_skeleton(skeleton, points=None, radii=None, compute_vertex_coordinates=True, compute_edge_length=True,
-                        check_border=True, delete_border=False, spacing=None, physical_units='', verbose=False):
+def graph_from_skeleton(skeleton, points=None, radii=None,
+                        compute_vertex_coordinates=True, compute_edge_length=True,
+                        check_border=True, delete_border=False, spacing=None, physical_units='',
+                        n_processes=-2, verbose=False):
     """
     Converts a binary skeleton image to a graph-tool graph.
 
@@ -210,6 +326,11 @@ def graph_from_skeleton(skeleton, points=None, radii=None, compute_vertex_coordi
     .. note::
 
         Edges are detected between neighbouring foreground pixels using 26-connectivity.
+
+    .. warning::
+
+        If ``delete_border`` is True, the input skeleton will be mutated in-place.
+        Otherwise the behaviour is RO
 
     Arguments
     ---------
@@ -241,9 +362,9 @@ def graph_from_skeleton(skeleton, points=None, radii=None, compute_vertex_coordi
         The graph corresponding to the skeleton.
     """
     if compute_edge_length and not compute_vertex_coordinates:
-        raise ValueError('Activating `compute_edge_length` requires `vertex_coordinates` to be True!')
+        raise ValueError('Activating `compute_edge_length` requires `compute_vertex_coordinates` to be True!')
 
-    skeleton = io.as_source(skeleton)
+    skeleton = io_ops.edit(skeleton)  # WARNING: ``edit`` here because delete_border (optional) is in-place
     if skeleton.dtype not in ('bool', np.uint8):
         raise TypeError('The skeleton array needs to be a boolean array!')
 
@@ -260,11 +381,20 @@ def graph_from_skeleton(skeleton, points=None, radii=None, compute_vertex_coordi
         timer_all = tmr.Timer()
         print('Graph from skeleton calculation initialized.!')
 
+    n_processes = sanitize_n_processes(n_processes)
     if points is None:
-        # points = ap.where(skeleton.reshape(-1, order='A')).array  # FIXME: put back to ap.where
-        points = np.where(skeleton.reshape(-1, order='A'))[0]
-
-        if verbose: timer.print_elapsed_time('Point list generation', reset=True)
+        if n_processes > 1:
+            # Get 3d coordinates of positive voxels
+            coords_3d = ap.where(skeleton, processes=n_processes)
+            # convert to linear indices using strides (efficient memory indexing)
+            strides = np.array(skeleton.strides) // skeleton.dtype.itemsize  # divide to get in units of array elelements
+            points = (coords_3d[:, 0] * strides[0] +
+                      coords_3d[:, 1] * strides[1] +
+                      coords_3d[:, 2] * strides[2])
+            points.sort()  # searchsorted in neighbours() requires sorted
+        else:
+            points = np.where(skeleton.reshape(-1, order='A'))[0]
+        if verbose: timer.print_elapsed_time(f'Point list generation with {n_processes=}', reset=True)
 
     # create graph
     n_vertices = points.shape[0]
@@ -279,19 +409,22 @@ def graph_from_skeleton(skeleton, points=None, radii=None, compute_vertex_coordi
     if verbose: timer.print_elapsed_time(f'Graph initialized with {n_vertices:,} vertices', reset=True)
 
     # ######################### detect edges #########################
-    edges_all = np.zeros((0, 2), dtype=int)  # TODO: list and stack later
+    edges = []
     for i, o in enumerate(t3d.orientations()):
         offset = np.sum((np.hstack(np.where(o)) - [1, 1, 1]) * skeleton.strides)
         # edges = ap.neighbours(points, offset)
-        edges = neighbours(points, offset)
-        if len(edges) > 0:
-            edges_all = np.vstack([edges_all, edges])
+        tmp_edges = neighbours(points, offset)
+        if len(tmp_edges) > 0:
+            edges.append(tmp_edges)
 
         if verbose:
-            timer.print_elapsed_time(f'{edges.shape[0]:,} edges with orientation {i + 1}/13 found', reset=True)
+            timer.print_elapsed_time(f'{len(tmp_edges):,} edges with orientation {i + 1}/13 found', reset=True)
 
-    if edges_all.shape[0] > 0:
+    if edges:
+        edges_all = np.vstack(edges, dtype=int)
         g.add_edge(edges_all)
+    else:
+        edges_all = np.zeros((0, 2), dtype=int)
 
     if verbose: timer.print_elapsed_time(f'Added {edges_all.shape[0]:,} edges to graph', reset=True)
 
@@ -305,18 +438,22 @@ def graph_from_skeleton(skeleton, points=None, radii=None, compute_vertex_coordi
             coords_dtype = np.int32
         vertex_coordinates = vertex_coordinates.astype(coords_dtype)
         g.set_vertex_coordinates(vertex_coordinates, dtype=coords_dtype)
+        if verbose: timer.print_elapsed_time(f'Added {len(vertex_coordinates)} vertex coordinates', reset=True)
 
         if spacing is not None:
             # Upcast to float because result is in physical units
             coords_phys = vertex_coordinates.astype(np.float32) * spacing[None, :]  # None broadcasts spacing to (1, 3)
             g.define_vertex_property('coordinates_units', coords_phys, dtype=np.float32)
+            if verbose: timer.print_elapsed_time(f'Added physical units coordinates', reset=True)
 
     if radii is not None:
         g.set_vertex_radius(radii)
+        if verbose: timer.print_elapsed_time(f'Added radii', reset=True)
 
     if compute_edge_length:
         edge_lengths = annotate_edge_lengths(g, spacing=spacing)
         g.define_edge_property('length', edge_lengths, dtype=np.float64)
+        if verbose: timer.print_elapsed_time(f'Added lengths', reset=True)
 
     if verbose:
         timer_all.print_elapsed_time('Skeleton to Graph')
@@ -461,7 +598,7 @@ def clean_graph(graph: graph_gt.Graph, remove_self_loops: bool = True, remove_is
 
     v_prop_arrays = {}  # Cache since graph..vertex_property is not a simple lookup (recreates np.array)
     for prop_name in vertex_mappings:
-        v_prop_arrays[prop_name] = graph.vertex_property(prop_name, as_array=True, is_scalar=False)
+        v_prop_arrays[prop_name] = graph.vertex_property(prop_name, as_array=True)  # FIXME: test , is_scalar=False)
 
     edge_counter = 0
     for i, clik_id in enumerate(clique_ids):
@@ -647,7 +784,9 @@ class PropertyAggregator:
         "edge"  → aggregating edge properties
         "vertex"→ aggregating vertex properties
     """
-    def __init__(self, graph: graph_gt.Graph, mapping: Dict[str, Callable], kind: str = "edge"):
+    def __init__(self, graph: graph_gt.Graph, mapping: Dict[str, Callable], kind: str = 'edge',
+                 n_processes: int | None= None):
+        self.n_processes = n_processes
         self.offsets = None  # offsets for the chains, (i.e., cumsum of chain lengths -> start/end indices)
         if kind not in self.ALLOWED_KINDS:
             raise ValueError(f"kind must be in {self.ALLOWED_KINDS}")
@@ -708,7 +847,7 @@ class PropertyAggregator:
         need_flip   = np.sign(diffs) != first_sign
         is_not_loop = np.all(sorted_vertices[0, :] != sorted_vertices[-1, :])
         need_flip = need_flip & is_not_loop  # no flip for self-loops
-        if self.kind == 'edge'and len(need_flip) > 0:  # FIXME: dirty trick for edge/vertex geometry length mismatch
+        if self.kind == 'edge'and len(need_flip) > 0:  # FIXME: dirty trick for edge/vertex geometry length (len()) mismatch
             need_flip = np.hstack([need_flip, need_flip[-1]])  #  FIXME: could remove if split vertex/edge geometry
         self.chain_edges_direction.append(need_flip)
 
@@ -729,20 +868,25 @@ class PropertyAggregator:
         offsets = np.cumsum([0] + [len(x) for x in self.chain_indices]).astype(np.uint64)
         self.offsets = offsets
 
-        n_procs = multiprocessing.cpu_count() - 2
+        n_procs = sanitize_n_processes(-2 if self.n_processes is None else self.n_processes)
 
         for prop_name, arr in self.properties.items():
             reduction_fn = self.aggregation_functions[prop_name]
 
             out_dtype = np.float64 if reduction_fn is np.sum else arr.dtype
 
-            mapped = np.zeros(len(self.chain_indices), dtype=out_dtype)  # pre-allocate output array
-            success = cy_reduce(arr, mapped, idx_stack=idx_stack, offsets=offsets, reducer_fn=reduction_fn,
-                                num_threads=n_procs)
-            if not success:  # default to pure Python if Cython fails
-                starts = offsets[:-1]
-                ends = offsets[1:]
+            if hasattr(reduction_fn, 'is_compatible'):  # TwoPhaseReducer protocol
+                reduction_fn.is_compatible(prop_name, arr)  # binary and threshold in (0,1)
+
+            tmp_dtype = getattr(reduction_fn, 'tmp_dtype', out_dtype) # for percentile, we need the intermediate means in float
+            mapped = np.zeros(len(self.chain_indices), dtype=tmp_dtype)  # pre-allocate output array
+            success = cy_reduce(ac.bool_as_uint8(arr), ac.bool_as_uint8(mapped), idx_stack=idx_stack, offsets=offsets,
+                                reducer_fn=reduction_fn, num_threads=n_procs)
+            if not success:  # pure Python fallback if Cython fails
+                starts, ends = offsets[:-1], offsets[1:]
                 mapped = np.array([reduction_fn(arr[idx_stack[s:e]]) for s, e in zip(starts, ends)], dtype=out_dtype)
+            elif hasattr(reduction_fn, 'finalise'):
+                mapped = reduction_fn.finalise(mapped, offsets, arr.dtype)
             self.aggregated_properties[prop_name] = mapped
 
     def get_indices_and_ranges(self, reduced_edge_order) -> (np.ndarray, np.ndarray):
@@ -855,7 +999,7 @@ def reduce_graph(graph, vertex_to_edge_mappings=None,
                  compute_edge_geometry=True,
                  edge_geometry_vertex_properties=('coordinates', 'radii', 'chain_id', '_vertex_id_'),
                  edge_geometry_edge_properties=('chain_id', ),
-                 return_maps=False, drop_pure_degree_2_loops=True,
+                 return_maps=False, drop_pure_degree_2_loops=True, n_processes=None,
                  verbose=False, label_branches=False, save_modified_graph_path=''):
     """
     Reduce graph by removing all vertices with degree two.
@@ -954,12 +1098,12 @@ def reduce_graph(graph, vertex_to_edge_mappings=None,
         chain_id_prop_arr = add_chain_id(graph, prop_kind='edge')
         chain_id_vertex_prop_arr = add_chain_id(graph, prop_kind='vertex')
 
-    vertex_agg = PropertyAggregator(graph, vertex_to_edge_mappings, kind="vertex")
-    edge_agg = PropertyAggregator(graph, edge_to_edge_mappings, kind="edge")
+    vertex_agg = PropertyAggregator(graph, vertex_to_edge_mappings, kind='vertex', n_processes=n_processes)
+    edge_agg = PropertyAggregator(graph, edge_to_edge_mappings, kind='edge', n_processes=n_processes)
     # vertex_geometry_agg =
     # edge_geometry_agg =
 
-    chains, _ = find_chains(graph) #, return_endpoints_mask=True);  check_chains(g, chains, degree_2_vertices_ids, non_degree_2_vertices_ids)
+    chains = find_chains(graph) #, return_endpoints_mask=True);  check_chains(g, chains, degree_2_vertices_ids, non_degree_2_vertices_ids)
 
     direct_edges = []  # Only the direct edges between non-degree 2 vertices
 
@@ -1070,7 +1214,7 @@ def check_chains(graph, chains, degree_2_v_ids, non_degree_2_v_ids):
     assert np.all(np.isin(non_degree_2_v_ids, non_d2s_ids_from_chains))  # all non-degree 2 from chains are in non_degree_2_v_ids
 
 
-def find_chains(graph, return_endpoints_mask=False):
+def find_chains(graph, *, return_endpoints_mask=False, return_edge_descriptors: bool = False):
     """
     Find chains (i.e. list of edges between vertices that are either branching points or end points) in a graph.
 
@@ -1092,6 +1236,10 @@ def find_chains(graph, return_endpoints_mask=False):
         `vertex_ids`.  A value *True* means “this vertex is a real endpoint
         (degree != 2)”, *False* means “internal degree-2 vertex”.
         Default is *False*.
+    return_edge_descriptors: bool
+        If True, also return a list of edge descriptors (e.g. edge objects or tuples) for each chain.
+        This is particularly useful for debugging or further processing, however, it has
+        a computational cost because it materialises python objects.
 
     Returns
     -------
@@ -1105,21 +1253,22 @@ def find_chains(graph, return_endpoints_mask=False):
     connectivity_w_eid = graph._base.get_edges(eprops=[graph._base.edge_index]).astype(np.uint32)
     connectivity_w_eid = np.roll(connectivity_w_eid, 1, axis=1)  # move edge id to the first column
 
-    v1_degs = graph._base.get_out_degrees(connectivity_w_eid[:, 1]).astype(np.uint8)
-    v2_degs = graph._base.get_out_degrees(connectivity_w_eid[:, 2]).astype(np.uint8)
+    v1_degs = graph._base.get_out_degrees(connectivity_w_eid[:, 1]).astype(np.uint32)
+    v2_degs = graph._base.get_out_degrees(connectivity_w_eid[:, 2]).astype(np.uint32)
 
     end_branches = np.logical_xor(v1_degs == 2, v2_degs == 2)
     end_branches_idx = np.where(end_branches)[0]
     end_branch_ids = connectivity_w_eid[end_branches_idx, 0]
 
-    vertex_degs = graph.vertex_degrees().astype(np.uint8)
+    vertex_degs = graph.vertex_degrees().astype(np.uint32)
     chains = find_degree2_branches(
         np.ascontiguousarray(connectivity_w_eid),  # FIXME: Check if contiguous is necessary
         end_branch_ids.astype(np.uint32),
         vertex_degs,
     )
 
-    edge_descriptors = np.array(list(graph._base.edges()), dtype=object)
+    if return_edge_descriptors:
+        edge_descriptors = np.array(list(graph._base.edges()), dtype=object)
 
     # Add direct edges to chains to process together
     direct_edges = connectivity_w_eid[(v1_degs != 2) & (v2_degs != 2)]
@@ -1145,9 +1294,11 @@ def find_chains(graph, return_endpoints_mask=False):
         visited[vs_idx] = True
 
     if not visited.sum() == graph.n_vertices:
-        raise ValueError(f'Not all vertices were visited during chain finding! '
-                         f'{visited.sum()} / {graph.n_vertices} visited. '
-                         f'Unvisited vertices: {np.where(~visited)[0]}')
+        unvisited_ids = np.where(~visited)[0]
+        raise ValueError(f'Not all vertices were visited during chain finding!\n'
+                         f'{visited.sum()} / {graph.n_vertices} visited.\n'
+                         f'Unvisited vertices: {unvisited_ids}\n'
+                         f'Unvisited vertices degrees: {graph.vertex_degrees()[unvisited_ids]}')
 
 
     if return_endpoints_mask:
@@ -1155,9 +1306,13 @@ def find_chains(graph, return_endpoints_mask=False):
         for eids, vids in chains:
             mask = (vertex_degs[vids] != 2)  # True endpoint
             chains_out.append((eids, vids, mask))
-        return chains_out, edge_descriptors
+        out = chains_out
     else:
-        return chains, edge_descriptors
+        out = chains
+    if return_edge_descriptors:
+        return out, edge_descriptors
+    else:
+        return out
 
 
 def check_graph_is_reduce_compatible(graph):
@@ -1361,7 +1516,8 @@ def trace_vertex_label(graph, vertex_label, condition, dilation_steps=1, max_ite
     return label
 
 
-def trace_edge_label(graph, edge_label, condition, max_iterations = None, dilation_steps = 1, pass_label = False, **condition_args):
+def trace_edge_label(graph, edge_label, condition, max_iterations = None,
+                     dilation_steps = 1, pass_label = False, **condition_args):
     """Traces label within a graph.
 
     Arguments

@@ -15,7 +15,7 @@ import warnings
 
 import numpy as np
 
-import ClearMap.IO.IO as io
+from ClearMap.IO import io_ops
 import ClearMap.ParallelProcessing.DataProcessing.MeasurePointList as mpl
 import ClearMap.Utils.Timer as tmr
 
@@ -26,7 +26,8 @@ import ClearMap.Utils.Timer as tmr
 def measure_radius(source, points, fraction=None, value=None,
                    max_radius=100, method='sphere', default=np.inf, scale=None,
                    return_radii=True, return_radii_as_scalar=True,
-                   return_indices=False, processes=None, verbose=False):
+                   return_indices=False, processes=None,
+                   verbose=False) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
     """
     Measures a radius via decay of intensity values for a list of points.
 
@@ -76,7 +77,7 @@ def measure_radius(source, points, fraction=None, value=None,
                       f'Please note this behavior is deprecated. Future versions will require a scale.',
                       DeprecationWarning, stacklevel=2)
 
-    source = io.as_source(source).array
+    source = io_ops.read(source)
 
     if verbose:
         timer = tmr.Timer()
@@ -114,9 +115,8 @@ def measure_radius(source, points, fraction=None, value=None,
     if return_radii:
         if scale is None:
             scale = 1
-        if not hasattr(scale, '__len__'):
-            scale = [scale] * ndim
-            scale = np.asarray(scale)
+        if not hasattr(scale, '__len__'):  # scalar provided -> broadcast
+            scale = np.full(ndim, scale, dtype=float)
         distance_table = np.abs(search) * scale
         if return_radii_as_scalar:
             distance_table = np.sqrt(np.sum(distance_table * distance_table, axis=1))
@@ -209,7 +209,6 @@ def search_indices_rectangle(radius):
 
 def test():
     import numpy as np
-    import ClearMap.IO.IO as io
 
     # noinspection PyUnresolvedReferences
     import ClearMap.Analysis.Measurements.radius_measurements as mr
@@ -222,7 +221,7 @@ def test():
     d,i = mr.measure_radius(data, points, fraction=0.75, max_radius=10, scale=2, verbose=True, processes=4, return_indices=True)
 
     data = np.random.rand(*(30,40,50))
-    io.write('data.npy', data)
+    io_ops.write('data.npy', data)
 
     points = np.array([np.random.randint(0,s, size=10) for s in data.shape]).T
     d,i = mr.measure_radius(data, points, value=0.5, max_radius=10, scale=2, verbose=True, processes=4, return_indices=True)

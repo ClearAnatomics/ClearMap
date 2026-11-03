@@ -13,11 +13,44 @@ import numpy as np
 
 import pyximport
 
+from ClearMap.Utils.exceptions import ClearMapValueError
+
 pyximport.install(setup_args={"include_dirs": [np.get_include(), os.path.dirname(os.path.abspath(__file__))]},
                   reload_support=True)
 
 
 import ClearMap.ImageProcessing.Tracing.TraceCode as code
+import ClearMap.Utils.array_checks as ac
+
+
+def _prepare(source, score, start, mask=None):
+  """Coerce the arguments to what TraceCode.pyx expects.
+
+  The C++ tracer receives raw pointers to the source, the score and the mask together with the
+  strides *of the source only*: the three arrays must have the same shape and the same memory
+  layout, hence they are all made C-contiguous (copies only when needed).
+  The source and score must be float64 (the only source_t compiled).
+  """
+  source = np.ascontiguousarray(ac.as_dtype(source, np.float64, name='source'))
+  score = np.ascontiguousarray(ac.as_dtype(score, np.float64, name='score'))
+  if source.ndim != 3:
+    raise ClearMapValueError(f'The source must be 3d, found {source.ndim:d} dimensions!')
+  if score.shape != source.shape:
+    raise ClearMapValueError(f'The score shape {score.shape!r} does not match the source shape {source.shape!r}!')
+  start = _prepare_point(start, source.shape, 'start')
+  if mask is not None:
+    mask = np.ascontiguousarray(ac.check_dtype(ac.bool_as_uint8(mask), (np.uint8, np.uint16, np.float32, np.float64), name='mask'))
+    if mask.shape != source.shape:
+      raise ClearMapValueError(f'The mask shape {mask.shape!r} does not match the source shape {source.shape!r}!')
+  return source, score, start, mask
+
+
+def _prepare_point(point, shape, name):
+  """A 3d index inside ``shape`` (the tracer does not check the bounds)."""
+  point = ac.as_index_array(point, name=name, ndim=1)
+  if point.shape != (3,) or np.any(point < 0) or np.any(point >= np.asarray(shape)):
+    raise ClearMapValueError(f'{name} {tuple(point)!r} is not a 3d point inside the source of shape {shape!r}!')
+  return point
 
 
 ###############################################################################
@@ -72,7 +105,9 @@ def trace(source, score, start, stop,
   if maxSteps is None:
     maxSteps = -1;
   
-  path = code.trace(source, score, np.array(start), np.array(stop), 
+  source, score, start, _ = _prepare(source, score, start)
+  stop = _prepare_point(stop, source.shape, 'stop')
+  path = code.trace(source, score, start, stop,
                     costPerDistance, minimumCostPerDistance, 
                     tubenessMultiplier, minimalTubeness,
                     returnQuality,
@@ -128,7 +163,8 @@ def trace_to_mask(source, tubeness, start, mask,
     maxSteps = -1;
   #maxSteps = long(maxSteps);
   
-  path = code.traceToMask(source, tubeness, np.array(start), mask, 
+  source, tubeness, start, mask = _prepare(source, tubeness, start, mask)
+  path = code.trace_to_mask(source, tubeness, start, mask,
                     costPerDistance, minimumCostPerDistance,
                     tubenessMultiplier, minimalTubeness, 
                     returnQuality,

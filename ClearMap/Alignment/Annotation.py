@@ -28,6 +28,7 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import os
 import collections
+import functools
 
 import json
 import warnings
@@ -40,51 +41,87 @@ from scipy.ndimage import distance_transform_edt
 import ClearMap.Settings
 import ClearMap.Settings as settings
 
-import ClearMap.IO.IO as clearmap_io
+from ClearMap.IO import IO as clearmap_io
+from ClearMap.IO import io_ops
 import ClearMap.IO.FileUtils as fu
 
 from ClearMap.Alignment.Resampling import orientation_to_transposition, format_orientation
 import ClearMap.Utils.HierarchicalDict as hdict
 
 from ClearMap.Alignment.utils import create_label_table
-from ClearMap.IO import IO as clearmap_io
+from ClearMap.IO.assets_constants import COMPRESSION_ALGORITHMS
+from ClearMap.Utils.exceptions import AssetNotFoundError
 
 from ClearMap.Visualization import Color as col
-from ClearMap.config.atlas import STRUCTURE_TREE_NAMES_MAP
+from ClearMap.config.atlas import (STRUCTURE_TREE_NAMES_MAP, ATLAS_COMPONENT_NAMES, ATLAS_CACHE_SUBFOLDER_NAME,
+                                   get_decompressed_atlases_dir)
 
 
 ###############################################################################
 # ## Atlas Structures
 ###############################################################################
 
-def decompress_atlases(atlas_base_name):  # FIXME: add option to move to a different folder if we can't write to the current one
+def decompress_atlases(atlas_base_name):
+    """
+    The paths of the files of an atlas, decompressed from the archives shipped with ClearMap when needed.
+
+    A file already decompressed in the atlas folder is used as is. Otherwise it is decompressed (once) in the cache
+    folder, never in the atlas folder, which is read-only on a cluster.
+    """
     paths = {}
-    atlas_component_names = ('annotation', 'hemispheres', 'reference', 'distance_to_surface')
-    for atlas_type in atlas_component_names:
-        f_path = os.path.join(settings.atlas_folder, f'{atlas_base_name}_{atlas_type}.tif')
-        fu.uncompress(f_path, extension='auto')
-        paths[atlas_type] = f_path
+    cache_dir = get_decompressed_atlases_dir()
+    for atlas_type in ATLAS_COMPONENT_NAMES:
+        file_name = f'{atlas_base_name}_{atlas_type}.tif'
+        paths[atlas_type] = str(fu.find_or_build(file_name, source_dir=settings.atlas_folder, cache_dir=cache_dir,
+                                                 build=functools.partial(_decompress_atlas_file, file_name)))
     return paths
+
+
+def _decompress_atlas_file(file_name, destination):
+    for algorithm in COMPRESSION_ALGORITHMS:
+        compressed_path = Path(settings.atlas_folder) / f'{file_name}.{algorithm}'
+        if compressed_path.exists():
+            fu.decompress_file(compressed_path, destination)
+            return
+    raise AssetNotFoundError(f'Neither {file_name} nor a compressed version of it '
+                             f'({", ".join(COMPRESSION_ALGORITHMS)}) is in {settings.atlas_folder}. '
+                             f'Check the atlas name or reinstall ClearMap.')
 
 
 ATLAS_BASE_NAME = 'ABA_25um'  # warning: change if different atlas
 
 
-default_annotation_file, default_hemispheres_file,\
-default_reference_file, default_distance_to_surface_file = decompress_atlases(ATLAS_BASE_NAME).values()
-"""
-Note
-----
-  This file is by default the Allen brain annotated mouse atlas with 25um 
-  isotropic resolution.
+@functools.lru_cache(maxsize=None)
+def get_default_atlas_files():
+    """
+    The files (:func:`decompress_atlases`) of the default atlas, decompressed when first needed.
 
-  Includes the
-    - Default volumetric annotated image file.
-    - Default hemispheres annotated image file
-    - Default reference (grayscale) image file
-    - Corresponding distance to surface file
+    Note
+    ----
+    This is by default the Allen brain annotated mouse atlas with 25um isotropic resolution. It includes the
 
-"""
+    - default volumetric annotated image file,
+    - default hemispheres annotated image file,
+    - default reference (grayscale) image file,
+    - corresponding distance to surface file.
+    """
+    return decompress_atlases(ATLAS_BASE_NAME)
+
+
+DEFAULT_ATLAS_FILE_ATTRIBUTES = {
+    'default_annotation_file': 'annotation',
+    'default_hemispheres_file': 'hemispheres',
+    'default_reference_file': 'reference',
+    'default_distance_to_surface_file': 'distance_to_surface',
+}
+
+
+def __getattr__(name):
+    """``default_annotation_file`` and its siblings are made when first used: they are 1 GB of files to decompress."""
+    if name in DEFAULT_ATLAS_FILE_ATTRIBUTES:
+        return get_default_atlas_files()[DEFAULT_ATLAS_FILE_ATTRIBUTES[name]]
+    raise AttributeError(f'module {__name__!r} has no attribute {name!r}')
+
 
 default_label_file = os.path.join(settings.atlas_folder, 'ABA_annotation.json')
 """Default list of labels and region names in the annotated image.
@@ -119,7 +156,7 @@ Note
 """
 
 
-class Label(object):
+class Label:
     """Class holding information of an individual Atlas label."""
 
     def __init__(self, data, children=None, parent=None, level=0):
@@ -187,7 +224,7 @@ class Label(object):
         return self.__str__(indent=indent, with_children=False)
 
 
-class Annotation(object):
+class Annotation:
     """Class that holds information of the annotated regions."""
 
     def __init__(self, atlas_base_name, slicing, orientation, label_source, target_directory=None, extra_label=None):
@@ -318,10 +355,10 @@ class Annotation(object):
                 label_file_path = self.label_file
         if annotation_file_path is None:
             if self.annotation_file is None:
-                warnings.warn(f'Annotation file not defined, using default: {default_annotation_file}.\n'
+                annotation_file_path = get_default_atlas_files()['annotation']
+                warnings.warn(f'Annotation file not defined, using default: {annotation_file_path}.\n'
                               f'Please note this is deprecated and will be removed in future versions.',
                               DeprecationWarning)
-                annotation_file_path = default_annotation_file
             else:
                 annotation_file_path = self.annotation_file
         if extra_label is None:
@@ -384,7 +421,7 @@ class Annotation(object):
         self.dict_name_to_id = self.get_dict(from_='name', to='id')
 
         # import atlas
-        self.atlas = clearmap_io.read(self.annotation_file)
+        self.atlas = io_ops.read(self.annotation_file)
         if self.atlas.dtype.kind == 'f':
             self.atlas = self.atlas.astype(int)
         self.children_df = create_label_table(self.label_file, save=False, from_cached=True)
@@ -532,14 +569,14 @@ class Annotation(object):
     def get_lateralised_volume_map(self, atlas_scale, hemispheres_file_path=None):
         if hemispheres_file_path is None:
             hemispheres_file_path = self.hemispheres_file
-        hemispheres_atlas = clearmap_io.read(hemispheres_file_path)
+        hemispheres_atlas = io_ops.read(hemispheres_file_path)
         scale = np.prod(atlas_scale)
-        hem_ids = sorted(np.unique(hemispheres_atlas))
+        hem_ids = sorted(np.unique(hemispheres_atlas).astype(int).tolist())
         volumes = {}
         for hem_id in hem_ids:
             unique_ids, counts = np.unique(self.atlas[hemispheres_atlas == hem_id], return_counts=True)
-            for id_, count in zip(unique_ids, counts):
-                volumes[(id_, hem_id)] = count * scale
+            for region_id, count in zip(unique_ids.astype(int).tolist(), counts.tolist()):
+                volumes[(region_id, hem_id)] = int(count) * scale
         return volumes
 
     def get_dict_parents_to_children(self, parents_ids=None, including_parents=False):
@@ -634,7 +671,7 @@ class Annotation(object):
             The labels for each point. (shape = len(points))
         """
         if annotation_file_path:
-            atlas = clearmap_io.read(annotation_file_path)
+            atlas = io_ops.read(annotation_file_path)
         else:
             atlas = self.atlas
 
@@ -716,11 +753,12 @@ class Annotation(object):
         }
         specified_paths = {k: v for k, v in file_paths.items() if v}
         if not specified_paths:
-            file_paths['annotation'] = default_annotation_file
-            file_paths['reference'] = default_reference_file
-            file_paths['distance_to_surface'] = default_distance_to_surface_file
+            default_files = get_default_atlas_files()
+            file_paths['annotation'] = default_files['annotation']
+            file_paths['reference'] = default_files['reference']
+            file_paths['distance_to_surface'] = default_files['distance_to_surface']
             if return_hemispheres:
-                file_paths['hemispheres'] = default_hemispheres_file
+                file_paths['hemispheres'] = default_files['hemispheres']
         else:  # infer the other paths
             existing_keys = list(specified_paths.keys())  # TODO: we should check that if > 1 key, they share pattern
             missing_keys = [k for k in file_paths if k not in existing_keys]
@@ -748,10 +786,10 @@ class Annotation(object):
                 raise FileNotFoundError(f'Cannot find annotation file: {f_path}')
 
             # Extract array
-            src = clearmap_io.as_source(f_path)
             if verbose:
-                print(f'Preparing: from source {src}')
-            data = np.array(src.array)
+                print(f'Preparing: from file: "{f_path}"')
+            src = io_ops.read(f_path)
+            data = np.array(src)
 
             if orientation is not None:
                 # transpose data to match orientation
@@ -766,7 +804,9 @@ class Annotation(object):
             if slicing is not None:
                 data = data[slicing]
 
-            clearmap_io.write(new_file_path, data)
+            # Atomic: an existing file is reused as is ('Atlas file exists, skipping'), so a crash
+            #  mid-write must never leave a truncated one behind
+            fu.atomic_write(io_ops.write, new_file_path, data)
             results.append(new_file_path)
 
         return results
@@ -867,7 +907,7 @@ class Annotation(object):
             The name of the file to which the color atlas was written.
         """
         if annotation_file_path:
-            atlas = clearmap_io.read(annotation_file_path)
+            atlas = io_ops.read(annotation_file_path)
         else:
             atlas = self.atlas
         atlas = self.convert_label(atlas, key='id', value='order', method='map')  # FIXME: why value='order'?
@@ -875,7 +915,7 @@ class Annotation(object):
         cm = self.color_map(alpha=False, as_int=True)
         atlas = cm[atlas]
         if dest_path:
-            clearmap_io.write(dest_path, atlas)
+            io_ops.write(dest_path, atlas)
         return atlas
 
 
@@ -904,7 +944,7 @@ def get_atlas_filepath(filename, directory=None, orientation=None, slicing=None)
 
 
 def annotation_to_distance_file(annotation_file_path):
-    brain_mask = (clearmap_io.read(annotation_file_path) > 0).astype(int)
+    brain_mask = (io_ops.read(annotation_file_path) > 0).astype(int)
     distance_array = distance_transform_edt(brain_mask)
     return distance_array
 
@@ -932,9 +972,9 @@ def _test1():
     cnts = annotator.count_points(points, hierarchical=False)
     print(cnts)
 
-    import ClearMap.IO.IO as io
+    from ClearMap.IO import FileUtils as file_utils
     ano.write_color_annotation('test.tif')
-    io.delete_file('test.tif')
+    file_utils.delete_file('test.tif')
 
     l = annotator.find(247, key='id')
     print(l)

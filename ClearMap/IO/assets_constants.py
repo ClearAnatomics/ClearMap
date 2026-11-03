@@ -1,4 +1,5 @@
-from copy import deepcopy
+import re
+from types import MappingProxyType
 
 EXTENSIONS = {
     'image': ['.npy', '.tif', '.tiff'],
@@ -7,7 +8,7 @@ EXTENSIONS = {
     'layout': ['.lyt'],
     'elastix_image': ['.mhd'],
     'elastix_points': ['.pts'],
-    'table': ['.npy', '.feather', '.csv'],
+    'table': ['.feather', '.csv', '.npy'],
     'log': ['.log'],
     'error_log': ['.html'],
 }
@@ -70,6 +71,19 @@ CONTENT_TYPE_TO_PIPELINE = {
     'myelin': 'TractMap'
 }
 DATA_CONTENT_TYPES = list(CONTENT_TYPE_TO_PIPELINE.keys())
+# The pipeline names: those of the content types, and stitching, which applies to any tiled channel
+PIPELINE_NAMES = frozenset({*(p for p in CONTENT_TYPE_TO_PIPELINE.values() if p is not None), 'stitching'})
+# The pipelines whose compound channels are oriented: the order of the parts carries meaning
+# (the colocalization of a in b is not that of b in a). The parts of the compound channels of
+# the other pipelines are an unordered set (e.g. the TubeMap vessels and arteries).
+ORIENTED_COMPOUND_PIPELINES = frozenset({'Colocalization'})
+# The data type of the part of the compound channels of a pipeline which is read for what the parts share, as they
+# are imaged together: shape, resolution, registration (transforms, atlas, annotator). For TubeMap, the all-vessels
+# channel, the one part every TubeMap compound has (not the first part, which is just the first in alphabetical
+# order). The compound channels of the other pipelines have none so far: their parts are read each on its own. A
+# pipeline whose compound channels need one (e.g. to read the atlas of a colocalization pair) declares it here.
+COMPOUND_REPRESENTATIVE_DATA_TYPES = MappingProxyType({'TubeMap': 'vessels'})
+
 
 # TODO: add link between labels and content types
 #    e.g.
@@ -84,6 +98,8 @@ Assets that are channel specific.
 They may or may not make sense for a given channel 
 based on the pipeline(s) relevant for that channel.
 """
+FILE_NAME_TOKEN_RE = re.compile(r'[A-Za-z0-9_.+-]+')  # What a computed part of a sub-type name may contain
+
 CHANNELS_ASSETS_TYPES_CONFIG = {
     'raw': {
         'file_format_category': 'image',
@@ -133,13 +149,29 @@ CHANNELS_ASSETS_TYPES_CONFIG = {
         'file_format_category': 'table',
         'resource_type': 'results',
         'relevant_pipelines': ['CellMap'],  # TODO: tune relevance for subsets
-        'sub_types': ['raw', 'filtered', 'shape', 'bkg']
+        'sub_types': {
+            'raw': None,                                   # inherits table
+            'filtered': None,                              # inherits table
+            'shape': {'file_format_category': 'image'},    # image → array
+            'bkg': {'file_format_category': 'image'},      # image → array
+            'maxima': {'file_format_category': 'image'},   # image → array
+        }
+    },
+    'vertices': {
+        'file_format_category': 'table',
+        'resource_type': 'results',
+        'relevant_pipelines': ['TubeMap'],
+        'extensions': ['.feather'],
     },
     'tract_voxels': {
         'file_format_category': 'table',
         'resource_type': 'results',
         'relevant_pipelines': ['TractMap'],
-        'sub_types': ['raw', 'filtered', 'shape']
+        'sub_types': {
+            'raw': None,
+            'filtered': None,
+            'shape': {'file_format_category': 'image'},
+        }
     },
     'cells_stats': {
         'file_format_category': 'table',

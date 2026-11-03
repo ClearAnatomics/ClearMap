@@ -10,7 +10,7 @@
 #
 # install: conda env create -f ClearMap.yml 
 # update:  conda env update -f ClearMap.yml 
-name: ClearMap3
+name: ClearMap3.1
 channels:
   - conda-forge
 
@@ -22,6 +22,7 @@ dependencies:
   - ipywidgets  # For pyvista
   - numpy
   - scipy
+  - numexpr  # ClearMap.Analysis.vasculature.geometry_utils
   - pandas<2  # Groupby syntax changes
   - pyarrow
   - scikit-image
@@ -46,17 +47,19 @@ dependencies:
   - napari
   - graph-tool<=2.45  # Cannot remove self loops with later versions
   - python-igraph
-  - pytorch<=2.2
+#  - pytorch<=2.2
   - mkl<2024.1  # Breaks pytorch (https://github.com/pytorch/pytorch/issues/123097)
-  - pytorch-cuda
+#  - pytorch-cuda
   - cudatoolkit=11.8
   - xmltodict  # to compensate for old tifffile
   - psutil
+  - pytest
+  - jsonschema
   - mpld3  # WARNING Maybe pip
   - lxml < 5.2  # lxml 5.2 breaks napari
   - pip
   - pip:
-    - itk==5.4.3  # Later seems to bug with numpy >= 1.24 (bool->bool_)
+    - itk~=5.4.5  # Not 5.4.4: it used np.bool, absent from NumPy 1.24 to 1.26 (fixed in ITK a637501, 5.4.5)
     - itk-elastix
 #    - --extra-index-url https://download.pytorch.org/whl/{cuda_suffix}')
 #    - torch

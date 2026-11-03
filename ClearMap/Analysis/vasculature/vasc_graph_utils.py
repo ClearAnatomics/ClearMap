@@ -1,5 +1,4 @@
 import inspect
-import multiprocessing
 import warnings
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
@@ -8,6 +7,7 @@ import igraph
 import numpy as np
 
 from ClearMap.Alignment import Annotation as annotation, Annotation as ano
+from ClearMap.Utils.utilities import sanitize_n_processes
 
 """These are the values of the "nkind" property of the edges in the graph
 these are used to have an integer value for the edges that can be used in the linear system"""
@@ -16,9 +16,6 @@ n_kinds = {
     'veins': 3,
     'capillaries': 4
 }
-
-
-MAX_PROCS = multiprocessing.cpu_count() - 1
 
 
 # ############################## Brain graph generic ########################################
@@ -324,7 +321,7 @@ def parallel_get_vessels_lengths(graph, edge_coordinates_name='coordinates', cli
     -------
     An array of the lengths of the vessels in the graph
     """
-    n_processes = min(n_processes, MAX_PROCS)
+    n_processes = min(sanitize_n_processes(n_processes), sanitize_n_processes(-1))  # One CPU is left to the parent
     vessels_coordinates = graph.edge_geometry(edge_coordinates_name)
     if len(vessels_coordinates) < 1000: n_processes = 1  # Avoids overhead of parallel processing for small graphs
     if n_processes > 1:

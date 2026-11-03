@@ -1,0 +1,217 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://clearmap.org/schemas/v3/vasculature"
+
+type: object
+additionalProperties: true
+
+$defs:
+  # --- Shared: binarization pipeline (used by templates and instances) ---
+  binarizationPipeline:
+    type: object
+    additionalProperties: true
+    properties:
+      binarize:
+        type: object
+        additionalProperties: true
+        properties:
+          run: { type: boolean }
+          save:  { type: boolean }
+          clip_range: { $ref: "./typedefs.schema.yaml#/$defs/numberPairPositive" }
+          threshold: { type: ["number", "null"] }
+      smooth:
+        type: object
+        additionalProperties: true
+        properties:
+          run: { type: boolean }
+          save:  { type: boolean }
+      binary_fill:
+        type: object
+        additionalProperties: true
+        properties:
+          run: { type: boolean }
+          save:  { type: boolean }
+      deep_fill:
+        type: object
+        additionalProperties: true
+        properties:
+          run: { type: boolean }
+          save:  { type: boolean }
+          resample_factor: { type: number, exclusiveMinimum: 0 }
+      step_order:
+        type: array
+        items:
+          type: string
+          enum: [ binarize, smooth, binary_fill, deep_fill ]
+        minItems: 1
+        uniqueItems: true
+
+  binarizationChannelsContainer:
+    type: object
+    additionalProperties:
+      $ref: "#/$defs/binarizationPipeline"
+
+  binarizationCombined:
+    type: object
+    additionalProperties: true
+    properties:
+      binary_fill: { type: boolean }
+      compress: { type: boolean }
+
+
+  # --- Performance: per-channel binarization perf pipeline ---
+  performanceBinarizationPipeline:
+    type: object
+    additionalProperties: true
+    properties:
+      binarize:
+        type: object
+        additionalProperties: true
+        properties:
+          block_processing: { $ref: "./typedefs.schema.yaml#/$defs/blockProcessing" }
+
+      smooth:
+        type: object
+        additionalProperties: true
+        properties:
+          block_processing: { $ref: "./typedefs.schema.yaml#/$defs/blockProcessing" }
+
+      binary_fill:
+        type: object
+        additionalProperties: true
+        properties:
+          n_processes: { type: integer }
+
+      deep_fill:
+        type: object
+        additionalProperties: true
+        properties:
+          block_processing: { $ref: "./typedefs.schema.yaml#/$defs/blockProcessing" }
+
+  performanceBinarizationChannelsContainer:
+    type: object
+    additionalProperties:
+      $ref: "#/$defs/performanceBinarizationPipeline"
+
+properties:
+  clearmap_schema: { type: integer }
+  clearmap_version: { type: string }
+
+  binarization:
+    type: object
+    additionalProperties: true
+    properties:
+      templates:
+        $ref: "#/$defs/binarizationChannelsContainer"
+      single_channels:
+        $ref: "#/$defs/binarizationChannelsContainer"
+      combined:
+        $ref: "#/$defs/binarizationCombined"
+
+  graph_construction:
+    type: object
+    additionalProperties: true
+    properties:
+      skeletonize:  { type: boolean }
+      build:        { type: boolean }
+      clean:        { type: boolean }
+      reduce:       { type: boolean }
+      transform:    { type: boolean }
+      annotate:     { type: boolean }
+      use_arteries: { type: boolean }
+
+  vessel_type_postprocessing:
+    type: object
+    additionalProperties: true
+    properties:
+      pre_filtering:
+        type: object
+        additionalProperties: true
+        properties:
+          vein_intensity_range_on_arteries_ch: { $ref: "./typedefs.schema.yaml#/$defs/intPair" }
+          restrictive_vein_radius_um:   { $ref: "./typedefs.schema.yaml#/$defs/positiveNumber" }
+          permissive_vein_radius_um:    { $ref: "./typedefs.schema.yaml#/$defs/positiveNumber" }
+          final_vein_radius_um:         { $ref: "./typedefs.schema.yaml#/$defs/positiveNumber" }
+          arteries_min_noise_edges: { $ref: "./typedefs.schema.yaml#/$defs/positiveInteger" }
+      tracing:
+        type: object
+        additionalProperties: true
+        properties:
+          max_arteries_iterations: { $ref: "./typedefs.schema.yaml#/$defs/positiveInteger" }
+          max_veins_iterations:    { $ref: "./typedefs.schema.yaml#/$defs/positiveInteger" }
+          artery_trace_radius_um:  { $ref: "./typedefs.schema.yaml#/$defs/positiveNumber" }
+          vein_trace_radius_um:    { $ref: "./typedefs.schema.yaml#/$defs/positiveNumber" }
+          distance_to_surface_min: { $ref: "./typedefs.schema.yaml#/$defs/positiveNumber" }
+          vein_intensity_min:    { $ref: "./typedefs.schema.yaml#/$defs/positiveNumber" }
+          artery_intensity_min:    { $ref: "./typedefs.schema.yaml#/$defs/positiveNumber" }
+      capillaries_removal:
+        type: object
+        additionalProperties: true
+        properties:
+          min_artery_size: { $ref: "./typedefs.schema.yaml#/$defs/positiveNumber" }
+          min_vein_size:   { $ref: "./typedefs.schema.yaml#/$defs/positiveNumber" }
+
+  visualization:
+    type: object
+    additionalProperties: true
+    properties:
+      voxelization:
+        type: object
+        additionalProperties: true
+        properties:
+          size: { $ref: "./typedefs.schema.yaml#/$defs/numberTriplePositive" }
+      slicing:
+        type: object
+        additionalProperties: true
+        properties:
+          dim_0: { $ref: "./typedefs.schema.yaml#/$defs/intPair" }
+          dim_1: { $ref: "./typedefs.schema.yaml#/$defs/intPair" }
+          dim_2: { $ref: "./typedefs.schema.yaml#/$defs/intPair" }
+      display:
+        type: object
+        additionalProperties: true
+
+  performance:
+    type: object
+    additionalProperties: true
+    properties:
+      binarization:
+        type: object
+        additionalProperties: true
+        properties:
+          # template/default perf shape
+          templates:
+            $ref: "#/$defs/performanceBinarizationChannelsContainer"
+
+          # instance perf shape
+          single_channels:
+            $ref: "#/$defs/performanceBinarizationChannelsContainer"
+
+          combine:
+            type: object
+            additionalProperties: true
+            properties:
+              block_processing: { $ref: "./typedefs.schema.yaml#/$defs/blockProcessing" }
+      graph_construction:
+        type: object
+        additionalProperties: true
+        properties:
+          skeletonize:
+            type: object
+            additionalProperties: true
+            properties:
+              n_processes: { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }
+          build:
+            type: object
+            additionalProperties: true
+            properties:
+              n_processes: { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }
+          clean:
+            type: object
+            additionalProperties: true
+            properties:
+              n_processes: { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }
+          reduce:
+            type: object
+            additionalProperties: true
+            properties:
+              n_processes: { $ref: "./typedefs.schema.yaml#/$defs/nProcessesType" }
