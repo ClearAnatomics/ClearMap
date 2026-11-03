@@ -78,7 +78,6 @@ import os
 import copy
 import re
 import functools
-import platform
 import warnings
 import gc
 from concurrent.futures import ProcessPoolExecutor
@@ -147,7 +146,6 @@ DEEP_FILL_REQUIRED_V_RAM = 22_000  # MiB (as reported by nvidia-smi) of free VRA
 MAX_PLOT_VERTICES = 300_000  # Empirical max number of vertices that can safely be plotted
 BRANCHES_DENSITY_SUB_TYPE = 'branches'  # Variants: branches[_weighted_<weight name>][_<filters name>]
 
-USE_BINARY_POINTS_FILE = not platform.system().lower().startswith('darwin')
 _SourcePath = Union[Path, str]
 
 
@@ -1255,7 +1253,7 @@ class VesselGraphProcessor(TubeMapOrchestrator):
             if self.registration_processor.was_registered:
                 for results_dir in self.registration_processor.get_transform_directories(self.representative_channel):
                     coordinates = elastix.transform_points(coordinates, transform_directory=results_dir,
-                                                           binary=USE_BINARY_POINTS_FILE, indices=False)
+                                                           indices=False)
             return coordinates
 
         self.graph_reduced.transform_properties(transformation=transformation,

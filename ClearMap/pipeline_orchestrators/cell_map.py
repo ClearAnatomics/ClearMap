@@ -82,7 +82,6 @@ from __future__ import annotations
 
 import copy
 import re
-import platform
 import warnings
 from concurrent.futures.process import BrokenProcessPool
 from typing import Optional, TYPE_CHECKING
@@ -125,8 +124,6 @@ from ClearMap.pipeline_orchestrators.registration_orchestrator import Registrati
 
 if TYPE_CHECKING:
     from PyQt5.QtWidgets import QWidget
-
-USE_BINARY_POINTS_FILE = not platform.system().lower().startswith('darwin')
 
 
 class CellDetector(ChannelPipelineOrchestrator):
@@ -319,7 +316,7 @@ class CellDetector(ChannelPipelineOrchestrator):
 
         if self.registration_processor.was_registered:
             for results_dir in self.registration_processor.get_transform_directories(self.channel, target_channel):
-                coords = elastix.transform_points(coords, transform_directory=results_dir, binary=USE_BINARY_POINTS_FILE)
+                coords = elastix.transform_points(coords, transform_directory=results_dir)
 
         return coords
 

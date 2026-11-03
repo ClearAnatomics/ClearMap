@@ -1075,6 +1075,90 @@ def read_points(filename, indices=False, binary=True):
     return points
 
 
+def write_vtk_points(filename, points):
+    """Write points as a binary legacy VTK file, the binary point file of a stock transformix (elastix >= 5.3)
+
+    Arguments
+    ---------
+    filename : str
+      File name of the point file; transformix recognises it by its ``.vtk`` extension.
+    points : array or str
+      Source of the points, in physical coordinates (VTK point files have no pixel index mode).
+
+    Returns
+    -------
+    filename: str
+      File name of the point file.
+    """
+    if not isinstance(points, np.ndarray):
+        points = io_ops.read(points)
+    points = np.ascontiguousarray(points, dtype='>f8')  # ITK reads the binary legacy VTK format as big-endian
+    header = ('# vtk DataFile Version 2.0\nClearMap points\nBINARY\nDATASET POLYDATA\n'
+              f'POINTS {len(points)} double\n')
+    with open(filename, 'wb') as point_file:
+        point_file.write(header.encode('ascii'))
+        points.tofile(point_file)
+    return filename
+
+
+def read_vtk_points(filename):
+    """Read the points of a binary legacy VTK file, as written by transformix (elastix >= 5.3)
+
+    Arguments
+    ---------
+    filename : str
+      File name of the point file.
+
+    Returns
+    -------
+    points : array
+      The point coordinates, as float64. Transformix keeps the precision of its input (double or float).
+    """
+    coordinate_dtypes = {b'double': np.dtype('>f8'), b'float': np.dtype('>f4')}  # ITK writes VTK as big-endian
+    with open(filename, 'rb') as point_file:
+        for line in iter(point_file.readline, b''):
+            if line.startswith(b'POINTS'):
+                _, n_points, coordinate_type = line.split()
+                n_points = int(n_points)
+                if coordinate_type not in coordinate_dtypes:
+                    raise ClearMapValueError(f'Unsupported coordinate type {coordinate_type.decode()} in "{filename}", '
+                                             f'expected one of {[name.decode() for name in coordinate_dtypes]}')
+                dtype = coordinate_dtypes[coordinate_type]
+                data = point_file.read(3 * n_points * dtype.itemsize)
+                if len(data) != 3 * n_points * dtype.itemsize:
+                    raise ClearMapIoException(f'"{filename}" announces {n_points} points but holds '
+                                              f'{len(data) // (3 * dtype.itemsize)}: the file is truncated')
+                return np.frombuffer(data, dtype=dtype).reshape(n_points, 3).astype(np.double)
+    return np.zeros((0, 3))  # ITK writes no POINTS line for an empty mesh
+
+
+def point_file_extension(*, binary, indices):
+    """The point file format to give transformix, by extension: 'vtk', 'bin' or 'txt'
+
+    Arguments
+    ---------
+    binary : bool
+      Use a binary format if the configured elastix reads one, otherwise text.
+    indices : bool
+      The points are pixel indices. Only the .bin and text formats hold indices.
+
+    Returns
+    -------
+    extension : str
+      'vtk' with elastix >= 5.3 (binary VTK in, binary VTK out, elastix pull request #1253), 'bin' with an earlier
+      elastix on Linux (assumed to be the patched build shipped with ClearMap: a stock elastix < 5.3 reads no binary
+      point file), 'txt' otherwise.
+    """
+    if not binary:
+        return 'txt'
+    has_binary_vtk = get_elastix_version() >= Version('5.3')
+    if has_binary_vtk and not indices:
+        return 'vtk'
+    if not has_binary_vtk and platform.system() == 'Linux':
+        return 'bin'
+    return 'txt'
+
+
 def transform_points(source, sink=None, transform_parameter_file=None, transform_directory=None, indices=False,
                      result_directory=None, temp_file=None, binary=True, n_processes=None):
     """Transform coordinates math:`x` via elastix estimated transformation to :math:`T(x)`.
@@ -1096,7 +1180,10 @@ def transform_points(source, sink=None, transform_parameter_file=None, transform
     result_directory : str or None
       Elastic result directory.
     temp_file : str or None
-      Optional file name for the elastix point file.
+      Optional file name for the elastix point file. Its extension must be the one of the chosen format
+      (:func:`point_file_extension`), from which transformix reads the format.
+    binary : bool
+      Use a binary point file if the configured elastix reads one (:func:`point_file_extension`), otherwise text.
 
     Returns
     -------
@@ -1108,32 +1195,29 @@ def transform_points(source, sink=None, transform_parameter_file=None, transform
     The transformation is from the fixed image coordinates to the moving image coordinates.
     """
     check_elastix_initialized()
+    if not isinstance(source, (str, np.ndarray)):
+        raise ClearMapRuntimeError(f'transform_points: source not string or array but "{type(source)}"!')
+    is_point_file = isinstance(source, str) and source[-3:] in ('txt', 'bin', 'vtk')  # given to transformix as is
+    extension = source[-3:] if is_point_file else point_file_extension(binary=binary, indices=indices)
+    if not is_point_file and temp_file is not None and not temp_file.endswith(f'.{extension}'):
+        raise ClearMapValueError(f'transform_points: temp_file "{temp_file}" must end with ".{extension}", the '
+                                 f'point format chosen for this elastix: transformix reads the format from it')
 
     # A private folder for this run: jobs and processes may call transformix at the same time
     working_directory = tempfile.mkdtemp(prefix=TRANSFORMIX_WORKING_DIRECTORY_PREFIX)
 
     # input point file
-    if temp_file is None:
-        extension = "bin" if binary else "txt"
-        temp_file = os.path.join(working_directory, f'elastix_input.{extension}')
-
     delete_point_file = None
-    if isinstance(source, str):
-        if len(source) > 3 and source[-3:] in ['txt', 'bin']:
-            binary = source[-3:] == 'bin'
-            point_file = source
-        else:
-            points = io_ops.read(source)
-            point_file = temp_file
-            delete_point_file = temp_file
-            write_points(point_file, points, indices=indices, binary=binary)
-    elif isinstance(source, np.ndarray):
-        point_file = temp_file
-        delete_point_file = temp_file
-        write_points(point_file, source, indices=indices, binary=binary)
+    if is_point_file:
+        point_file = source
     else:
-        _remove_working_directory(working_directory)  # nothing was written to it yet
-        raise ClearMapRuntimeError(f'transform_points: source not string or array but "{type(source)}"!')
+        points = source if isinstance(source, np.ndarray) else io_ops.read(source)
+        point_file = temp_file or os.path.join(working_directory, f'elastix_input.{extension}')
+        delete_point_file = point_file
+        if extension == 'vtk':
+            write_vtk_points(point_file, points)
+        else:
+            write_points(point_file, points, indices=indices, binary=extension == 'bin')
 
     # result directory
     if result_directory is None:
@@ -1170,12 +1254,13 @@ def transform_points(source, sink=None, transform_parameter_file=None, transform
         _remove_working_directory(working_directory)
 
     # read data / file
-    extension = 'bin' if binary else 'txt'
-    output_file = f'outputpoints.{extension}'
+    output_file = os.path.join(out_dirname, f'outputpoints.{extension}')
     if sink == []:  # return sink as file name
-        return os.path.join(out_dirname, output_file)
+        return output_file
+    elif extension == 'vtk':
+        transformed_points = read_vtk_points(output_file)
     else:
-        transformed_points = read_points(os.path.join(out_dirname, output_file), indices=indices, binary=binary)
+        transformed_points = read_points(output_file, indices=indices, binary=extension == 'bin')
 
     if delete_result_directory:
         _remove_working_directory(delete_result_directory)
