@@ -18,12 +18,43 @@ Conventions
 """
 import numpy as np
 
-__all__ = ['check_dtype', 'bool_as_uint8', 'as_uint8_flags', 'as_index_array', 'as_dtype',
+from ClearMap.Utils.exceptions import ClearMapValueError
+
+__all__ = ['check_ndim', 'check_dtype', 'bool_as_uint8', 'as_uint8_flags', 'as_index_array', 'as_dtype',
            'pad_to_ndim', 'scratch_parameters']
 
 
 def _dtype_names(dtypes):
     return [np.dtype(d).name for d in dtypes]
+
+
+def check_ndim(array, ndim, name='array'):
+    """Check that ``array`` has ``ndim`` dimensions, without converting it.
+
+    Arguments
+    ---------
+    array : array
+      The array to check.
+    ndim : int
+      The required number of dimensions.
+    name : str
+      Name of the argument used in the error message.
+
+    Returns
+    -------
+    array : array
+      The input array.
+
+    Raises
+    ------
+    ClearMapValueError
+      If the number of dimensions differs. A 4D array usually has an extra axis of size 1 or a channel axis
+      (e.g. written by an external tool or a tuple saved as one array).
+    """
+    if array.ndim != ndim:
+        raise ClearMapValueError(f'{name} has {array.ndim} dimensions (shape {array.shape}), {ndim} are required. '
+                                 f'An extra axis of size 1 can be removed with numpy.squeeze.')
+    return array
 
 
 def check_dtype(array, allowed, name='array', allow_bool=False):

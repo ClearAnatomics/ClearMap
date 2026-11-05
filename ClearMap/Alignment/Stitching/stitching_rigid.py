@@ -41,7 +41,7 @@ from ClearMap.Utils.Formatting import ensure
 
 from ClearMap.Alignment.Stitching.layout_graph_utils import (get_connected_components, connect_sources,
                                                              get_positions_from_tree)
-from ClearMap.Utils.exceptions import ClearMapIoException
+from ClearMap.Utils.exceptions import ClearMapIoException, ClearMapFileNotFoundError
 
 from ClearMap.Utils.utilities import CancelableProcessPoolExecutor, sanitize_n_processes
 
@@ -1994,6 +1994,10 @@ def _initialize_tiles_from_expression(expression, tile_axes = None, tile_shape =
 
     # construct tiling
     files = fl._file_list(expression)
+    if not files:
+        raise ClearMapFileNotFoundError(f'No file matches the tile pattern {expression.string()!r}. Check that the '
+                                        f'folder exists, that it holds the tiles, and that the pattern (names and '
+                                        f'extension) matches their names.')
     for f in files:
         if not os.path.exists(f):
             raise ClearMapIoException(f'File {f!r} does not exist! '

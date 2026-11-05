@@ -365,6 +365,7 @@ def graph_from_skeleton(skeleton, points=None, radii=None,
         raise ValueError('Activating `compute_edge_length` requires `compute_vertex_coordinates` to be True!')
 
     skeleton = io_ops.edit(skeleton)  # WARNING: ``edit`` here because delete_border (optional) is in-place
+    ac.check_ndim(skeleton, 3, name='The skeleton array')
     if skeleton.dtype not in ('bool', np.uint8):
         raise TypeError('The skeleton array needs to be a boolean array!')
 
