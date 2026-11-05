@@ -96,6 +96,7 @@ class FileListSource(source_mod.VirtualSource):
         self._shape = shape
         self._dtype = dtype
         self._order = order
+        self._values_per_tag = None  # See _tag_values_per_axis
 
     @property
     def file_list(self, sort = True):  # FIXME: arg in getter
@@ -246,6 +247,31 @@ class FileListSource(source_mod.VirtualSource):
                     break
         return axes_to_tags
 
+    def _tag_values_per_axis(self):
+        """
+        For each list axis (in axes order), the sorted values that its tag takes in the files found.
+
+        The i-th position along an axis is the i-th value in this list, whatever the gaps in the numbering.
+
+        Examples
+        --------
+        Planes ``Z0001.npy, Z0002.npy, Z0004.npy``, one tag ``Z``: the result is ``[[1, 2, 4]]``, so the position 2
+        is the file ``Z0004.npy`` (not ``Z0003.npy``).
+
+        Tiles ``tile_<X,2>_<Y,2>.npy`` with X in (1, 3) and Y in (2, 5, 6), i.e. 6 files, step by step::
+
+            tag_values_of_each_file = [[1, 2], [1, 5], [1, 6], [3, 2], [3, 5], [3, 6]]   # [X, Y] of each file
+            values_per_tag = [[1, 3], [2, 5, 6]]                                         # X, then Y
+            result = [[1, 3], [2, 5, 6]]       # axes in the order of the tags: (X, Y)
+            result = [[2, 5, 6], [1, 3]]       # with axes_order=['Y', 'X']: (Y, X)
+        """
+        # Parsed once: every read needs it and parsing all the names takes long (about 20 ms for 3000 files, i.e. a
+        # minute to read such a stack plane by plane). The file list of a source does not change.
+        if self._values_per_tag is None:
+            tag_values_of_each_file = [self.expression.indices(f) for f in self.file_list]
+            self._values_per_tag = [natsort.natsorted(set(values)) for values in zip(*tag_values_of_each_file)]
+        return [self._values_per_tag[tag] for tag in self.tag_to_axes_order()]
+
     @staticmethod
     def _select_along_axis(slicing, n_positions, tag_values):
         """
@@ -259,7 +285,7 @@ class FileListSource(source_mod.VirtualSource):
         n_positions : int
             The number of positions along this axis.
         tag_values : list
-            The value of the tag at each position along this axis.
+            The values of the tag at each position, see :meth:`FileListSource._tag_values_per_axis`.
 
         Examples
         --------
@@ -340,17 +366,13 @@ class FileListSource(source_mod.VirtualSource):
         sliced_shape_file = slc.sliced_shape(slicing=slicing_file, shape=shape_file)
         #sliced_shape_list = slc.sliced_shape(slicing=slicing_list, shape=shape_list);
 
-        #start indices
-        indices_start = self.expression.indices(self.file_list[0])
+        # The position along an axis is that of the files found, not the offset to the first index (the numbering
+        # can have gaps)
         #TODO: steps in file list
-
-        # The value of the tag at each position along an axis: the first index plus the position
-        tag_values_per_axis = [range(start, start + n_positions)
-                               for start, n_positions in zip(indices_start, shape_list)]
         # Per list axis: the files which the slicing selects (the numbers in their names) and where their data goes
         # along that axis of the result
         selections = [self._select_along_axis(sl, n_positions, tag_values) for sl, n_positions, tag_values
-                      in zip(slicing_list, shape_list, tag_values_per_axis)]
+                      in zip(slicing_list, shape_list, self._tag_values_per_axis())]
         # One entry per file to read: the tag indices to build its name from, and the position of its data in the result
         files_to_read = self._files_to_read(selections, axes_to_tags=self.axes_to_tag_order())
         shape_list_keep_dims = tuple(len(selection.tag_values) for selection in selections)
