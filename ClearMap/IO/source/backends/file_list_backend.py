@@ -23,6 +23,8 @@ import natsort
 import warnings
 import itertools
 import numbers
+from collections.abc import Sequence
+from typing import NamedTuple
 
 import numpy as np
 import concurrent.futures
@@ -244,6 +246,82 @@ class FileListSource(source_mod.VirtualSource):
                     break
         return axes_to_tags
 
+    @staticmethod
+    def _select_along_axis(slicing, n_positions, tag_values):
+        """
+        Which files a slicing selects along one axis of the file list.
+
+        Arguments
+        ---------
+        slicing : slice, list, ndarray or int
+            What is selected along this axis of the full array, in positions (the i-th file found), not in values of the
+            tag (the numbers in the file names).
+        n_positions : int
+            The number of positions along this axis.
+        tag_values : list
+            The value of the tag at each position along this axis.
+
+        Examples
+        --------
+        With the planes ``Z0001, Z0002, Z0004, Z0008``, ``tag_values=[1, 2, 4, 8]`` and:
+
+        * ``slice(1, 3)`` selects the files Z0002 and Z0004: ``AxisSelection([2, 4], range(0, 2), True)``
+        * ``[0, 3]`` selects Z0001 and Z0008: ``AxisSelection([1, 8], [0, 3], True)``
+        * ``2`` selects Z0004 and removes the axis: ``AxisSelection([4], [0], False)``
+        """
+        if isinstance(slicing, slice):
+            selected_positions = range(*slicing.indices(n_positions))
+            return AxisSelection([tag_values[p] for p in selected_positions], range(len(selected_positions)), True)
+        if isinstance(slicing, (list, np.ndarray)):
+            return AxisSelection([tag_values[p] for p in slicing], slicing, True)
+        if isinstance(slicing, numbers.Integral):
+            return AxisSelection([tag_values[slicing]], [0], False)
+        raise IndexError(f'Invalid slice specification {slicing!r}!')
+
+    @staticmethod
+    def _files_to_read(selections, axes_to_tags):
+        """
+        The files to read for the selection along each axis, each with the place of its data in the result.
+
+        Arguments
+        ---------
+        selections : list of AxisSelection
+            One per axis of the file list, in the order of the axes.
+        axes_to_tags : list of int
+            For each tag of the expression, the axis which holds it, see :meth:`FileListSource.axes_to_tag_order`.
+
+        Returns
+        -------
+        list of FileToRead
+            One per combination of one file per axis. The order is that of :func:`itertools.product` (the last axis
+            varies the fastest); it does not matter, as each file is read with the position of its own data.
+
+        Examples
+        --------
+        Tiles ``tile_<X,2>_<Y,2>.npy`` with X in (1, 3) and Y in (2, 5, 6), reading the tiles Y=5 and Y=6 (positions 1
+        and 2) of the column X=3 (position 1, an integer)::
+
+            selections = [AxisSelection([3], [0], False), AxisSelection([5, 6], range(2), True)]
+            FileListSource._files_to_read(selections, axes_to_tags=[0, 1])
+            # -> [FileToRead(tag_indices=(3, 5), position=(0, 0)), FileToRead(tag_indices=(3, 6), position=(0, 1))]
+
+        The files are ``tile_03_05`` and ``tile_03_06``, their data go to positions 0 and 1 along Y (the X axis is
+        removed at the end, an integer selected it).
+
+        ``axes_to_tags`` matters only for a source given an ``axes_order`` other than the order of the tags in the
+        name (nothing in ClearMap does it): the tag indices are then put back in the order of the expression.
+        """
+        # The value of the tag and the position of its data travel together in a pair, so they cannot get out of step
+        pairs_per_axis = [list(zip(selection.tag_values, selection.positions)) for selection in selections]
+        files_to_read = []
+        for pair_of_each_axis in itertools.product(*pairs_per_axis):
+            tag_value_of_each_axis = tuple(tag_value for tag_value, _ in pair_of_each_axis)
+            position = tuple(result_position for _, result_position in pair_of_each_axis)
+            # The name is built from the tags in the order of the expression (differs only with an axes_order)
+            tag_indices = tuple(tag_value_of_each_axis[axis] for axis in axes_to_tags)
+            files_to_read.append(FileToRead(tag_indices, position))
+        return files_to_read
+
     def __getitem__(self, slicing, processes = None, order = None):
         e  = self.expression
 
@@ -264,50 +342,24 @@ class FileListSource(source_mod.VirtualSource):
 
         #start indices
         indices_start = self.expression.indices(self.file_list[0])
-        #print(indices_start)
         #TODO: steps in file list
 
-        # generate file list to read
-        # Note: indices increase according to the axes order but their own order is in tag order
-        indices = []
-        slicing_list_indices = []
-        shape_list_keep_dims = ()
-        slicing_keep_dims_to_final = (Ellipsis,)
-        for sl, s, i in zip(slicing_list, shape_list, indices_start):
-            if isinstance(sl, slice):
-                slice_indices = sl.indices(s)
-                slice_indices = (slice_indices[0] + i, slice_indices[1] + i, slice_indices[2])
-                indices.append(range(*slice_indices))
-                n = len(indices[-1])
-                slicing_list_indices.append(range(n))
-                shape_list_keep_dims += (n,)
-                slicing_keep_dims_to_final += (slice(None),)
-            elif isinstance(sl, (list, np.ndarray)):
-                indices.append(np.array(sl) + i)
-                n = len(indices[-1])
-                slicing_list_indices.append(sl)
-                shape_list_keep_dims += (n,)
-                slicing_keep_dims_to_final += (slice(None),)
-            elif isinstance(sl, numbers.Integral):
-                indices.append([sl + i])
-                slicing_list_indices.append([0])
-                shape_list_keep_dims += (1,)
-                slicing_keep_dims_to_final += (0,)
-            else:
-                raise IndexError(f'Invalid slice specification {sl!r}!')
-        indices.reverse()
-        indices = itertools.product(*indices)
-        indices = [i[::-1] for i in indices]
-        slicing_list_indices.reverse()
-        slicing_list_indices = itertools.product(*slicing_list_indices)
-        slicing_list_indices = [i[::-1] for i in slicing_list_indices]
-        #print(indices, slicing_list_indices, slicing_keep_dims_to_final)
+        # The value of the tag at each position along an axis: the first index plus the position
+        tag_values_per_axis = [range(start, start + n_positions)
+                               for start, n_positions in zip(indices_start, shape_list)]
+        # Per list axis: the files which the slicing selects (the numbers in their names) and where their data goes
+        # along that axis of the result
+        selections = [self._select_along_axis(sl, n_positions, tag_values) for sl, n_positions, tag_values
+                      in zip(slicing_list, shape_list, tag_values_per_axis)]
+        # One entry per file to read: the tag indices to build its name from, and the position of its data in the result
+        files_to_read = self._files_to_read(selections, axes_to_tags=self.axes_to_tag_order())
+        shape_list_keep_dims = tuple(len(selection.tag_values) for selection in selections)
+        # Applied at the end: removes the axes which an integer selected (they have size 1 until then)
+        drop_integer_axes = (Ellipsis,) + tuple(slice(None) if selection.keeps_axis else 0
+                                                for selection in selections)
 
-        axes_to_tags = self.axes_to_tag_order()
-        if len(axes_to_tags) > 1 and axes_to_tags != list(range(len(axes_to_tags))):
-            indices = [tuple(i[j] for j in axes_to_tags) for i in indices]
-
-        fl = [e.string_from_index(i) for i in indices]
+        fl = [e.string_from_index(file.tag_indices) for file in files_to_read]
+        positions = [file.position for file in files_to_read]
 
         dtype = self.dtype
 
@@ -320,14 +372,14 @@ class FileListSource(source_mod.VirtualSource):
 
         processes = sanitize_n_processes(processes, can_run_in_calling_process=True)
         if processes == 0:
-            for f,i in zip(fl, slicing_list_indices):
+            for f,i in zip(fl, positions):
                 func(f,i)
         else:
             with concurrent.futures.ThreadPoolExecutor(processes) as executor:
-                results = executor.map(func, fl, slicing_list_indices)
+                results = executor.map(func, fl, positions)
             _ = list(results)
 
-        data = data[slicing_keep_dims_to_final]
+        data = data[drop_integer_axes]
 
         return data
 
@@ -406,6 +458,29 @@ class FileListSource(source_mod.VirtualSource):
 
     def as_buffer(self):
        return self.array
+
+
+class AxisSelection(NamedTuple):
+    """What a slicing selects along one axis of the file list.
+
+    For the planes ``Z0001, Z0002, Z0004, Z0008`` and the slicing ``1:3`` this is ``tag_values=[2, 4]``,
+    ``positions=range(2)`` and ``keeps_axis=True``.
+    """
+    tag_values: list
+    """In the space of the file names: the tag of the files to read, e.g. [2, 4] for the files Z0002 and Z0004"""
+    positions: Sequence
+    """In the space of the array which is returned: where each of these files goes along this axis"""
+    keeps_axis: bool
+    """False for an integer, which removes the axis from the array which is returned"""
+
+
+class FileToRead(NamedTuple):
+    """A file of the file list to read, and where its data goes in the array which is returned."""
+    tag_indices: tuple
+    """The index of each tag of its name, in the order of the tags of the expression: the number in the name, unless
+    the tag has a range of values (then the index in that range), see :meth:`Expression.string_from_index`"""
+    position: tuple
+    """Where its data goes, along each axis of the file list (in the order of the axes)"""
 
 
 class FileListVirtualSource(source_mod.VirtualSource):
