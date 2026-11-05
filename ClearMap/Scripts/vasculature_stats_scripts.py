@@ -302,12 +302,25 @@ def plot_selected_brain_regions(regions, features, norm=False, font_size='x-larg
 
 
 def bin_props(graph_props, prop_name, n_bins, normed):
-    _, bins = graph_props[prop_name].agg({k: [np.histogram] for k in (
-        [k for k in graph_props[prop_name].columns if k != 'region_id'])}, bins=n_bins, density=normed)  # density not really needed here
-    # Apply the binning to all regions
-    df_hist = pd.DataFrame(graph_props[prop_name].groupby("region_id").
-                           agg({k: [np.histogram] for k in (
-        [k for k in graph_props[prop_name].columns if k != 'region_id'])}, bins=bins, density=normed))
+    """
+    Histogram each property of ``graph_props[prop_name]`` per region, with bins that are the same for all regions.
+
+    Returns
+    -------
+    df_hist : pd.DataFrame
+        One row per region_id and, for each property, a column ``(property, 'histogram')`` whose values are the
+        ``(counts, bin edges)`` of ``np.histogram`` for this region.
+    bins : pd.DataFrame
+        The ``n_bins + 1`` bin edges (rows) of each property (columns): those of the histogram of all the regions.
+    """
+    props = graph_props[prop_name]
+    columns = [column for column in props.columns if column != 'region_id']
+    bins = pd.DataFrame({column: np.histogram_bin_edges(props[column], bins=n_bins) for column in columns})
+    regions = props.groupby('region_id')
+    # The keywords of apply() are given to np.histogram, those of agg({column: [np.histogram]}, ...) are not
+    df_hist = pd.concat({column: regions[column].apply(np.histogram, bins=bins[column].to_numpy(),
+                                                       density=normed).to_frame('histogram')
+                         for column in columns}, axis=1)
     return df_hist, bins  # FIXME: there must be a better way to store this
 
 
