@@ -530,14 +530,14 @@ def _array(filename):
             gzipfile = gzip.GzipFile(fileobj=data_file_handle)
             # Again, unfortunately, np.fromfile does not support
             # reading from a gzip stream, so we'll do it like this.
-            data = np.fromstring(gzipfile.read(), dtype)
+            data = np.frombuffer(gzipfile.read(), dtype).copy()  # frombuffer of bytes is read-only
 
         elif fields['encoding'] == 'bzip2' or\
              fields['encoding'] == 'bz2':
-            bz2_file = bz2.BZ2File(fileobj=data_file_handle)
+            bz2_file = bz2.BZ2File(data_file_handle)  # Python 3: the file object is the first argument
             # Again, unfortunately, np.fromfile does not support
-            # reading from a gzip stream, so we'll do it like this.
-            data = np.fromstring(bz2_file.read(), dtype)
+            # reading from a bz2 stream, so we'll do it like this.
+            data = np.frombuffer(bz2_file.read(), dtype).copy()  # frombuffer of bytes is read-only
 
         else:
             raise NrrdError(f'Unsupported encoding: "{fields["encoding"]}"')
@@ -717,7 +717,7 @@ def _write_data(data, filehandle, options):
         data.tofile(filehandle)
     elif encoding in compressors.keys():
         with compressors[encoding].open(filename=filehandle, mode='wb') as compressor_file:
-            compressor_file.write(data.tostring(order='F'))
+            compressor_file.write(data.tobytes(order='F'))
     else:
         raise NrrdError(f'Unsupported encoding: {encoding}')
 
