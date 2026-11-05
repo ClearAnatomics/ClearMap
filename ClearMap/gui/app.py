@@ -161,7 +161,7 @@ from ClearMap.Alignment.Stitching import layout_graph_utils  # noqa: F401 # WARN
 
 from ClearMap.Utils.utilities import title_to_snake, snake_to_title
 from ClearMap.config.config_adjusters.patch_ops import deep_merge
-from ClearMap.Utils.nvidia_utils import cuda_available
+from ClearMap.Utils.nvidia_utils import cuda_available, diagnose_nvidia_driver
 from ClearMap.Utils.event_bus import EventBus, BusSubscriberMixin, GUI_THREAD
 from ClearMap.Utils.progress import ProgressWatcher
 from ClearMap.Utils.events import (ProgressMainStepNameChanged, ProgressSubStepNameChanged, ProgressMainValueChanged,
@@ -288,6 +288,13 @@ class ClearMapAppBase(QMainWindow, Ui_ClearMapGui):
         if isinstance(msg, Exception):
             msg = str(msg)
         self.__print_status_msg(msg, '#ff5555')  # red from qdarkstyle palette
+
+    def _warn_if_nvidia_driver_is_broken(self):
+        """Tell the user (statusbar and log) when the NVIDIA driver does not answer, see :func:`diagnose_nvidia_driver`"""
+        msg = diagnose_nvidia_driver()
+        if msg is not None:
+            warnings.warn(msg)
+            self.print_warning_msg(msg)
 
     def print_warning_msg(self, msg: str):
         """
@@ -764,6 +771,7 @@ class ClearMapApp(ClearMapAppBase):
         self.amend_ui()
         self._init_drag_drop()
         self.setup_monitoring_bars()
+        self._warn_if_nvidia_driver_is_broken()
         self.app = QApplication.instance() # noqa
 
         # FIXME: do for current version w/ config_handler
