@@ -82,7 +82,8 @@ def compare(
     axes = blockprocessing.block_axes(source_0)
     axis_wise_overlap = 4 * voxel_blob_diameters
     # be careful the filtration of overlap below is needed for proper def of overlap in bp.process call
-    overlap = int(np.ceil(axis_wise_overlap[axes]))
+    # One overlap per axis of the block processing (split_into_blocks accepts a list)
+    overlap = [int(np.ceil(axis_wise_overlap[axis])) for axis in axes]
     results = blockprocessing.process(
         local_report,
         [source_0, source_1],
