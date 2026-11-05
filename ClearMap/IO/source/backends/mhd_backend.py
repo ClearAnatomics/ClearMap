@@ -676,7 +676,7 @@ def _write_raw(filename, array, compression=False):
 
     with open(filename, 'wb') as raw_file:
         if compression:
-            compressed = zlib.compress(array.tostring())
+            compressed = zlib.compress(array.tobytes())
             raw_file.write(compressed)
         else:
             array.tofile(raw_file)  # tofile writes in C order !
