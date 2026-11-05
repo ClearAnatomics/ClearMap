@@ -59,7 +59,7 @@ def findEndpoints(skel, points, border = None):
     order = 'F'; 
   
   #find node degrees
-  deg = cpl.convolve_3d_indices(skel, t3d.n26, points, out_dtype = 'uint8')
+  deg = cpl.convolve_3d_indices(skel, t3d.n26, points, sink_dtype = 'uint8')
   
   #isolated and end points
   isolated = points[deg == 0];
