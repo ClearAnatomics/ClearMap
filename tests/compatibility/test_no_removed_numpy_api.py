@@ -26,6 +26,14 @@ REMOVED_NUMPY_ATTRIBUTES = {
     'in1d': 'np.isin',
     'byte_bounds': 'np.lib.array_utils.byte_bounds (numpy.byte_bounds in NumPy 1.x: import it once, with a fallback)',
 }
+# Method of ndarray that is gone: what replaces it. Any call of a method of that name is reported, whatever the
+# object (the type is not known from the syntax tree), e.g. lxml's etree.tostring() would be.
+REMOVED_NDARRAY_METHODS = {
+    'tostring': 'array.tobytes()',
+    'itemset': 'array[index] = value',
+    'newbyteorder': 'array.view(array.dtype.newbyteorder())',
+    'ptp': 'np.ptp(array)',
+}
 
 
 def _parsed_python_sources():
@@ -53,6 +61,10 @@ def _uses_a_removed_attribute(node, attribute_name):
             and isinstance(node.value, ast.Name) and node.value.id in NUMPY_MODULE_NAMES)
 
 
+def _calls_a_removed_method(node, method_name):
+    return isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == method_name
+
+
 def _offending_lines(is_offending):
     return [f'{path.relative_to(PACKAGE_DIRECTORY.parent)}:{node.lineno}'
             for path, tree in _parsed_python_sources() for node in ast.walk(tree) if is_offending(node)]
@@ -71,3 +83,11 @@ def test_no_maintained_module_uses_a_numpy_attribute_that_was_removed(attribute_
 
     replacement = REMOVED_NUMPY_ATTRIBUTES[attribute_name]
     assert not offenders, f'np.{attribute_name}: use {replacement}\n' + '\n'.join(offenders)
+
+
+@pytest.mark.parametrize('method_name', sorted(REMOVED_NDARRAY_METHODS))
+def test_no_maintained_module_calls_an_array_method_that_was_removed(method_name):
+    offenders = _offending_lines(partial(_calls_a_removed_method, method_name=method_name))
+
+    replacement = REMOVED_NDARRAY_METHODS[method_name]
+    assert not offenders, f'array.{method_name}(): use {replacement}\n' + '\n'.join(offenders)
