@@ -24,6 +24,7 @@ MOVED_NUMPY_MODULES = {
 REMOVED_NUMPY_ATTRIBUTES = {
     'float_': 'np.float64',
     'in1d': 'np.isin',
+    'byte_bounds': 'np.lib.array_utils.byte_bounds (numpy.byte_bounds in NumPy 1.x: import it once, with a fallback)',
 }
 
 

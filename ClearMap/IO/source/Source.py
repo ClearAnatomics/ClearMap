@@ -17,6 +17,10 @@ from functools import cached_property
 from typing import ClassVar, TYPE_CHECKING
 
 import numpy as np
+try:
+    from numpy.lib.array_utils import byte_bounds  # NumPy 2
+except ImportError:  # NumPy 1.x
+    from numpy import byte_bounds
 
 import ClearMap.IO.FileUtils as fu
 from ClearMap.IO.source import geometry_utils
@@ -495,7 +499,7 @@ class ArraySource(BaseArraySource):
         base = getattr(array, 'base', None)
         if base is None:
             return 0
-        return np.byte_bounds(array)[0] - np.byte_bounds(base)[0]
+        return byte_bounds(array)[0] - byte_bounds(base)[0]
 
     # ## Item access
     def _getitem(self, slicing):
