@@ -49,7 +49,7 @@ from pathlib import Path
 from typing import List
 
 import numpy as np
-from numpy.core.memmap import memmap
+from numpy import memmap
 import pandas as pd
 import scipy.ndimage as ndi
 from scipy.spatial.transform import Rotation
