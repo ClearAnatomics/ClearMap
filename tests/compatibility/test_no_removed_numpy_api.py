@@ -15,9 +15,14 @@ import pytest
 PACKAGE_DIRECTORY = Path(__file__).resolve().parents[2] / 'ClearMap'
 # Vendored code, code that is not imported, and the scripts of the user (ignored by git)
 NOT_MAINTAINED_DIRECTORIES = ('External', '_Old', '_Todo', 'custom_scripts')
+NUMPY_MODULE_NAMES = ('np', 'numpy')
 # Name of the module that moved: where it is now
 MOVED_NUMPY_MODULES = {
     'numpy.core': 'numpy._core is private, import the public name from numpy (e.g. from numpy import memmap)',
+}
+# Attribute of the numpy module that is gone: what replaces it
+REMOVED_NUMPY_ATTRIBUTES = {
+    'float_': 'np.float64',
 }
 
 
@@ -41,6 +46,11 @@ def _imports_of_a_moved_module(node, module_name):
     return False
 
 
+def _uses_a_removed_attribute(node, attribute_name):
+    return (isinstance(node, ast.Attribute) and node.attr == attribute_name
+            and isinstance(node.value, ast.Name) and node.value.id in NUMPY_MODULE_NAMES)
+
+
 def _offending_lines(is_offending):
     return [f'{path.relative_to(PACKAGE_DIRECTORY.parent)}:{node.lineno}'
             for path, tree in _parsed_python_sources() for node in ast.walk(tree) if is_offending(node)]
@@ -51,3 +61,11 @@ def test_no_maintained_module_imports_a_numpy_module_that_moved(module_name):
     offenders = _offending_lines(partial(_imports_of_a_moved_module, module_name=module_name))
 
     assert not offenders, f'{module_name}: {MOVED_NUMPY_MODULES[module_name]}\n' + '\n'.join(offenders)
+
+
+@pytest.mark.parametrize('attribute_name', sorted(REMOVED_NUMPY_ATTRIBUTES))
+def test_no_maintained_module_uses_a_numpy_attribute_that_was_removed(attribute_name):
+    offenders = _offending_lines(partial(_uses_a_removed_attribute, attribute_name=attribute_name))
+
+    replacement = REMOVED_NUMPY_ATTRIBUTES[attribute_name]
+    assert not offenders, f'np.{attribute_name}: use {replacement}\n' + '\n'.join(offenders)
