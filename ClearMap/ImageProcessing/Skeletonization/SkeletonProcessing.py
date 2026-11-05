@@ -81,7 +81,7 @@ def clean_open_branches(skeleton, skelton_copy, points, radii, length, clean = T
     e_pts_new = e_pts + np.sum((np.vstack(np.unravel_index(e_pts_label, label.shape)) - 1).T * strides, axis = 1)
     
     # did we hit a branch point
-    delete = np.in1d(e_pts_new, branchpoints); #, assume_unique = True);
+    delete = np.isin(e_pts_new, branchpoints); #, assume_unique = True);
     keep   = np.logical_not(delete);
     #print delete.shape, keep.shape, e_pts_new.shape
     
@@ -118,7 +118,7 @@ def clean_open_branches(skeleton, skelton_copy, points, radii, length, clean = T
   if clean:
     skel_flat = np.reshape(skeleton, -1, order = 'F');
     skel_flat[delete_points] = False;
-    keep_ids = np.logical_not(np.in1d(points, delete_points, assume_unique = True))
+    keep_ids = np.logical_not(np.isin(points, delete_points, assume_unique = True))
     points = points[keep_ids];
     radii  = radii[keep_ids];
     return skeleton, points, radii

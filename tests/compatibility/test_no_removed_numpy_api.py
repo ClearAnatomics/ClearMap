@@ -23,6 +23,7 @@ MOVED_NUMPY_MODULES = {
 # Attribute of the numpy module that is gone: what replaces it
 REMOVED_NUMPY_ATTRIBUTES = {
     'float_': 'np.float64',
+    'in1d': 'np.isin',
 }
 
 

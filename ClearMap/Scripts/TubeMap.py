@@ -595,7 +595,7 @@ if __name__ == '__main__':
   graph_artery_edge, edge_map = graph_artery.edge_graph(return_edge_map=True)
   
   artery_components, artery_size = graph_artery_edge.label_components(return_vertex_counts=True);
-  remove = edge_map[np.in1d(artery_components, np.where(artery_size < min_artery_size)[0])];
+  remove = edge_map[np.isin(artery_components, np.where(artery_size < min_artery_size)[0])];
   artery[remove] = False;
   
   artery = np.logical_and(artery, np.logical_not(vein_large))
@@ -686,7 +686,7 @@ if __name__ == '__main__':
   graph_artery_edge, edge_map = graph_artery.edge_graph(return_edge_map=True)
   
   artery_components, artery_size = graph_artery_edge.label_components(return_vertex_counts=True);
-  remove = edge_map[np.in1d(artery_components, np.where(artery_size < min_artery_size)[0])];
+  remove = edge_map[np.isin(artery_components, np.where(artery_size < min_artery_size)[0])];
   artery[remove] = False;
   
   graph.define_edge_property('artery', artery)
@@ -700,7 +700,7 @@ if __name__ == '__main__':
   graph_vein_edge, edge_map = graph_vein.edge_graph(return_edge_map=True)
   
   vein_components, vein_size = graph_vein_edge.label_components(return_vertex_counts=True);
-  remove = edge_map[np.in1d(vein_components, np.where(vein_size < min_vein_size)[0])];
+  remove = edge_map[np.isin(vein_components, np.where(vein_size < min_vein_size)[0])];
   vein[remove] = False;
   
   graph.define_edge_property('vein', vein)
