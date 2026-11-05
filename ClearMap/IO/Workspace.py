@@ -616,8 +616,12 @@ class Workspace:
     def __format_pattern_line(self, files, expression, tag_names, tile_axes_):
         tile_positions = [expression.values(f) for f in files]
         tile_positions = [tuple(tv[n] for n in tile_axes_) for tv in tile_positions]
-        tile_lower = tuple(np.min(tile_positions, axis=0))
-        tile_upper = tuple(np.max(tile_positions, axis=0))
+        # tile_positions has one tuple per file (tile), values_per_tag one tuple per tag. With 3 tiles and the tags X, Y:
+        # [(1, 7), (2, 8), (3, 9)] -> [(1, 2, 3), (7, 8, 9)], so the lower tile is (1, 7) and the upper (3, 9).
+        # The builtins, not np.min, which fails on string tags (<Name,S,Width>) and prints numpy scalars
+        values_per_tag = list(zip(*tile_positions))
+        tile_lower = tuple(min(values) for values in values_per_tag)
+        tile_upper = tuple(max(values) for values in values_per_tag)
         tag_names = tuple(tag_names)
         relative_file_pattern = os.path.relpath(expression.string(), start=self.directory)
         pattern_line = f'{relative_file_pattern} {{{len(files)} files, {tag_names}: {tile_lower} -> {tile_upper}}}\n'
