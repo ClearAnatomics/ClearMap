@@ -727,7 +727,9 @@ def _open_memmap(location, mode=None, shape=None, dtype=None, order=None, contex
     """
     kwargs = dict(mode=mode)
     if shape is not None:
-        kwargs['shape'] = shape
+        # NumPy writes the repr of the shape into the npy header: with NumPy 2 a np.int64 is written as
+        # 'np.int64(3)' and the file cannot be opened again
+        kwargs['shape'] = tuple(int(size) for size in shape)
     if dtype is not None:
         kwargs['dtype'] = dtype
     if mode == 'w+':
