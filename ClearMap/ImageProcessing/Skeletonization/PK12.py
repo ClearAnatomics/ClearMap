@@ -640,7 +640,7 @@ def skeletonize_index(binary, points = None, steps = None, removals = False,
   
   if radii is True:
     #calculate average diameter as death average death of neighbourhood     
-    radii = cpl.convolve_3d_indices(death, t3d.n18, points, out_dtype='uint16', processes=n_processes);
+    radii = cpl.convolve_3d_indices(death, t3d.n18, points, sink_dtype='uint16', processes=n_processes)
   else:
     radii = None;
   
