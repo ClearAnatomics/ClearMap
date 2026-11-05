@@ -117,7 +117,9 @@ def collapse_structures(df: pd.DataFrame, map_collapse, collapse_hemispheres=Fal
                   .sum()
                   )
     else:
-        counts = (df.groupby(['id'], as_index=False)
+        # pandas 2 sums the strings of the hemisphere column ('LHRH'), pandas 1 dropped it
+        counts = (df.drop(columns='hemisphere')
+                  .groupby(['id'], as_index=False)
                   .sum()
                   )
     return counts
