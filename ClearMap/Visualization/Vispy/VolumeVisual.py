@@ -482,7 +482,7 @@ class VolumeVisual(Visual):
             self._clim = vol.min(), vol.max()
         
         # Apply clim
-        vol = np.array(vol, dtype='float32', copy=False)
+        vol = np.array(vol, dtype='float32')  # Always a copy: it is scaled in place below
         if self._clim[1] == self._clim[0]:
             if self._clim[0] != 0.:
                 vol *= 1.0 / self._clim[0]
