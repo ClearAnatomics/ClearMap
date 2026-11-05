@@ -2,6 +2,20 @@
 Changelog
 =========
 
+3.1.1
+-----
+
+Bug fixes only; the configuration files and the results of 3.1.0 are unchanged.
+
+- Stitching: a tile pattern which matches no file stops with an error which names the pattern (#193).
+- Reading planes from a list of files: the planes of a list land at positions 0..n-1 of the result, and a numbering
+  with gaps (planes 0, 20, 40, ...) is read by position (#73).
+- ``Workspace.info()`` no longer fails on tile patterns with string tags and prints plain integers for the tile range
+  (#58).
+- CellMap: measuring the intensity after a disabled step is refused. It used to give the intensity of the source (#60).
+- Vasculature: ``skeletonize(..., radii=True)`` no longer fails on an unexpected ``out_dtype`` argument, and
+  ``graph_from_skeleton`` refuses an array which is not 3D and says what it received (#75, #76).
+
 3.1.0
 -----
 
