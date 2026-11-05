@@ -372,6 +372,11 @@ def detect_cells_block(source, parameter=default_cell_detection_parameter,
         for m in measure:
             if m not in valid_measurement_keys:
                 raise KeyError(f'Unknown measurement: {m}')
+            if m != 'source' and not parameter.get(m):
+                # A disabled step returns its input (see run_step): the measure would silently be that of the source
+                raise ClearMapValueError(f'Cannot measure the intensity after the step "{m}": it is disabled '
+                                         f'({m}={parameter.get(m)!r}). Enable the step or remove "{m}" from the '
+                                         f'"measure" list of intensity_detection.')
             steps_to_measure[m] = None
     else:
         measure = []
