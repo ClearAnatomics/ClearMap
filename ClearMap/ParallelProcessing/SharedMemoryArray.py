@@ -36,22 +36,10 @@ def ctype(dtype):
   #get dtype in case argument is a ndarray
   if isinstance(dtype, np.ndarray):
     dtype = dtype.dtype;
-  #convert to typestr
-  a = np.empty(1, dtype = dtype);
-  if a.dtype == bool:
-    a = a.astype('uint8');
-  #typestr = np.ctypeslib.as_ctypes(a[0]).__array_interface__['typestr'];
-  typestr = a.__array_interface__['typestr'];
-  #map to ctype  
-  
-  try:
-    #numpy 1.14
-    ct = np.ctypeslib._typecodes[typestr];  
-  except:
-    #numpy 1.16
-    ct = np.ctypeslib._ctype_from_dtype_scalar(np.dtype(typestr));
-   
-  return ct;
+  dtype = np.dtype(dtype)
+  if dtype == bool:  # Shared as bytes, the numpy wrapper views them as bool
+    dtype = np.dtype('uint8')
+  return np.ctypeslib.as_ctypes_type(dtype)
 
 
 def base(array):
