@@ -1113,7 +1113,11 @@ class Graph(grp.AnnotatedGraph):
         return gt.GraphView(self.base, vfilt=vertex_filter, efilt=edge_filter)
 
     def remove_self_loops(self):
-        gt.stats.remove_self_loops(self.base)
+        try:  # Newer graphgt
+            remove_self_loops = gtg.remove_self_loops
+        except AttributeError:  # Old versions (<= 2.45)
+            remove_self_loops = gt.stats.remove_self_loops
+        remove_self_loops(self.base)  # outside try/except to catch graph errors
 
     def remove_isolated_vertices(self):
         non_isolated = self.vertex_degrees() > 0
