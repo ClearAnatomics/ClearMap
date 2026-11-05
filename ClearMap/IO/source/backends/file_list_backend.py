@@ -266,14 +266,14 @@ class FileListSource(source_mod.VirtualSource):
         With the planes ``Z0001, Z0002, Z0004, Z0008``, ``tag_values=[1, 2, 4, 8]`` and:
 
         * ``slice(1, 3)`` selects the files Z0002 and Z0004: ``AxisSelection([2, 4], range(0, 2), True)``
-        * ``[0, 3]`` selects Z0001 and Z0008: ``AxisSelection([1, 8], [0, 3], True)``
+        * ``[0, 3]`` selects Z0001 and Z0008: ``AxisSelection([1, 8], range(0, 2), True)``
         * ``2`` selects Z0004 and removes the axis: ``AxisSelection([4], [0], False)``
         """
         if isinstance(slicing, slice):
             selected_positions = range(*slicing.indices(n_positions))
             return AxisSelection([tag_values[p] for p in selected_positions], range(len(selected_positions)), True)
         if isinstance(slicing, (list, np.ndarray)):
-            return AxisSelection([tag_values[p] for p in slicing], slicing, True)
+            return AxisSelection([tag_values[p] for p in slicing], range(len(slicing)), True)
         if isinstance(slicing, numbers.Integral):
             return AxisSelection([tag_values[slicing]], [0], False)
         raise IndexError(f'Invalid slice specification {slicing!r}!')

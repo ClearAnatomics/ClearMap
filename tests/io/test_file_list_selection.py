@@ -32,6 +32,13 @@ def test_a_list_selects_the_files_at_these_positions():
     assert FileListSource._select_along_axis([0, 3], len(PLANE_NUMBERS), PLANE_NUMBERS).tag_values == [1, 8]
 
 
+def test_the_data_of_a_list_goes_to_the_positions_from_zero_not_to_the_positions_selected():
+    """[2, 3] selects two files: the result has two planes, at 0 and 1 (not at 2 and 3, which it does not have)"""
+    selection = FileListSource._select_along_axis([2, 3], len(PLANE_NUMBERS), PLANE_NUMBERS)
+
+    assert list(selection.positions) == [0, 1]
+
+
 def test_an_array_of_positions_is_a_list():
     assert FileListSource._select_along_axis(np.array([3, 1]), len(PLANE_NUMBERS), PLANE_NUMBERS).tag_values == [8, 2]
 

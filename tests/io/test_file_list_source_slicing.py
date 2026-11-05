@@ -26,3 +26,10 @@ def test_a_negative_position_or_slice_counts_from_the_last_plane(tmp_path):
 
     np.testing.assert_array_equal(source[:, :, -1], np.full(PLANE_SHAPE, 4))
     assert _plane_numbers(source[:, :, -2:]) == [3, 4]
+
+
+@pytest.mark.parametrize('positions', [[0, 1], [2, 3], [3, 0], np.array([1, 3]), [-1, -3]], ids=str)
+def test_a_list_of_planes_is_read_in_the_order_of_the_list(tmp_path, positions):
+    source = _stack_of_planes(tmp_path)
+
+    assert _plane_numbers(source[:, :, positions]) == [PLANE_NUMBERS[p] for p in positions]
