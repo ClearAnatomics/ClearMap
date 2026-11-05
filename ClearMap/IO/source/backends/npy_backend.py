@@ -77,7 +77,7 @@ class NumpySource(source_mod.ArraySource):
 
     @shape.setter
     def shape(self, value):
-        self._array.shape = value
+        self._array = self._array.reshape(value)
 
     @property
     def dtype(self):
