@@ -282,7 +282,7 @@ if __name__ == "__main__":
   
   #%% Save results
   
-  coordinates_transformed.dtype=[(t,float) for t in ('xt','yt','zt')]
+  coordinates_transformed = coordinates_transformed.view([(t,float) for t in ('xt','yt','zt')])
   label = np.array(label, dtype=[('order', int)]);
   names = np.array(names, dtype=[('name' , 'U256')])
   

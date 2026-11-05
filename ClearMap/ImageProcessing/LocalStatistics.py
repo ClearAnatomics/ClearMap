@@ -139,7 +139,7 @@ def apply_local_function(source, function, selem=(50,50), spacing=None, step=Non
     results = full;
     
   if fshape is None: 
-    results.shape = results.shape[:-1];
+    results = results.reshape(results.shape[:-1])
   
   if return_centers:
     return results, centers

@@ -407,7 +407,7 @@ def extract_neighbourhood(img,x,y,z):
         idx = x+xx-1; idy = y+yy-1; idz = z+zz-1;
         nhood[:,w]=img[idx, idy, idz];
   
-  nhood.shape = (nhood.shape[0], 3, 3, 3);
+  nhood = nhood.reshape((nhood.shape[0], 3, 3, 3))
   nhood[:, 1, 1, 1] = 0;
   return nhood;
 
