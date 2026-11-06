@@ -16,14 +16,14 @@ channels:
 
 dependencies:
   - python=3.11  # constraining seems to speed up resolution
-  - cython
+  - cython>=3  # The Cython headers of NumPy 2 refuse an older Cython
   - ipython
   - jupyter
   - ipywidgets  # For pyvista
-  - numpy
+  - numpy>=2  # ClearMap 3.2 runs on NumPy 2 (the code still runs on 1.x)
   - scipy
   - numexpr  # ClearMap.Analysis.vasculature.geometry_utils
-  - pandas<2  # Groupby syntax changes
+  - pandas>=2.2.2  # The first pandas that runs with NumPy 2
   - pyarrow
   - scikit-image
   - scikit-learn
@@ -45,7 +45,7 @@ dependencies:
   - vtk
   - pyopengl
   - napari
-  - graph-tool<=2.45  # Cannot remove self loops with later versions
+  - graph-tool  # Graph.remove_self_loops finds the function in generation (recent) or stats (<= 2.45)
   - python-igraph
 #  - pytorch<=2.2
   - mkl<2024.1  # Breaks pytorch (https://github.com/pytorch/pytorch/issues/123097)

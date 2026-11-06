@@ -2,9 +2,10 @@
 ``Graph.remove_self_loops()`` calls graph-tool's function wherever the installed graph-tool has it.
 
 The function is documented in ``graph_tool.generation`` in the current graph-tool; ClearMap called it as
-``graph_tool.stats.remove_self_loops``, and ClearMap3.yml pins ``graph-tool<=2.45`` because later releases could not
-remove the self loops. The graph-tool modules are replaced by fakes here, so that both locations are tested whatever
-graph-tool is installed: the graph itself is tested by ``test_graph_corrections.py::test_remove_auto_loops``.
+``graph_tool.stats.remove_self_loops``, and ClearMap3.yml pinned ``graph-tool<=2.45`` (up to ClearMap 3.1) because
+later releases could not remove the self loops. The graph-tool modules are replaced by fakes here, so that both
+locations are tested whatever graph-tool is installed: the graph itself is tested by
+``test_graph_corrections.py::test_remove_auto_loops``.
 """
 from types import SimpleNamespace
 
