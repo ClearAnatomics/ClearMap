@@ -14,7 +14,6 @@ from packaging.version import Version
 import qdarkstyle
 from PyQt5.QtWidgets import QApplication, QDialog
 
-from ClearMap import __version__
 from ClearMap.IO.assets_constants import CHANNELS_ASSETS_TYPES_CONFIG
 from ClearMap.IO.FileUtils import Rename, apply_renames
 from ClearMap.Utils.tag_expression import Expression
@@ -22,16 +21,12 @@ from ClearMap.Utils.versions import as_version
 from ClearMap.config.config_adjusters.dict_ops import (try_get_item_recursive, set_item_recursive, has_item_recursive,
                                                        del_item_recursive)
 from ClearMap.config.config_adjusters.patch_ops import deep_merge
-from ClearMap.config.config_handler import ConfigHandler, ALTERNATIVES_REG
+from ClearMap.config.config_handler import ConfigHandler, ALTERNATIVES_REG, VERSION_SUFFIX
 from ClearMap.config.registration_channels import MOVING_OTHER
 
 from ClearMap.gui.dialogs import RenameChannelsDialog, VerifyRenamingDialog
 from ClearMap.gui.dialog_helpers import get_directory_dlg
 from ClearMap.gui.gui_utils_base import ensure_qapp
-
-
-clearmap_version = __version__
-VERSION_SUFFIX = f'v{Version(clearmap_version).major}_{Version(clearmap_version).minor}'
 
 
 SUPPORTED_VERSIONS = [Version(v) for v in ('2.1', '3.0', '3.1')]
