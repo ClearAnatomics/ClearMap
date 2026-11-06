@@ -21,13 +21,15 @@ import configobj
 from packaging.version import Version
 
 from ClearMap._version import CURRENT_CONFIG_VERSION
-from ClearMap.Utils.versions import as_version, VersionLike
+from ClearMap.Utils.versions import as_version, compare_versions, VersionLike
 from ClearMap import Settings as clearmap_settings
 from ClearMap.IO.FileUtils import atomic_replace
 from .utils import _handle_configobj_failed_parse, configobj_to_dict
 from ..Utils.path_utils import clean_path, de_duplicate_path
 from ..Utils.utilities import title_to_snake
+from ClearMap.Utils.exceptions import ClearMapConfigError
 
+CONFIG_VERSION_N_PARTS = 2  # Configs change with the major.minor of the version, not with its patch number
 
 
 def config_version_label(version: VersionLike, *, separator: str) -> str:
@@ -41,6 +43,34 @@ def config_version_label(version: VersionLike, *, separator: str) -> str:
 
 
 VERSION_SUFFIX = config_version_label(CURRENT_CONFIG_VERSION, separator='_')
+
+
+def config_needs_upgrade(config_version: VersionLike | None) -> bool:
+    """
+    Whether configs that carry this ``clearmap_version`` must be converted before this ClearMap reads them.
+
+    Compares the config versions (major.minor), never the package version: ClearMap 3.1.1 reads the configs that its
+    own defaults write, which say "3.1.0".
+
+    Parameters
+    ----------
+    config_version: str | tuple | Version | None
+        The ``clearmap_version`` of the config. Empty or None for the configs of old versions that did not write it.
+
+    Raises
+    ------
+    ClearMapConfigError
+        If the config is newer than this ClearMap reads (downgrades are not supported).
+    """
+    if not config_version:
+        return True
+    order = compare_versions(config_version, CURRENT_CONFIG_VERSION, parts=CONFIG_VERSION_N_PARTS)
+    if order > 0:
+        raise ClearMapConfigError(f'The config says clearmap_version {config_version}, newer than the configs that '
+                                  f'this ClearMap reads ({as_version(CURRENT_CONFIG_VERSION)}). '
+                                  f'Open it with a newer ClearMap.')
+    return order < 0
+
 
 # FIXME: implement validation
 
@@ -730,7 +760,7 @@ class ConfigHandler:
         Get the canonical path to the configuration file with the given name.
         The path is determined based on whether the config is local (tab/experiment)
         or global (machine/display/preferences).
-        The rest is determined by the current config format and layout as well as preferred extension.
+        The rest is determined by the current config version and layout as well as preferred extension.
 
         Parameters
         ----------
