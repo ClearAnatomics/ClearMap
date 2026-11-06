@@ -15,7 +15,7 @@ Usage
 
 .. code-block:: bash
 
-    conda activate ClearMap3.1
+    conda activate ClearMap3.2
     python -m ClearMap.Scripts.tube_map_new_api /path/to/experiment
 
 The experiment directory must contain a ``sample.yml`` config file (created

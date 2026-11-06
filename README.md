@@ -105,7 +105,7 @@ in the documentation.
     cd ClearMap
     chmod +x install_gui.sh
     ./install_gui.sh
-    conda activate ClearMap3.1
+    conda activate ClearMap3.2
     clearmap-ui
 
 Minimum recommended hardware: 256 GB RAM, 12-core CPU, NVMe SSD storage.

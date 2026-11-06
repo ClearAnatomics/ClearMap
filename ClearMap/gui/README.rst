@@ -31,7 +31,7 @@ Running
 
 .. code-block:: bash
 
-    conda activate ClearMap3.1
+    conda activate ClearMap3.2
     clearmap-ui
 
 The GUI will guide you and create the required config files with sensible defaults that
