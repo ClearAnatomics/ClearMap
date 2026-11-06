@@ -37,7 +37,7 @@ dependencies:
   - pyqt<6
   - pyqtwebengine
   - qtpy  # for qdarkstyle
-  - pyqtgraph=0.12  # Problem with pyqtgraph import of QWidgets with 0.13
+  - pyqtgraph>=0.13.5  # NumPy 2 fixes in 0.13.4 and 0.13.5; needs Qt >= 5.15
   - pygments
   - qdarkstyle
   - vispy
