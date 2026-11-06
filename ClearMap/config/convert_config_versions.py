@@ -14,14 +14,14 @@ from packaging.version import Version
 import qdarkstyle
 from PyQt5.QtWidgets import QApplication, QDialog
 
-from ClearMap import __version__
 from ClearMap.IO.assets_constants import CHANNELS_ASSETS_TYPES_CONFIG
 from ClearMap.IO.FileUtils import Rename, apply_renames
 from ClearMap.Utils.tag_expression import Expression
+from ClearMap.Utils.versions import as_version
 from ClearMap.config.config_adjusters.dict_ops import (try_get_item_recursive, set_item_recursive, has_item_recursive,
                                                        del_item_recursive)
 from ClearMap.config.config_adjusters.patch_ops import deep_merge
-from ClearMap.config.config_handler import ConfigHandler, ALTERNATIVES_REG
+from ClearMap.config.config_handler import ConfigHandler, ALTERNATIVES_REG, VERSION_SUFFIX
 from ClearMap.config.registration_channels import MOVING_OTHER
 
 from ClearMap.gui.dialogs import RenameChannelsDialog, VerifyRenamingDialog
@@ -29,15 +29,8 @@ from ClearMap.gui.dialog_helpers import get_directory_dlg
 from ClearMap.gui.gui_utils_base import ensure_qapp
 
 
-clearmap_version = __version__
-VERSION_SUFFIX = f'v{Version(clearmap_version).major}_{Version(clearmap_version).minor}'
-
-
 SUPPORTED_VERSIONS = [Version(v) for v in ('2.1', '3.0', '3.1')]
 
-
-def _norm_ver(v) -> Version:
-    return v if isinstance(v, Version) else Version(str(v))
 
 def read_cfg(path: Path | str, must_exist: bool = True):
     path = Path(path).expanduser().resolve()
@@ -78,8 +71,8 @@ def cfg_converter(from_v: str, to_v: str, config_type: str):
         def convert_sample_3_0_to_3_1(cfg_path: Path) -> Path:
         ...
     """
-    from_v = _norm_ver(from_v)
-    to_v = _norm_ver(to_v)
+    from_v = as_version(from_v)
+    to_v = as_version(to_v)
     def decorator(func: Callable) -> Callable:
         key = (from_v, to_v)
         if key not in FILE_CONVERTERS:
@@ -97,8 +90,8 @@ def version_guard(from_v, to_v, key: str = 'clearmap_version'):
     - Raises if version != from_v
     - Warns & returns filename if version == to_v
     """
-    from_v = _norm_ver(from_v)
-    to_v = _norm_ver(to_v)
+    from_v = as_version(from_v)
+    to_v = as_version(to_v)
 
     def decorator(func: Callable) -> Callable:
         @wraps(func)
@@ -116,8 +109,8 @@ def version_guard(from_v, to_v, key: str = 'clearmap_version'):
 
 
 def global_cfg_converter(from_v, to_v, config_type: str):
-    from_v = _norm_ver(from_v)
-    to_v = _norm_ver(to_v)
+    from_v = as_version(from_v)
+    to_v = as_version(to_v)
     def decorator(func: Callable) -> Callable:
         GLOBAL_FILE_CONVERTERS.setdefault((from_v, to_v), {})[config_type] = func
         return func
@@ -138,8 +131,8 @@ def project_converter(from_v: str, to_v: str):
         def convert_project_3_0_to_3_1(exp_dir: Path) -> None:
             ...
     """
-    from_v = _norm_ver(from_v)
-    to_v = _norm_ver(to_v)
+    from_v = as_version(from_v)
+    to_v = as_version(to_v)
 
     def decorator(func: Callable) -> Callable:
         PROJECT_CONVERTERS[(from_v, to_v)] = func
@@ -346,8 +339,8 @@ def convert(cfg_path, *, prev_v: str | Version = '2.1', new_v: str | Version = '
     cfg_path = Path(cfg_path).expanduser().resolve()
     cfg_type, scope = detect_config_type(cfg_path)
 
-    prev_v = _norm_ver(prev_v)
-    new_v = _norm_ver(new_v)
+    prev_v = as_version(prev_v)
+    new_v = as_version(new_v)
 
     steps = get_conversion_steps(prev_v, new_v)
     if not steps:
@@ -876,8 +869,8 @@ def convert_3_0_to_3_1(main_folder: str | Path = '', create_app: bool = True):
 def convert_versions(previous_version: str, new_version: str, *,
                      exp_dir: str | Path = '', create_app: bool = True):
     exp_dir = str(Path(exp_dir).expanduser().resolve())
-    previous_version = _norm_ver(previous_version)
-    new_version = _norm_ver(new_version)
+    previous_version = as_version(previous_version)
+    new_version = as_version(new_version)
 
     if previous_version == new_version:
         warnings.warn(f'No conversion needed: already at version {new_version}')

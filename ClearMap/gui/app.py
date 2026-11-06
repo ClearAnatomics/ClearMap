@@ -8,6 +8,8 @@ from ClearMap.config.change_detection import (channels_added_or_removed, channel
                                               whole_sample_changed, channels_with_changed_property,
                                               channel_path_changed, IRRELEVANT_DATA_TYPES)
 from ClearMap.config.convert_config_versions import convert_versions
+from ClearMap._version import CURRENT_CONFIG_VERSION
+from ClearMap.Utils.versions import as_version
 from ClearMap.gui.exception_handler import install_global_handler
 
 """
@@ -173,7 +175,7 @@ from ClearMap.Utils.events import (ProgressMainStepNameChanged, ProgressSubStepN
 from ClearMap.config.update_config import update_default_config
 from ClearMap.config.config_coordinator import make_cfg_coordinator_factory
 from ClearMap.config.config_handler import ConfigHandler, CLEARMAP_CFG_DIR, ALTERNATIVES_REG, \
-    scan_folder_for_experiments
+    scan_folder_for_experiments, config_needs_upgrade
 
 from ClearMap.gui.gui_utils_images import get_current_res
 from ClearMap.gui.tab_registry import TabRegistry
@@ -837,23 +839,21 @@ class ClearMapApp(ClearMapAppBase):
 
         exp_roots = scan_folder_for_experiments(group_dir)  # your new helper (roots set)
 
-        current = Version(str(self.app.applicationVersion()))  # or Version(CLEARMAP_VERSION)
-
         outdated: list[tuple[Path, Version | None]] = []
         for root in sorted(exp_roots):
             v = self._read_exp_version(root)
-            if v is None or v < current:
+            if config_needs_upgrade(v):
                 outdated.append((root, v))
 
         if outdated:
             # prompt once
-            msg = f'{len(outdated)} experiments appear older than {current}. Upgrade now?'
+            msg = f'{len(outdated)} experiments appear older than {as_version(CURRENT_CONFIG_VERSION)}. Upgrade now?'
             if not ClearMap.gui.dialog_helpers.prompt_dialog('Upgrade experiments', msg):
                 return
 
             for root, v in outdated:
                 prev = str(v) if v else '2.1'  # fallback to first numbered version
-                convert_versions(prev, str(current), exp_dir=root, create_app=False)
+                convert_versions(prev, CURRENT_CONFIG_VERSION, exp_dir=root, create_app=False)
 
         # 1) init group controller before tabs
         self.gui_controller.group_controller.set_group_base_dir(group_dir)
@@ -1226,12 +1226,13 @@ class ClearMapApp(ClearMapAppBase):
         needs_exp_open = self.load_sample()
         if needs_exp_open:
             sample_version = self.experiment_controller.read_sample_version()
-            if sample_version != CLEARMAP_VERSION:  # Old version detected
+            if config_needs_upgrade(sample_version):  # Configs of an older ClearMap
+                current_version = as_version(CURRENT_CONFIG_VERSION)
                 match ClearMap.gui.dialog_helpers.option_dialog(f'Old version detected ({sample_version})',
                                                                 f'An old version of ClearMap was detected, do you want to: ',
-                                                                [f'Upgrade to {CLEARMAP_VERSION}', 'Abort']):
+                                                                [f'Upgrade to {current_version}', 'Abort']):
                     case 0:  # Upgrade
-                        self.experiment_controller.upgrade_configs(sample_version, CLEARMAP_VERSION)
+                        self.experiment_controller.upgrade_configs(sample_version, CURRENT_CONFIG_VERSION)
                     case 1:  # Abort
                         self.src_folder = ''  # reset
                         return

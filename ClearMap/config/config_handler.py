@@ -20,15 +20,57 @@ from functools import cached_property
 import configobj
 from packaging.version import Version
 
-from ClearMap import __version__
+from ClearMap._version import CURRENT_CONFIG_VERSION
+from ClearMap.Utils.versions import as_version, compare_versions, VersionLike
 from ClearMap import Settings as clearmap_settings
 from ClearMap.IO.FileUtils import atomic_replace
 from .utils import _handle_configobj_failed_parse, configobj_to_dict
 from ..Utils.path_utils import clean_path, de_duplicate_path
 from ..Utils.utilities import title_to_snake
+from ClearMap.Utils.exceptions import ClearMapConfigError
 
-clearmap_version = __version__
-VERSION_SUFFIX = f'v{Version(clearmap_version).major}_{Version(clearmap_version).minor}'
+CONFIG_VERSION_N_PARTS = 2  # Configs change with the major.minor of the version, not with its patch number
+
+
+def config_version_label(version: VersionLike, *, separator: str) -> str:
+    """
+    The major.minor of a config version as it appears in folder and file names, e.g. ``v3_1`` for ``separator='_'``.
+
+    The patch number and the dev tag are not part of it: (3, 1), '3.1.1' and '3.1.0.dev0' give the same label.
+    """
+    parsed = as_version(version)
+    return f'v{parsed.major}{separator}{parsed.minor}'
+
+
+VERSION_SUFFIX = config_version_label(CURRENT_CONFIG_VERSION, separator='_')
+
+
+def config_needs_upgrade(config_version: VersionLike | None) -> bool:
+    """
+    Whether configs that carry this ``clearmap_version`` must be converted before this ClearMap reads them.
+
+    Compares the config versions (major.minor), never the package version: ClearMap 3.1.1 reads the configs that its
+    own defaults write, which say "3.1.0".
+
+    Parameters
+    ----------
+    config_version: str | tuple | Version | None
+        The ``clearmap_version`` of the config. Empty or None for the configs of old versions that did not write it.
+
+    Raises
+    ------
+    ClearMapConfigError
+        If the config is newer than this ClearMap reads (downgrades are not supported).
+    """
+    if not config_version:
+        return True
+    order = compare_versions(config_version, CURRENT_CONFIG_VERSION, parts=CONFIG_VERSION_N_PARTS)
+    if order > 0:
+        raise ClearMapConfigError(f'The config says clearmap_version {config_version}, newer than the configs that '
+                                  f'this ClearMap reads ({as_version(CURRENT_CONFIG_VERSION)}). '
+                                  f'Open it with a newer ClearMap.')
+    return order < 0
+
 
 # FIXME: implement validation
 
@@ -649,8 +691,8 @@ class ConfigHandler:
         return name
 
     @staticmethod
-    def _layout_subdir_for_version(version: str, defaults: bool) -> Path:
-        v = Version(version)
+    def _layout_subdir_for_version(version: VersionLike, defaults: bool) -> Path:
+        v = as_version(version)
         if v >= Version('3.1'):  # >= 3.1 has “defaults/vX.Y/”
             prefix = Path('defaults') if defaults else Path()
             return prefix / f'v{v.major}.{v.minor}'
@@ -658,8 +700,8 @@ class ConfigHandler:
             return Path()
 
     @staticmethod
-    def _filename_for(cfg_base: str, ext: str, *, version: str, is_exp_local: bool) -> str:
-        v = Version(version)
+    def _filename_for(cfg_base: str, ext: str, *, version: VersionLike, is_exp_local: bool) -> str:
+        v = as_version(version)
         base = cfg_base  # already stripped of *_params and version bits before
         if v >= Version('3.1'):  # New layout: no prefix/suffix in filename
             return f'{base}{ext}'
@@ -674,12 +716,12 @@ class ConfigHandler:
     def get_local_canonical_path(self, cfg_name: str) -> Path:
         canonical_name = ALTERNATIVES_REG.to_canonical(cfg_name)
         canonical_filename = self._filename_for(canonical_name, self.supported_exts[0],
-                                                version=clearmap_version, is_exp_local=True)
+                                                version=CURRENT_CONFIG_VERSION, is_exp_local=True)
         return self.src_dir / canonical_filename
 
     @classmethod
     def get_global_canonical_path(cls, cfg_name: str, *, root: Path | None = None,
-                                  version: Optional[str] = None) -> Path:
+                                  version: Optional[VersionLike] = None) -> Path:
         """
         Where the global configuration file with the given name should be (it may not exist yet).
 
@@ -689,28 +731,28 @@ class ConfigHandler:
             The name (without params and extension) of the configuration file
         root: Optional[Path]
             The base directory of the global configs. If None, the user's global config directory is used.
-        version: Optional[str]
+        version: Optional[VersionLike]
             The version string in the major.minor format to use for the folder structure.
-            If None, the current ClearMap version is used.
+            If None, the current config version (CURRENT_CONFIG_VERSION) is used.
         """
         canonical_name = ALTERNATIVES_REG.to_canonical(cfg_name)
         return cls._name_to_shared_path(canonical_name, cls.supported_exts[0],
                                         root=Path(root) if root is not None else cls.user_global_dir,
-                                        version=version or clearmap_version, defaults=False)
+                                        version=version or CURRENT_CONFIG_VERSION, defaults=False)
 
     @classmethod
     def get_user_defaults_canonical_path(cls, cfg_name: str) -> Path:
         """
-        Canonical path for a user default config for the *current* ClearMap version.
+        Canonical path for a user default config in the *current* config version.
 
         - No scanning / fallback across versions
-        - Uses current clearmap_version
+        - Uses the current config version (CURRENT_CONFIG_VERSION)
         - Always uses the given ext (default: .yml for 3.1+)
         """
         canonical = ALTERNATIVES_REG.to_canonical(cls.normalise_cfg_name(cfg_name))
         return cls._name_to_shared_path(canonical, cls.supported_exts[0],
                                         root=cls.user_defaults_dir,
-                                        version=str(Version(clearmap_version)),
+                                        version=CURRENT_CONFIG_VERSION,
                                         defaults=True)
 
     def get_canonical_path(self, cfg_name: str) -> Path:
@@ -718,7 +760,7 @@ class ConfigHandler:
         Get the canonical path to the configuration file with the given name.
         The path is determined based on whether the config is local (tab/experiment)
         or global (machine/display/preferences).
-        The rest is determined by the current ClearMap version and layout as well as preferred extension.
+        The rest is determined by the current config version and layout as well as preferred extension.
 
         Parameters
         ----------
@@ -751,7 +793,7 @@ class ConfigHandler:
 
     @classmethod
     def _name_to_shared_path(cls, cfg_name: str, ext: str, *, root: Path,
-                             version: Optional[str] = None, defaults: bool = True) -> Path:
+                             version: Optional[VersionLike] = None, defaults: bool = True) -> Path:
         """
         Helper to construct a *shared* (i.e. non experiment-local) config path from name + ext.
         The path is either in the ClearMap package directory or in the user's ~/.clearmap directory.
@@ -771,12 +813,12 @@ class ConfigHandler:
             The file extension
         root: Path
             The root directory to look for the default config file.
-        version: Optional[str]
+        version: Optional[VersionLike]
             The version string in the major.minor format to use for the folder structure.
-             If None, the current ClearMap version is used.
+             If None, the current config version (CURRENT_CONFIG_VERSION) is used.
 
         """
-        v = Version(version or clearmap_version)  # default to latest layout
+        v = as_version(version or CURRENT_CONFIG_VERSION)  # default to latest layout
         base = cls.strip_params(cfg_name)
         is_exp_local = ALTERNATIVES_REG.is_local_file(base)
 
@@ -831,7 +873,7 @@ class ConfigHandler:
 
     @classmethod
     def _find_shared_cfg_path(cls, cfg_name: str, *, root: Path,
-                              version: Optional[str], defaults: bool) -> Path | None:
+                              version: Optional[VersionLike], defaults: bool) -> Path | None:
         """
         Get the path to a *shared* configuration file with the given name.
         Several extensions are tried in order of preference.
@@ -849,9 +891,9 @@ class ConfigHandler:
             The base directory to look for the default config file.
             If None, the directory is determined by from_package.
             Typically, this would be either the ClearMap package directory or the user's ~/.clearmap directory.
-        version: Optional[str]
+        version: Optional[VersionLike]
             The version string in the major.minor format to use for the folder structure.
-             If None, the current ClearMap version is used.
+             If None, the current config version (CURRENT_CONFIG_VERSION) is used.
         defaults: bool
             If True, look in the 'defaults' subdirectory (for >=v3.1).
             Otherwise, look at the root of base_dir. (or what it resolves to)
@@ -868,7 +910,8 @@ class ConfigHandler:
         """
         cfg_name = cls.normalise_cfg_name(cfg_name)
 
-        versions_to_try = [version] if version else (clearmap_version, '3.0', '2.1')  # Currently 3 kinds of layout (read up to vX.Y)
+        # Currently 3 kinds of layout (read up to vX.Y)
+        versions_to_try = [version] if version else (CURRENT_CONFIG_VERSION, '3.0', '2.1')
 
         paths_checked = []  # FIXME: include this in caller errors
         for base in ALTERNATIVES_REG.get_alternatives(cfg_name):
@@ -917,7 +960,7 @@ class ConfigHandler:
 
     @classmethod
     def get_global_path(cls, cfg_name: str, must_exist: bool = True, *, base_dir: Path | None = None,
-                        version: Optional[str] = None) -> Path:
+                        version: Optional[VersionLike] = None) -> Path:
         """
         Get the path to the global configuration file with the given name.
         Several extensions are tried in order of preference, in the global folder then (unless base_dir
@@ -937,7 +980,7 @@ class ConfigHandler:
         base_dir: Optional[Path]
             The base directory to look for the global config file.
             If None, the user's ~/.clearmap directory is used.
-        version: Optional[str]
+        version: Optional[VersionLike]
             The version string in the major.minor format to use for the folder structure.
 
         Returns
@@ -946,7 +989,7 @@ class ConfigHandler:
             The path to the global configuration file
         """
         root = Path(base_dir) if base_dir is not None else cls.user_global_dir
-        version = version or clearmap_version
+        version = version or CURRENT_CONFIG_VERSION
 
         global_path = cls._find_shared_cfg_path(cfg_name, root=root, version=version, defaults=False)
         if global_path is None and base_dir is None:  # Old user_global_dir was same as default
@@ -963,7 +1006,7 @@ class ConfigHandler:
 
     @classmethod
     def get_default_path(cls, cfg_name: str, must_exist: bool = True, *, base_dir: Path | None = None,
-                         version: Optional[str] = None, from_package: bool = False) -> Path | None:
+                         version: Optional[VersionLike] = None, from_package: bool = False) -> Path | None:
         """
         Get the path to the default configuration file with the given name.
         Several extensions are tried in order of preference.
@@ -979,9 +1022,9 @@ class ConfigHandler:
         base_dir: Optional[Path]
             The base directory to look for the default config file.
             If specified, this overrides the from_package parameter.
-        version: Optional[str]
+        version: Optional[VersionLike]
             The version string in the major.minor format to use for the folder structure.
-            If None, the current ClearMap version is used.
+            If None, the current config version (CURRENT_CONFIG_VERSION) is used.
         from_package: bool
             If True, look for the default config in the ClearMap package directory.
             Otherwise, look in the user's ~/.clearmap directory.
@@ -994,11 +1037,11 @@ class ConfigHandler:
         Path
             The path to the default configuration file
         """
-        version = version or clearmap_version
+        version = version or CURRENT_CONFIG_VERSION
         if (base_dir is None
             and not from_package
             and ALTERNATIVES_REG.is_global_cfg(cfg_name)
-            and Version(version) >= Version('3.1')
+            and as_version(version) >= Version('3.1')
         ):
             raise ValueError(f'Config "{cfg_name}" is global; use get_global_path() instead of get_default_path().')
         root = Path(base_dir) if base_dir is not None else (

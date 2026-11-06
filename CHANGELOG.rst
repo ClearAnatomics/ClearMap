@@ -2,6 +2,16 @@
 Changelog
 =========
 
+3.1.2
+-----
+
+Bug fixes only; the configuration files and the results of 3.1.1 are unchanged.
+
+- GUI: opening an experiment (or a group of experiments) written by ClearMap 3.1.x no longer reports "Old version
+  detected" and offers to upgrade it. The check compared the ``clearmap_version`` of the configs with the version of the
+  package, but the configs only change with the major.minor of ClearMap, so 3.1.1 flagged its own configs. A config
+  written by a newer ClearMap than the one which reads it is refused with an error which names both versions.
+
 3.1.1
 -----
 
