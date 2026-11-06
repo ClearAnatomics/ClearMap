@@ -28,7 +28,7 @@ import warnings
 import numpy as np
 
 import skimage.morphology
-import scipy.ndimage.measurements
+import scipy.ndimage
 
 
 import ClearMap.Utils.Timer as tmr
@@ -229,8 +229,8 @@ def find_size(label, max_label=None, verbose=False):
     if max_label is None:
         max_label = int(label.max())
 
-    sizes = scipy.ndimage.measurements.sum(np.ones(label.shape, dtype=bool),
-                                           labels=label, index=np.arange(1, max_label + 1))
+    sizes = scipy.ndimage.sum(np.ones(label.shape, dtype=bool),
+                              labels=label, index=np.arange(1, max_label + 1))
 
     if verbose:
         timer.print_elapsed_time(head='Size detection')
@@ -272,10 +272,10 @@ def find_intensity(source, label, max_label=None, method='sum', verbose=False):
         max_label = label.max()
 
     measure_functions = {
-      'sum': scipy.ndimage.measurements.sum,
-      'mean': scipy.ndimage.measurements.mean,
-      'max': scipy.ndimage.measurements.maximum,
-      'min': scipy.ndimage.measurements.minimum
+      'sum': scipy.ndimage.sum,
+      'mean': scipy.ndimage.mean,
+      'max': scipy.ndimage.maximum,
+      'min': scipy.ndimage.minimum
     }
 
     try:

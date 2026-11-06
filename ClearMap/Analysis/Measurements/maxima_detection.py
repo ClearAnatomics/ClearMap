@@ -15,8 +15,7 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import numpy as np
 
-import scipy.ndimage.measurements as ndm
-import scipy.ndimage.filters as ndf
+from scipy import ndimage
 
 import ClearMap.ImageProcessing.grey_reconstruction as gr
 
@@ -74,7 +73,7 @@ def local_max(source, shape=5):
     if not isinstance(shape, tuple):
         shape = (shape,) * source.ndim
 
-    return ndf.maximum_filter(source, size=shape) == source
+    return ndimage.maximum_filter(source, size=shape) == source
     
 
 def extended_max(source, h_max=0):
@@ -189,12 +188,12 @@ def find_center_of_maxima(source, maxima=None, label=None, verbose=False):
 
     # center of maxima
     if label is None:
-        label, n_label = ndm.label(maxima)
+        label, n_label = ndimage.label(maxima)
     else:
         n_label = label.max()
 
     if n_label > 0:
-        centers = np.array(ndm.center_of_mass(source, label, index=np.arange(1, n_label + 1)))  # Labels 1 to n
+        centers = np.array(ndimage.center_of_mass(source, label, index=np.arange(1, n_label + 1)))  # Labels 1 to n
     else:
         centers = np.zeros((0, source.ndim))
 

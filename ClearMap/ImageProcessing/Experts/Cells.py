@@ -26,7 +26,6 @@ import numpy as np
 
 import cv2
 import pandas as pd
-import scipy.ndimage.filters as ndf
 import scipy.ndimage as ndi
 
 import ClearMap.IO.IO as clearmap_io
@@ -560,7 +559,7 @@ def dog_filter(source, shape, sigma=None, sigma2=None):
     if shape is not None:
         fdog = fk.filter_kernel(ftype='dog', shape=shape, sigma=sigma, sigma2=sigma2)
         fdog = fdog.astype('float32')
-        filtered = ndf.correlate(source, fdog)
+        filtered = ndi.correlate(source, fdog)
         filtered[filtered < 0] = 0
         return filtered
     else:

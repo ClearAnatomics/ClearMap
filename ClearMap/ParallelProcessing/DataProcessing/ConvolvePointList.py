@@ -382,7 +382,7 @@ def test():
   
   import scipy.ndimage
   t0 = time.time();
-  good = scipy.ndimage.filters.convolve(np.array(source, dtype = float), np.array(n6, dtype = float), mode = 'constant', cval = 0)
+  good = scipy.ndimage.convolve(np.array(source, dtype = float), np.array(n6, dtype = float), mode = 'constant', cval = 0)
   t1 = time.time();
   print('%f secs' % ((t1-t0)));
   
