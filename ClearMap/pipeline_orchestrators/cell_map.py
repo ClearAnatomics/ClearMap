@@ -471,7 +471,6 @@ class CellDetector(ChannelPipelineOrchestrator):
     def plot_cells_3d_scatter_w_atlas_colors(self, raw=False, parent=None):
         import ClearMap.Visualization.Qt.Plot3d as qplot_3d
         from ClearMap.Visualization.Qt.widgets import Scatter3D
-        import pyqtgraph as pg
         from matplotlib.colors import to_hex
 
         asset_properties = {'channel': self.channel}
@@ -493,11 +492,6 @@ class CellDetector(ChannelPipelineOrchestrator):
                                               found_items=[r for r, ok in requirements if ok])
         dv = qplot_3d.plot(asset.path, title=f'{asset_properties["asset_type"].title()} and cells',  # FIXME: correct scaling for anisotropic if raw
                            arrange=False, lut='white', parent=parent)[0]
-
-        scatter = pg.ScatterPlotItem()
-
-        dv.view.addItem(scatter)
-        dv.scatter = scatter
 
         df = self.get_cells_df()
 
@@ -525,10 +519,10 @@ class CellDetector(ChannelPipelineOrchestrator):
             df['color'] = to_hex((1, 0, 0))
 
         particle_size = self.config['detection']['background_correction']['diameter'][0]
-        dv.scatter_coords = Scatter3D(coordinates, colors=df['color'].to_list(),
-                                      hemispheres=hemispheres,
-                                      z_radius=self.machine_config['particle_plot_z_sphere_radius'],
-                                      marker_size=max(3, particle_size // 2))
+        dv.overlay_scatter(Scatter3D(coordinates, colors=df['color'].to_list(),
+                                     hemispheres=hemispheres,
+                                     z_radius=self.machine_config['particle_plot_z_sphere_radius'],
+                                     marker_size=max(3, particle_size // 2)))
         dv.refresh()
         return [dv]
 
@@ -551,19 +545,13 @@ class CellDetector(ChannelPipelineOrchestrator):
     def plot_filtered_cells(self, parent=None, smarties=False):
         import ClearMap.Visualization.Qt.Plot3d as qplot_3d
         from ClearMap.Visualization.Qt.widgets import Scatter3D
-        import pyqtgraph as pg
 
         _, coordinates = self.get_coords('filtered')
         stitched_path = self.get_path('stitched', channel=self.channel)
         dv = qplot_3d.plot(stitched_path, title='Stitched and filtered cells', arrange=False,
                            lut='white', parent=parent)[0]
-        scatter = pg.ScatterPlotItem()
-
-        dv.view.addItem(scatter)
-        dv.scatter = scatter
-
-        dv.scatter_coords = Scatter3D(coordinates, smarties=smarties,
-                                      z_radius=self.machine_config['particle_plot_z_sphere_radius'])
+        dv.overlay_scatter(Scatter3D(coordinates, smarties=smarties,
+                                     z_radius=self.machine_config['particle_plot_z_sphere_radius']))
         dv.refresh()
         return [dv]
 

@@ -444,7 +444,6 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         return [dv]
 
     def plot_tracts_3d_scatter_w_atlas_colors(self, raw=False, coordinates_from_debug=False, plot_onto_debug=False, parent=None):
-        import pyqtgraph as pg
         from matplotlib.colors import to_hex
         from ClearMap.Visualization.Qt.widgets import Scatter3D
         from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
@@ -476,11 +475,6 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         dv = q_plot_3d.plot(asset_path, title=f'{asset_properties["asset_type"].title()} and tracts coordinates',
                            arrange=False, lut='white', parent=parent)[0]
 
-        scatter = pg.ScatterPlotItem()
-
-        dv.view.addItem(scatter)
-        dv.scatter = scatter
-
         df = pd.read_feather(df_path)
 
         if raw:
@@ -502,8 +496,8 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
         color_map = {id_: annotator.convert_label(id_, key='id', value='color_hex_triplet') for id_ in unique_ids}
         color_map[0] = np.array(to_hex((1, 0, 0)))  # default to red
         df['color'] = df['id'].map(color_map)
-        dv.scatter_coords = Scatter3D(coordinates, colors=df['color'].to_list(),
-                                      hemispheres=hemispheres, z_radius=0)  # plotting adjacent is too slow for tracts
+        dv.overlay_scatter(Scatter3D(coordinates, colors=df['color'].to_list(),
+                                     hemispheres=hemispheres, z_radius=0))  # plotting adjacent is too slow for tracts
         dv.refresh()
         return [dv]
 

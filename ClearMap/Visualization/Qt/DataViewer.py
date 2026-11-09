@@ -733,6 +733,18 @@ class DataViewer(QWidget):
 
         return scaled_size, zoom_factor
 
+    def overlay_scatter(self, scatter_coords):
+        """
+        Draw the markers of a scatter on top of the slices, from the next :meth:`refresh` on.
+
+        Arguments
+        ---------
+        scatter_coords : ClearMap.Visualization.Qt.widgets.Scatter3D
+            The markers and their positions.
+        """
+        self.scatter = pg.ScatterPlotItem()
+        self.view.addItem(self.scatter)
+        self.scatter_coords = scatter_coords
 
     def plot_scatter_markers(self, ax, index):
         coords = self.scatter_coords

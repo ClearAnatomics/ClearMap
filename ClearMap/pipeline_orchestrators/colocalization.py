@@ -145,7 +145,6 @@ class ColocalizationProcessor(PerCompoundConfigMixin, CompoundChannelPipelineOrc
 
     def plot_nearest_neighbors(self, channel_a, channel_b, parent=None):  # TODO: improve with line between particles
         from matplotlib.colors import to_hex
-        import pyqtgraph as pg
         from ClearMap.Visualization.Qt import Plot3d as q_plot_3d
         from ClearMap.Visualization.Qt.widgets import Scatter3D
 
@@ -181,11 +180,8 @@ class ColocalizationProcessor(PerCompoundConfigMixin, CompoundChannelPipelineOrc
                             title=f'Nearest Neighbours {channel_a} - {channel_b}',
                             arrange=False, parent=parent)[0]
 
-        scatter = pg.ScatterPlotItem()
-        dv.view.addItem(scatter)
-        dv.scatter = scatter
-        dv.scatter_coords = Scatter3D(scatter_df, z_radius=self.machine_config['particle_plot_z_sphere_radius'],
-                                      marker_size=self.config['comparison']['particle_diameter'] // 2)
+        dv.overlay_scatter(Scatter3D(scatter_df, z_radius=self.machine_config['particle_plot_z_sphere_radius'],
+                                     marker_size=self.config['comparison']['particle_diameter'] // 2))
         dv.refresh()
 
         return [dv]
