@@ -16,7 +16,7 @@ import numpy as np
 
 from qtpy import QtGui
 from qtpy.QtCore import QRectF
-from qtpy.QtWidgets import QApplication
+from qtpy.QtWidgets import QApplication, QVBoxLayout, QWidget
 import pyqtgraph as pg
 
 from ClearMap.Utils.exceptions import ClearMapRuntimeError
@@ -148,9 +148,9 @@ def link_dataviewers_cursors(dvs):
         dv.pals = pals
 
 
-def figures_as_web_views(figures):
+def figures_as_widgets(figures):
     """
-    Show matplotlib figures as interactive web pages (mpld3), one Qt web view each.
+    Show matplotlib figures as Qt widgets, each with the navigation toolbar of matplotlib (zoom, pan, save).
 
     Arguments
     ---------
@@ -159,8 +159,8 @@ def figures_as_web_views(figures):
 
     Returns
     -------
-    list of QWebEngineView
-        One view per figure, in the same order.
+    list of QWidget
+        One widget (canvas and toolbar) per figure, in the same order.
 
     Raises
     ------
@@ -169,16 +169,19 @@ def figures_as_web_views(figures):
     """
     # The caller owns the application, whatever its name, hence the check before any widget
     if QApplication.instance() is None:
-        raise ClearMapRuntimeError('Qt web views need a QApplication: create one first '
+        raise ClearMapRuntimeError('Qt figure widgets need a QApplication: create one first '
                                    '(e.g. ClearMap.gui.gui_utils_base.ensure_qapp()) or use the matplotlib figures')
-    from qtpy.QtWebEngineWidgets import QWebEngineView  # Not at the top: only these views need QtWebEngine
-    import mpld3
-    views = []
+    # Not at the top: the Qt backend of matplotlib chooses its binding when imported
+    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
+    widgets = []
     for figure in figures:
-        view = QWebEngineView()
-        view.setHtml(mpld3.fig_to_html(figure))
-        views.append(view)
-    return views
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        canvas = FigureCanvasQTAgg(figure)
+        layout.addWidget(NavigationToolbar2QT(canvas, widget))
+        layout.addWidget(canvas)
+        widgets.append(widget)
+    return widgets
 
   
 ############################################################################################################

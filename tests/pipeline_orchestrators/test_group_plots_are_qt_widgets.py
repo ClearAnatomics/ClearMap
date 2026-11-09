@@ -1,11 +1,12 @@
 """
-The group plots (volcanoes, histograms) are returned as Qt web views by ``run_plots``, in any Qt application.
+The group plots (volcanoes, histograms) are returned as Qt widgets (matplotlib canvas and toolbar) by ``run_plots``,
+in any Qt application.
 
-``run_plots`` only imported ``QWebEngineView`` when the application was named 'ClearMap' (a guard copied from the
-Sphinx protection of the GUI tabs), so with any other application, e.g. one made by ``ensure_qapp()`` in a script, and
+``run_plots`` only made its views when the application was named 'ClearMap' (a guard copied from the Sphinx
+protection of the GUI tabs), so with any other application, e.g. one made by ``ensure_qapp()`` in a script, and
 with none, it raised an UnboundLocalError. Without an application it now says so before any widget is made (Qt aborts
-the process on a widget without a QApplication). The views are made by ClearMap.Visualization.Qt.utils, so that the
-orchestrator imports no Qt. Qt is faked here: the sandbox and the CI have no display, and the rule tested is the one of
+the process on a widget without a QApplication). The widgets are made by ClearMap.Visualization.Qt.utils, so that the
+orchestrator imports no Qt, and without QtWebEngine, which PyQt6 has not on conda-forge. Qt is faked here: the sandbox and the CI have no display, and the rule tested is the one of
 ClearMap, not of Qt.
 """
 import sys
@@ -33,13 +34,28 @@ class FakeApplication:
         return 'python'
 
 
-class FakeWebView:
-    def setHtml(self, html):
-        self.html = html
+class FakeWidget:
+    pass
 
 
-def _html_of(figure):
-    return f'<html>{figure}</html>'
+class FakeLayout:
+    """Like a QVBoxLayout, it belongs to its widget and keeps the widgets added, in order"""
+    def __init__(self, parent):
+        parent.layout = self
+        self.children = []
+
+    def addWidget(self, widget):
+        self.children.append(widget)
+
+
+class FakeCanvas:
+    def __init__(self, figure):
+        self.figure = figure
+
+
+class FakeToolbar:
+    def __init__(self, canvas, parent):
+        self.canvas = canvas
 
 
 def _fake_module(name, **attributes):
@@ -50,11 +66,13 @@ def _fake_module(name, **attributes):
 
 @pytest.fixture()
 def fake_qt(monkeypatch):
-    """The Qt application, web view and mpld3 of the group plots, without a display"""
+    """The Qt application, widgets and matplotlib Qt backend of the group plots, without a display"""
     monkeypatch.setattr(qt_utils, 'QApplication', FakeApplication)
-    monkeypatch.setitem(sys.modules, 'qtpy.QtWebEngineWidgets',
-                        _fake_module('qtpy.QtWebEngineWidgets', QWebEngineView=FakeWebView))
-    monkeypatch.setitem(sys.modules, 'mpld3', _fake_module('mpld3', fig_to_html=_html_of))
+    monkeypatch.setattr(qt_utils, 'QWidget', FakeWidget)
+    monkeypatch.setattr(qt_utils, 'QVBoxLayout', FakeLayout)
+    monkeypatch.setitem(sys.modules, 'matplotlib.backends.backend_qtagg',
+                        _fake_module('matplotlib.backends.backend_qtagg', FigureCanvasQTAgg=FakeCanvas,
+                                     NavigationToolbar2QT=FakeToolbar))
     monkeypatch.setattr(FakeApplication, 'current', None)
     return FakeApplication
 
@@ -75,11 +93,14 @@ def plot_the_number_of_rows(df, **_):
     return f'figure of {len(df)} rows'
 
 
-def test_the_group_plots_are_web_views_in_an_application_not_named_clearmap(fake_qt, analysis_with_stats_table):
+def test_the_group_plots_are_canvases_with_a_toolbar_in_an_application_not_named_clearmap(
+        fake_qt, analysis_with_stats_table):
     fake_qt.current = FakeApplication()
-    views = analysis_with_stats_table.run_plots(plot_the_number_of_rows, [GROUP_NAMES], channel='cells',
-                                                plot_kw_args={'group_names': None})
-    assert [view.html for view in views] == ['<html>figure of 2 rows</html>']
+    widgets = analysis_with_stats_table.run_plots(plot_the_number_of_rows, [GROUP_NAMES], channel='cells',
+                                                  plot_kw_args={'group_names': None})
+    assert len(widgets) == 1
+    toolbar, canvas = widgets[0].layout.children
+    assert canvas.figure == 'figure of 2 rows' and toolbar.canvas is canvas
 
 
 def test_the_group_plots_ask_for_an_application_when_there_is_none(fake_qt, analysis_with_stats_table):

@@ -8,7 +8,6 @@ from pandas import DataFrame
 from scipy import stats
 
 
-# import mpld3  # WARNING: local import. Present here only for reference
 # from PyQt5.QtWidgets import QApplication
 
 from ClearMap.IO import io_ops
@@ -27,7 +26,7 @@ from ..config.compound_keys import CompoundKey
 if TYPE_CHECKING:
     from ClearMap.IO.workspace_asset import Asset
     from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
-    from qtpy.QtWebEngineWidgets import QWebEngineView
+    from qtpy.QtWidgets import QWidget
 
 Pair = Tuple[str, str]
 
@@ -306,8 +305,8 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
         return reg.annotator_of(representative_channel(sample_manager, self.pipeline, channel))
 
     def run_plots(self, plot_function, comparisons: List[Pair], *,
-                  channel: str, plot_kw_args: Dict) -> list['QWebEngineView']:
-        from ClearMap.Visualization.Qt.utils import figures_as_web_views
+                  channel: str, plot_kw_args: Dict) -> list['QWidget']:
+        from ClearMap.Visualization.Qt.utils import figures_as_widgets
         figures = []
         for gp1_name, gp2_name in comparisons:
             if plot_kw_args.get('group_names') is None:
@@ -316,7 +315,7 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
                 kwargs = plot_kw_args
             df = pd.read_csv(self.assets.readable_path(self.assets.stats_table_path(channel, gp1_name, gp2_name), channel))
             figures.append(plot_function(df, **kwargs))
-        return figures_as_web_views(figures)
+        return figures_as_widgets(figures)
 
     def compute_stats_tables(self, comparisons, *, channel: str | None = None, density_suffix: str | None = None, save=True):
         # FIXME: add save
