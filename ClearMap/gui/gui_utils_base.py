@@ -17,8 +17,8 @@ import warnings
 from pathlib import Path
 from typing import Optional, Callable
 
-from PyQt5.QtCore import pyqtSignal
-from PyQt5.QtWidgets import QLayout, QApplication, QWidget, \
+from qtpy.QtCore import Signal
+from qtpy.QtWidgets import QLayout, QApplication, QWidget, \
     QToolBox  # REFACTOR: local imports or strings for annotations?
 
 # WARNING: declared here for dependency visibility but imported locally where used
@@ -263,14 +263,14 @@ def disconnect_widget_signal(widget_signal, max_iter: int = 10,
     raise ValueError(f'Could not disconnect signal after {max_iter} iterations')
 
 
-def unique_connect(signal: pyqtSignal, slot: Callable, *,
+def unique_connect(signal: Signal, slot: Callable, *,
                    max_disconnect_iter: int = 10, disconnect_all: bool = False) -> None:
     """
     Connect a signal to a slot, ensuring no duplicate connections.
 
     Parameters
     ----------
-    signal : pyqtSignal
+    signal : Signal
         The signal to connect.
     slot : callable
         The slot to connect.

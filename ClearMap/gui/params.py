@@ -11,8 +11,8 @@ from typing import Callable, Iterable, List, Mapping, Optional
 
 import numpy as np
 
-from PyQt5.QtCore import Qt, QTimer, QSignalBlocker
-from PyQt5.QtWidgets import (QToolBox, QCheckBox, QLabel, QHBoxLayout, QVBoxLayout,
+from qtpy.QtCore import Qt, QTimer, QSignalBlocker
+from qtpy.QtWidgets import (QToolBox, QCheckBox, QLabel, QHBoxLayout, QVBoxLayout,
                              QSpinBox, QLineEdit, QDoubleSpinBox, QRadioButton, QFrame, QDialog, QButtonGroup,
                              QMessageBox)
 

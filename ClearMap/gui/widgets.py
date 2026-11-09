@@ -54,10 +54,10 @@ import pyqtgraph as pg
 from pyqtgraph import PlotWidget
 from qdarkstyle import DarkPalette
 
-from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtCore import Qt, QTimer, pyqtSignal
-from PyQt5.QtGui import QColor, QIcon
-from PyQt5.QtWidgets import (QWidget, QDialogButtonBox, QListWidget, QListWidgetItem,
+from qtpy import QtCore, QtWidgets
+from qtpy.QtCore import Qt, QTimer, Signal
+from qtpy.QtGui import QColor, QIcon
+from qtpy.QtWidgets import (QWidget, QDialogButtonBox, QListWidget, QListWidgetItem,
                              QLayout, QHBoxLayout, QVBoxLayout, QGridLayout,
                              QPushButton, QTableWidget, QTableWidgetItem, QToolBox, QRadioButton,
                              QTreeWidget, QTreeWidgetItem, QTabWidget, QFileDialog,
@@ -266,7 +266,7 @@ class TwoListSelection(QWidget):
     moving them to a list of selected items.
     """
     #: Emitted when a single item is selected in either list. Argument: item text.
-    itemSelectionChanged = pyqtSignal(str)
+    itemSelectionChanged = Signal(str)
 
     def __init__(self, parent=None, input_title=None, output_title=None):
         super().__init__(parent)
@@ -348,7 +348,7 @@ class TwoListSelection(QWidget):
             item = sel[0]
             self.itemSelectionChanged.emit(item.text())
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def update_buttons_status(self):
         self.mBtnUp.setDisabled(not bool(self.mOutput.selectedItems()) or self.mOutput.currentRow() == 0)
         self.mBtnDown.setDisabled(not bool(self.mOutput.selectedItems()) or self.mOutput.currentRow() == (self.mOutput.count() - 1))
@@ -366,36 +366,36 @@ class TwoListSelection(QWidget):
         self.mBtnUp.clicked.connect(self.__on_mBtnUp_clicked)
         self.mBtnDown.clicked.connect(self.__on_mBtnDown_clicked)
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def __on_mBtnMoveToAvailable_clicked(self):
         """Move all selected rows from left to right."""
         for it in reversed(self.mInput.selectedItems()):          # reversed keeps order
             self.mOutput.addItem(self.mInput.takeItem(self.mInput.row(it)))
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def __on_mBtnMoveToSelected_clicked(self):
         """Move all selected rows from right to left."""
         for it in reversed(self.mOutput.selectedItems()):
             self.mInput.addItem(self.mOutput.takeItem(self.mOutput.row(it)))
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def __on_mButtonToAvailable_clicked(self):
         while self.mOutput.count() > 0:
             self.mInput.addItem(self.mOutput.takeItem(0))
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def __on_mButtonToSelected_clicked(self):
         while self.mInput.count() > 0:
             self.mOutput.addItem(self.mInput.takeItem(0))
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def __on_mBtnUp_clicked(self):
         row = self.mOutput.currentRow()
         currentItem = self.mOutput.takeItem(row)
         self.mOutput.insertItem(row - 1, currentItem)
         self.mOutput.setCurrentRow(row - 1)
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def __on_mBtnDown_clicked(self):
         row = self.mOutput.currentRow()
         currentItem = self.mOutput.takeItem(row)
@@ -497,7 +497,7 @@ class CheckableListWidget(QWidget):
     """A list widget where each item has a checkbox."""
 
     #: Emitted when an item's check state changes. Arguments: ``(index, checked, item_text)``.
-    check_state_changed = pyqtSignal(int, bool, str)
+    check_state_changed = Signal(int, bool, str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1729,11 +1729,11 @@ class StructureSelector(WizardWidget):
 
 class PerfMonitor(QWidget):
     #: Emitted when CPU values update. Arguments: ``(cpu_percent, thread_percent, ram_percent)``.
-    cpu_vals_changed = QtCore.pyqtSignal(int, int, int)
+    cpu_vals_changed = QtCore.Signal(int, int, int)
     #: Emitted when GPU values update. Arguments: ``(gpu_percent, vram_percent)``.
-    gpu_vals_changed = QtCore.pyqtSignal(int, int)
+    gpu_vals_changed = QtCore.Signal(int, int)
     # Internal: a CPU sample taken in the sampler thread, delivered (queued) to the main thread
-    _cpu_sampled = QtCore.pyqtSignal(int, int, int)
+    _cpu_sampled = QtCore.Signal(int, int, int)
 
     def __init__(self, parent, fast_period, slow_period, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
@@ -1933,11 +1933,11 @@ def channel_page_id_of(page) -> ChannelPageId | None:
 
 class ExtendableTabWidget(QTabWidget):
     #: Emitted when the ``(+)`` tab is clicked.
-    addTabClicked = pyqtSignal()
+    addTabClicked = Signal()
     #: Emitted when a channel tab is clicked. Argument: channel name.
-    channelChanged = pyqtSignal(str)
+    channelChanged = Signal(str)
     #: Emitted when a channel tab is renamed. Arguments: ``(old_name, new_name)``.
-    channelRenamed = pyqtSignal(str, str)
+    channelRenamed = Signal(str, str)
 
     def __init__(self, parent=None, with_add_tab=True):
         super().__init__(parent)
@@ -2014,7 +2014,7 @@ class ExtendableTabWidget(QTabWidget):
 
 class FileDropListWidget(QListWidget):  # TODO: check if I need dragMoveEvent
     #: Emitted when items are added or removed.
-    itemsChanged = pyqtSignal()
+    itemsChanged = Signal()
     def __init__(self, parent=None, plus_btn=None, minus_btn=None):
         super().__init__(parent)
         self.setAcceptDrops(True)
@@ -2090,9 +2090,9 @@ class LandmarksWeightsPanel(QFrame):
     in the controller.
     """
     #: Emitted when any slider changes. Argument: full list of weights (0–100).
-    weightsChanged = pyqtSignal(list)           # emits the full 0..100 list (ints)
+    weightsChanged = Signal(list)           # emits the full 0..100 list (ints)
     #: Emitted when a single slider changes. Arguments: ``(index, value)``.
-    weightAtChanged = pyqtSignal(int, int)      # emits (idx, 0..100)
+    weightAtChanged = Signal(int, int)      # emits (idx, 0..100)
 
     def __init__(self, parent: QWidget = None,
                  value_to_model=None, model_to_value=None):
@@ -2230,7 +2230,7 @@ class GraphFilterList(QWidget):
       default) and ``'filter_{i}_or_btn'``.
     """
     #: Emitted when filters are added or modified.
-    filtersChanged = pyqtSignal()
+    filtersChanged = Signal()
 
     def __init__(self, layout: QVBoxLayout, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -2717,7 +2717,7 @@ class NProcessesWidget(QWidget):
     it can be used transparently by ``ParamLink``.
     """
     #: Emitted when the spin box value changes. Argument: new value.
-    valueChanged = pyqtSignal(int)
+    valueChanged = Signal(int)
 
     def __init__(self, parent: QWidget | None = None, label: str = 'n_processes'):
         """
@@ -2851,7 +2851,7 @@ class BlockProcessingWidget(QGroupBox):
 class ClickableFrame(QFrame):
     """A QFrame that emits a ``clicked`` signal on mouse press."""
     #: Emitted on mouse press.
-    clicked = pyqtSignal()
+    clicked = Signal()
 
     def mousePressEvent(self, event):
         self.clicked.emit()

@@ -12,8 +12,8 @@ from datetime import datetime
 from io import UnsupportedOperation
 
 import lxml.html
-from PyQt5 import QtCore
-from PyQt5.QtWidgets import QApplication, QWidget
+from qtpy import QtCore
+from qtpy.QtWidgets import QApplication, QWidget
 from matplotlib.colors import cnames
 
 
@@ -45,7 +45,7 @@ _ANSI_RE = re.compile(
 
 class Printer(QWidget):
     #: Triggered on ``write``
-    text_updated = QtCore.pyqtSignal(str)
+    text_updated = QtCore.Signal(str)
     original_std_out = sys.stdout
     original_std_err = sys.stderr
 

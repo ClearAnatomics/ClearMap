@@ -1,9 +1,9 @@
 import os
 import functools
 
-from PyQt5.QtCore import QSize, Qt
-from PyQt5.QtGui import QPixmap, QPainter, QFont, QFontMetrics, QPen
-from PyQt5.QtWidgets import QFileDialog, QMessageBox, QInputDialog, QDialog, QVBoxLayout, QStyle, QLabel, QHBoxLayout, \
+from qtpy.QtCore import QSize, Qt
+from qtpy.QtGui import QPixmap, QPainter, QFont, QFontMetrics, QPen
+from qtpy.QtWidgets import QFileDialog, QMessageBox, QInputDialog, QDialog, QVBoxLayout, QStyle, QLabel, QHBoxLayout, \
     QPushButton, QDialogButtonBox, QSplashScreen, QProgressBar
 
 from ClearMap.Utils.path_utils import clean_path

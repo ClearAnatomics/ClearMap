@@ -104,11 +104,11 @@ from typing import TYPE_CHECKING, Callable
 
 import numpy as np
 import pandas as pd
-from PyQt5.QtCore import QSignalBlocker
+from qtpy.QtCore import QSignalBlocker
 
 from ClearMap.Utils.tag_expression import Expression
 
-from PyQt5.QtWidgets import QApplication, QButtonGroup, QWidget, QDialog, QMessageBox
+from qtpy.QtWidgets import QApplication, QButtonGroup, QWidget, QDialog, QMessageBox
 import pyqtgraph as pg
 from natsort import natsorted
 

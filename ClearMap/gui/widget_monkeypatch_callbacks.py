@@ -9,7 +9,7 @@ allowing notably compound widgets from QtCreator without defining plugins
 import types
 from typing import Iterable
 
-from PyQt5.QtWidgets import (QSpinBox, QDoubleSpinBox, QCheckBox, QLineEdit,
+from qtpy.QtWidgets import (QSpinBox, QDoubleSpinBox, QCheckBox, QLineEdit,
                              QDialogButtonBox, QDockWidget, QPlainTextEdit, QTextEdit, QFrame)
 
 

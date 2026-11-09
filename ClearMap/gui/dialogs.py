@@ -16,8 +16,8 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Sequence
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QLabel, QDialogButtonBox, QDialog, QHBoxLayout, QVBoxLayout, QFormLayout,
+from qtpy.QtCore import Qt
+from qtpy.QtWidgets import (QLabel, QDialogButtonBox, QDialog, QHBoxLayout, QVBoxLayout, QFormLayout,
                              QPushButton, QLineEdit, QGroupBox, QCheckBox, QComboBox, QListWidget, QTableWidget,
                              QTableWidgetItem)
 

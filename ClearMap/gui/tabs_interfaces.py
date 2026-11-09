@@ -12,7 +12,7 @@ from contextlib import contextmanager, ExitStack
 from typing import final, Callable, Any, Iterable, TYPE_CHECKING, TypeVar, Generic, ParamSpec, Tuple, Union
 
 import numpy as np
-from PyQt5.QtWidgets import QWhatsThis, QWidget, QApplication
+from qtpy.QtWidgets import QWhatsThis, QWidget, QApplication
 
 from ClearMap.Utils.event_bus import BusSubscriberMixin, GUI_THREAD
 from ClearMap.Utils.utilities import title_to_snake
@@ -26,7 +26,7 @@ from .gui_utils_base import create_clearmap_widget, replace_widget
 from .widgets import ExtendableTabWidget, SamplePickerDialog, channel_page_id_of, assign_channel_page_id_if_known
 
 if TYPE_CHECKING:
-    from PyQt5.QtWidgets import QMainWindow, QToolButton
+    from qtpy.QtWidgets import QMainWindow, QToolButton
     from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
     from ClearMap.pipeline_orchestrators.generic_orchestrators import PipelineOrchestrator
     from .app import ClearMapApp

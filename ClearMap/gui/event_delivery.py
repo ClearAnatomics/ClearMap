@@ -10,7 +10,7 @@ GUI event loop (which :meth:`~ClearMap.gui.app.ClearMapApp.wrap_in_thread` keeps
 import threading
 from typing import Any, Callable
 
-from PyQt5.QtCore import QObject, Qt, pyqtSignal, pyqtSlot
+from qtpy.QtCore import QObject, Qt, Signal, Slot
 
 
 class GuiThreadDelivery(QObject):
@@ -20,7 +20,7 @@ class GuiThreadDelivery(QObject):
     .. warning::
         Must be created in the GUI thread (it lives there, and so do the queued calls).
     """
-    _queued_call = pyqtSignal(object, object)  # (handler, event)
+    _queued_call = Signal(object, object)  # (handler, event)
 
     def __init__(self):
         super().__init__()
@@ -33,6 +33,6 @@ class GuiThreadDelivery(QObject):
         else:
             self._queued_call.emit(handler, event)
 
-    @pyqtSlot(object, object)  # A slot of this QObject, so that the queued call runs in its (the GUI) thread
+    @Slot(object, object)  # A slot of this QObject, so that the queued call runs in its (the GUI) thread
     def _run(self, handler: Callable[[Any], None], event: Any) -> None:
         handler(event)

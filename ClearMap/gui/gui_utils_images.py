@@ -2,8 +2,8 @@ import matplotlib
 import numpy as np
 from matplotlib.colors import hsv_to_rgb
 
-from PyQt5 import QtGui
-from PyQt5.QtGui import QColor
+from qtpy import QtGui
+from qtpy.QtGui import QColor
 
 
 def np_to_qpixmap(img_array, alpha):

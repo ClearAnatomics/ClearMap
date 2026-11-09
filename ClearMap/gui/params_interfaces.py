@@ -6,11 +6,11 @@ from abc import ABC, abstractmethod
 from contextlib import ExitStack, contextmanager
 from typing import List, Any, Callable, Mapping, Optional, Dict, Type, Tuple, Sequence, Union
 
-from PyQt5.QtCore import QEvent, QObject
+from qtpy.QtCore import QEvent, QObject
 from packaging.version import Version
 
-from PyQt5 import sip
-from PyQt5.QtWidgets import (QCheckBox, QLabel, QLineEdit, QSpinBox, QFrame,
+from qtpy.compat import isalive
+from qtpy.QtWidgets import (QCheckBox, QLabel, QLineEdit, QSpinBox, QFrame,
                              QComboBox, QPlainTextEdit, QTextEdit, QGroupBox,
                              QWidget, QListWidget, QDoubleSpinBox)
 
@@ -46,10 +46,10 @@ def _is_alive(widget):
     if widget is None:
         return False
     try:
-        if sip.isdeleted(widget):
+        if not isalive(widget):
             return False
     except Exception:
-        # Not a sip-wrapped object (e.g. mock in tests).
+        # Not a wrapped Qt object (e.g. mock in tests).
         # Can't determine deletion state; assume alive.
         return True
     if widget.property('_cm_replaced'):

@@ -31,8 +31,8 @@ import sys
 import traceback as tb_module
 from typing import Callable
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QApplication, QDialog, QFrame, QHBoxLayout, QLabel, QPushButton,
+from qtpy.QtCore import Qt
+from qtpy.QtWidgets import (QApplication, QDialog, QFrame, QHBoxLayout, QLabel, QPushButton,
                              QSizePolicy, QStyle, QTextEdit, QVBoxLayout, QWidget)
 
 from ClearMap.Utils.exceptions import DISMISS, ClearMapException, Severity

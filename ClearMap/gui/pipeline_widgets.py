@@ -1,8 +1,8 @@
 from __future__ import annotations
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+from qtpy.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                               QPushButton, QSizePolicy)
-from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QPainter, QColor, QPen, QBrush, QFont, QPainterPath, QPalette
+from qtpy.QtCore import Qt, Signal
+from qtpy.QtGui import QPainter, QColor, QPen, QBrush, QFont, QPainterPath, QPalette
 
 from .pipeline_model import LinearPipeline, StepSpec, BINARIZATION_STEPS
 
@@ -16,9 +16,9 @@ _CROSS_COLOR = QColor('#b85c5c')   # muted dusty-red
 class StepChip(QWidget):
     """Single step tile — click to toggle enabled/disabled."""
     #: Triggered when step is toggled
-    toggled = pyqtSignal(str, bool)   # step_id, enabled
+    toggled = Signal(str, bool)   # step_id, enabled
     #: Triggered when ``keep`` step is toggled
-    keep_changed = pyqtSignal(str, bool)   # step_id, keep_intermediate
+    keep_changed = Signal(str, bool)   # step_id, keep_intermediate
 
     _W, _H = 150, 32
     _ICON_ZONE = 35    # px reserved on each side for icons
@@ -138,9 +138,9 @@ class LinearPipelineWidget(QWidget):
     Steps can be reordered with ▲/▼ buttons except locked steps (binarize).
     """
     #: Triggered when new pipeline selected
-    pipeline_changed = pyqtSignal(list)   # list[str] of enabled step names
+    pipeline_changed = Signal(list)   # list[str] of enabled step names
     #: Triggered when ``keep`` checkbox is toggled on a step chip
-    keep_intermediate_changed = pyqtSignal(str, bool)  # spec_name, keep
+    keep_intermediate_changed = Signal(str, bool)  # spec_name, keep
 
     CONNECTOR_H = _CONNECTOR_H
 

@@ -61,11 +61,11 @@ from statistics import mode
 # # WARNING: Necessary for QCoreApplication creation
 # from PyQt5.QtWebEngineWidgets import QWebEngineView  # noqa: F401
 
-print('Importing PyQt5...', flush=True)
-from PyQt5 import QtGui
-from PyQt5.QtGui import QGuiApplication
-from PyQt5.QtCore import Qt, QBuffer
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QPushButton, QSpinBox, QDoubleSpinBox,
+print('Importing Qt...', flush=True)
+from qtpy import QtGui
+from qtpy.QtGui import QGuiApplication
+from qtpy.QtCore import Qt, QBuffer
+from qtpy.QtWidgets import (QApplication, QMainWindow, QWidget, QPushButton, QSpinBox, QDoubleSpinBox,
                              QComboBox, QLineEdit, QMessageBox, QToolBox, QProgressBar, QLabel,
                              QStyle, QAction, QDockWidget)
 
