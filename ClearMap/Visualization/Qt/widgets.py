@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 from matplotlib.colors import to_hex
-from PyQt5.QtGui import QColor
+from qtpy.QtGui import QColor
 import pyqtgraph as pg
 
 from ClearMap.gui.gui_utils_images import pseudo_random_rgb_array

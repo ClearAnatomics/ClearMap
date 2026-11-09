@@ -14,8 +14,8 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import numpy as np
 
-from PyQt5 import QtGui
-from PyQt5.QtCore import QRectF
+from qtpy import QtGui
+from qtpy.QtCore import QRectF
 import pyqtgraph as pg
 
 

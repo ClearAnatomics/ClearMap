@@ -2,10 +2,10 @@ import functools as ft
 
 import numpy as np
 import pyqtgraph as pg
-from PyQt5 import QtCore
-from PyQt5.QtCore import QSize, QObject
-from PyQt5.QtGui import QColor
-from PyQt5.QtWidgets import QGridLayout, QPushButton, QSizePolicy, QWidget
+from qtpy import QtCore
+from qtpy.QtCore import QSize, QObject
+from qtpy.QtGui import QColor
+from qtpy.QtWidgets import QGridLayout, QPushButton, QSizePolicy, QWidget
 
 from ClearMap.Visualization.Color import rand_cmap
 

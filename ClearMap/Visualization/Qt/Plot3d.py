@@ -23,8 +23,8 @@ import numpy as np
 import pyqtgraph as pg
 import functools as ft
 
-from PyQt5.QtCore import QRect
-from PyQt5.QtWidgets import QApplication
+from qtpy.QtCore import QRect
+from qtpy.QtWidgets import QApplication
 
 from ClearMap.Utils.utilities import runs_on_spyder
 

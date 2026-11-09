@@ -28,10 +28,10 @@ from datetime import datetime
 import numpy as np
 
 import pyqtgraph as pg
-from PyQt5 import QtWidgets
-from PyQt5.QtCore import QEvent, QRect, QSize, pyqtSignal, Qt
-from PyQt5.QtGui import QPainter, QIcon
-from PyQt5.QtWidgets import (QWidget, QRadioButton, QLabel, QSplitter, QApplication, QSizePolicy, QPushButton,
+from qtpy import QtWidgets
+from qtpy.QtCore import QEvent, QRect, QSize, Signal, Qt
+from qtpy.QtGui import QPainter, QIcon
+from qtpy.QtWidgets import (QWidget, QRadioButton, QLabel, QSplitter, QApplication, QSizePolicy, QPushButton,
                              QCheckBox, QGraphicsPathItem, QGridLayout, QLineEdit, QScrollArea, QFileDialog, QSpinBox)
 
 from ClearMap.Utils.utilities import runs_on_spyder
@@ -55,7 +55,7 @@ if not pg.QAPP:
 
 class DataViewer(QWidget):
     #: Triggered when the mouse is clicked in the image view. The signal emits the x, y, and z coordinates of the click.
-    mouse_clicked = pyqtSignal(int, int, int)
+    mouse_clicked = Signal(int, int, int)
 
     def __init__(self, source,
                  points=None, vectors=None, orientations=None, annotation=None,
