@@ -366,11 +366,10 @@ def widen_control_panel(qapp, window, *, widening_percent: float) -> None:
 
 def open_application(sample_dir: Path, window_size: tuple[int, int], *, panel_widening_percent: float):
     """Start the application like ``ClearMap.gui.app.main`` does (without its event loop), open the experiment"""
-    import qdarkstyle
-
     import ClearMap.gui.app as app_module  # WARNING: runs the first boot and shows the splash screen at import
     from ClearMap.Utils.event_bus import EventBus, GUI_THREAD
     from ClearMap.gui.event_delivery import GuiThreadDelivery
+    from ClearMap.gui.style import dark_style_sheet
     from ClearMap.gui.tab_registry import TabRegistry
 
     qapp = app_module.app
@@ -381,7 +380,7 @@ def open_application(sample_dir: Path, window_size: tuple[int, int], *, panel_wi
     experiment, group_controller = app_module.build_business_objects(bus)
     gui = app_module.GuiController(bus, experiment, TabRegistry(), group_controller)
 
-    qapp.setStyleSheet(qdarkstyle.load_stylesheet(qt_api='pyqt5'))
+    qapp.setStyleSheet(dark_style_sheet())
     gui.start(qapp, centered=False)
     window = gui.window
     app_module.splash.finish(window)

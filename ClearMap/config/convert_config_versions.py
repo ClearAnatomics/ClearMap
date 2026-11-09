@@ -11,7 +11,6 @@ from typing import Callable, Dict, Tuple
 import numpy as np
 from packaging.version import Version
 
-import qdarkstyle
 from qtpy.QtWidgets import QApplication
 
 from ClearMap.IO.assets_constants import CHANNELS_ASSETS_TYPES_CONFIG
@@ -27,6 +26,7 @@ from ClearMap.config.registration_channels import MOVING_OTHER
 from ClearMap.gui.dialogs import RenameChannelsDialog, VerifyRenamingDialog
 from ClearMap.gui.dialog_helpers import get_directory_dlg
 from ClearMap.gui.gui_utils_base import ensure_qapp, DIALOG_ACCEPTED
+from ClearMap.gui.style import dark_style_sheet
 
 
 SUPPORTED_VERSIONS = [Version(v) for v in ('2.1', '3.0', '3.1')]
@@ -610,7 +610,7 @@ class ExperimentUpgrade_2_1_to_3_0(ExperimentConfigConverter):
 @project_converter('2.1', '3.0')
 def convert_2_1_to_3_0(main_folder='', create_app=True):
     app = ensure_qapp()
-    app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
+    app.setStyleSheet(dark_style_sheet())
 
     if not main_folder:
         main_folder = get_directory_dlg('~/')
@@ -855,7 +855,7 @@ class ExperimentUpgrade_3_0_to_3_1(ExperimentConfigConverter):
 @project_converter('3.0', '3.1')
 def convert_3_0_to_3_1(main_folder: str | Path = '', create_app: bool = True):
     app = ensure_qapp()
-    app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
+    app.setStyleSheet(dark_style_sheet())
 
     if not main_folder:
         main_folder = get_directory_dlg('~/')

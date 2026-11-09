@@ -12,6 +12,8 @@ __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
+import qdarkstyle
+import qtpy
 from qdarkstyle import DarkPalette
 
 QDARKSTYLE_BACKGROUND = '#2E3436'
@@ -28,6 +30,11 @@ QPushButton {{
     border-radius: 4px;
     padding: 2px;
 }}"""
+
+
+def dark_style_sheet() -> str:
+    """The qdarkstyle style sheet for the Qt binding that qtpy loaded (qtpy.API: 'pyqt5', 'pyqt6'...)"""
+    return qdarkstyle.load_stylesheet(qt_api=qtpy.API)
 
 HIGHLIGHTED_BTN_STYLE = f"""
     background-color: {HIGHLIGHTED_BTN_BG};

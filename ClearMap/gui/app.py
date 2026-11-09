@@ -69,7 +69,6 @@ from qtpy.QtWidgets import (QApplication, QMainWindow, QWidget, QPushButton, QSp
                              QComboBox, QLineEdit, QMessageBox, QToolBox, QProgressBar, QLabel,
                              QStyle, QAction, QDockWidget)
 
-import qdarkstyle
 from qdarkstyle import DarkPalette
 
 print('Running first ClearMap imports...', flush=True)
@@ -1744,7 +1743,7 @@ def main(app_, splash_):
     tab_registry = TabRegistry()
     gui = GuiController(bus, experiment, tab_registry, group_controller)
 
-    app_.setStyleSheet(qdarkstyle.load_stylesheet(qt_api='pyqt5'))
+    app_.setStyleSheet(style.dark_style_sheet())
     gui.start(app_, centered=True)
 
     splash_.finish(gui.window)
