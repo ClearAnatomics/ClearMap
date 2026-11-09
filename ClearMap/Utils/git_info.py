@@ -4,7 +4,8 @@ Which commit of ClearMap is running, for the About dialog and bug reports.
 An installed ClearMap (``python setup.py install`` copies it to site-packages) is not in a git repository: setup.py
 records the commit of the checkout it installs in a stamp next to the installed code (``write_commit_stamp``), and
 ``get_commit_info`` reads it. A ClearMap run from its checkout has no stamp and asks git, so it follows ``git pull``.
-A ClearMap that is neither (a zip, a copy) has no commit.
+The zip of a commit made by ``git archive`` knows its commit too (``_git_archive.txt``, see ``.gitattributes``). A
+ClearMap that is none of these (a copy, a modified zip) has no commit.
 """
 import json
 import logging
@@ -19,6 +20,10 @@ PACKAGE_DIRECTORY = Path(__file__).resolve().parents[1]
 GIT_TIMEOUT_SECONDS = 5
 SHORT_HASH_LENGTH = 10
 STAMP_FILE_NAME = '_commit_stamp.json'
+ARCHIVE_FILE_NAME = '_git_archive.txt'  # Its placeholders are replaced by git archive, see .gitattributes
+ARCHIVE_PLACEHOLDER_MARKER = '$Format:'  # Left as is when the file is not in an archive
+ARCHIVE_HEAD_PREFIX = 'HEAD -> '
+ARCHIVE_TAG_PREFIX = 'tag: '
 DETACHED_HEAD_LABEL = 'detached HEAD'
 
 
@@ -27,9 +32,22 @@ class CommitInfo:
     commit_hash: str
     commit_date: str  # YYYY-MM-DD
     branch: str | None  # None on a detached HEAD
+    tag: str | None = None  # The tag of the commit, e.g. of a release
 
     def __str__(self):
-        return f'{self.commit_hash[:SHORT_HASH_LENGTH]} ({self.branch or DETACHED_HEAD_LABEL}, {self.commit_date})'
+        short_hash = self.commit_hash[:SHORT_HASH_LENGTH]
+        # Info priority: tag first, then branch, then commit ID
+        if self.tag:
+            ref_label = f'tag {self.tag}'
+        elif self.branch:
+            ref_label = self.branch
+        else:
+            ref_label = DETACHED_HEAD_LABEL
+        return f'{short_hash} ({ref_label}, {self.commit_date})'
+
+    def __str__(self):
+        ref = self.branch or (f'tag {self.tag}' if self.tag else DETACHED_HEAD_LABEL)
+        return f'{self.commit_hash[:SHORT_HASH_LENGTH]} ({ref}, {self.commit_date})'
 
 
 def _run_git(directory, *arguments):
@@ -69,12 +87,34 @@ def _read_commit_from_git(package_directory):
         return None
     commit_hash, commit_date = commit.splitlines()
     branch = _run_git(package_directory, 'branch', '--show-current')  # Empty on a detached HEAD
-    return CommitInfo(commit_hash=commit_hash, commit_date=commit_date, branch=branch or None)
+    tag = _run_git(package_directory, 'describe', '--tags', '--exact-match')  # Fails if the commit has no tag
+    return CommitInfo(commit_hash=commit_hash, commit_date=commit_date, branch=branch or None, tag=tag or None)
+
+
+def _read_commit_of_archive(package_directory):
+    """
+    The commit that ``git archive`` wrote in ``ARCHIVE_FILE_NAME`` (hash, date and ref names, one per line).
+
+    Git replaces the placeholders only when it builds the archive: it tells which commit the archive was made of, not
+    whether the files were changed afterwards.
+    """
+    path = Path(package_directory) / ARCHIVE_FILE_NAME
+    if not path.exists():
+        return None
+    lines = path.read_text(encoding='utf-8').splitlines()
+    if len(lines) < 3 or any(ARCHIVE_PLACEHOLDER_MARKER in line for line in lines):
+        return None  # Not in an archive: the placeholders are still there
+    commit_hash, commit_date, ref_names = lines[0].strip(), lines[1].strip(), lines[2].split(',')
+    refs = [ref.strip() for ref in ref_names]
+    branch = next((ref[len(ARCHIVE_HEAD_PREFIX):] for ref in refs if ref.startswith(ARCHIVE_HEAD_PREFIX)), None)
+    tag = next((ref[len(ARCHIVE_TAG_PREFIX):] for ref in refs if ref.startswith(ARCHIVE_TAG_PREFIX)), None)
+    return CommitInfo(commit_hash=commit_hash, commit_date=commit_date, branch=branch, tag=tag)
 
 
 def get_commit_info(package_directory=PACKAGE_DIRECTORY) -> CommitInfo | None:
     """
-    The commit of ClearMap: the one recorded when it was installed, or else the one that is checked out.
+    The commit of ClearMap: the one recorded when it was installed, else the one that is checked out, else the one
+    of the archive it was unpacked from.
 
     Parameters
     ----------
@@ -84,6 +124,9 @@ def get_commit_info(package_directory=PACKAGE_DIRECTORY) -> CommitInfo | None:
     Returns
     -------
     CommitInfo | None
-        None if ClearMap was neither installed from a git checkout nor is one (or git is not installed).
+        None if ClearMap was installed from, is, or was unpacked from none of a git checkout or an archive of a commit
+        (or git is not installed).
     """
-    return _read_commit_stamp(package_directory) or _read_commit_from_git(package_directory)
+    return (_read_commit_stamp(package_directory)
+            or _read_commit_from_git(package_directory)
+            or _read_commit_of_archive(package_directory))

@@ -65,7 +65,7 @@ def test_the_source_tree_is_left_alone_by_the_installation(setup_script, source_
                           text=True, check=True).stdout == ''
 
 
-def test_installing_from_something_that_is_not_a_checkout_warns_and_installs_without_a_commit(
+def test_installing_from_a_copy_that_is_neither_a_checkout_nor_a_zip_of_a_commit_warns_and_installs_without_a_commit(
         setup_script, tmp_path, capsys):
     root = tmp_path / 'unpacked_zip'
     (root / 'ClearMap' / 'Utils').mkdir(parents=True)
@@ -86,3 +86,24 @@ def test_setup_stamps_the_package_when_it_builds_it():
                 if keyword.arg == 'cmdclass']
 
     assert cmdclass and 'build_py' in [key.value for key in cmdclass[0].keys]
+
+
+def test_installing_from_the_zip_of_a_commit_records_that_commit(setup_script, source_checkout, tmp_path):
+    (source_checkout / '.gitattributes').write_text('ClearMap/_git_archive.txt export-subst\n')
+    (source_checkout / 'ClearMap' / '_git_archive.txt').write_text('$Format:%H$\n$Format:%cs$\n$Format:%D$\n')
+    _git(source_checkout, 'add', '.gitattributes', 'ClearMap')
+    _git(source_checkout, 'commit', '-q', '-m', 'archive file')
+    head = subprocess.run(['git', '-C', str(source_checkout), 'rev-parse', 'HEAD'], check=True, capture_output=True,
+                          text=True).stdout.strip()
+    unpacked = tmp_path / 'zip'
+    unpacked.mkdir()
+    archive = subprocess.run(['git', '-C', str(source_checkout), 'archive', 'HEAD'], check=True,
+                             capture_output=True).stdout
+    subprocess.run(['tar', '-x', '-C', str(unpacked)], input=archive, check=True)
+    built = tmp_path / 'build' / 'ClearMap'
+    built.mkdir(parents=True)
+
+    stamped = setup_script.stamp_installed_commit(unpacked, built)
+
+    assert stamped.commit_hash == head
+    assert get_commit_info(built).commit_hash == head  # The installed copy has neither the zip nor git

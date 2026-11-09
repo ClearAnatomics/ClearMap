@@ -289,7 +289,7 @@ def stamp_installed_commit(source_root, built_package_directory):
     git_info = load_git_info_module(source_root)
     commit_info = git_info.get_commit_info(source_root / 'ClearMap')
     if commit_info is None:
-        print(f'WARNING: {source_root} is not a git checkout (or git is not installed): '
+        print(f'WARNING: {source_root} is neither a git checkout nor the zip of a commit (or git is not installed): '
               f'the installed ClearMap will not know its commit')
         return None
     git_info.write_commit_stamp(commit_info, built_package_directory)

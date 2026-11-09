@@ -4,7 +4,7 @@ import subprocess
 import pytest
 
 from ClearMap.Utils.git_info import CommitInfo, get_commit_info, write_commit_stamp, PACKAGE_DIRECTORY, \
-    SHORT_HASH_LENGTH, DETACHED_HEAD_LABEL, STAMP_FILE_NAME
+    SHORT_HASH_LENGTH, DETACHED_HEAD_LABEL, STAMP_FILE_NAME, ARCHIVE_FILE_NAME
 
 COMMIT_DATE = '2026-11-05'
 BRANCH = 'v3.2.x'
@@ -117,3 +117,59 @@ def test_a_stamp_that_cannot_be_read_is_reported_and_git_is_asked_instead(checko
 
 def test_the_package_directory_is_the_one_of_clearmap():
     assert (PACKAGE_DIRECTORY / 'Utils' / 'git_info.py').exists()
+
+
+def _archive_of(checkout, destination, revision='HEAD'):
+    """What a zip of the commit holds, unpacked: git archive builds it as the download of a commit does"""
+    destination.mkdir()
+    archive = subprocess.run(['git', '-C', str(checkout), 'archive', revision], check=True, capture_output=True).stdout
+    subprocess.run(['tar', '-x', '-C', str(destination)], input=archive, check=True)
+    return destination / 'ClearMap'
+
+
+@pytest.fixture
+def checkout_with_archive_file(checkout):
+    (checkout / '.gitattributes').write_text(f'ClearMap/{ARCHIVE_FILE_NAME} export-subst\n')
+    (checkout / 'ClearMap' / ARCHIVE_FILE_NAME).write_text('$Format:%H$\n$Format:%cs$\n$Format:%D$\n')
+    _git(checkout, 'add', '.gitattributes', 'ClearMap')
+    _git(checkout, 'commit', '-q', '-m', 'archive file')
+    return checkout
+
+
+def test_the_unpacked_archive_of_a_commit_knows_the_commit_it_was_made_of(checkout_with_archive_file, tmp_path):
+    unpacked = _archive_of(checkout_with_archive_file, tmp_path / 'zip')
+
+    info = get_commit_info(unpacked)
+
+    assert info.commit_hash == _head(checkout_with_archive_file)
+    assert info.commit_date == COMMIT_DATE
+    assert info.branch == BRANCH  # HEAD -> branch, as the archive of a branch gives it
+
+
+def test_the_unpacked_archive_of_a_tag_knows_the_tag(checkout_with_archive_file, tmp_path):
+    _git(checkout_with_archive_file, 'tag', 'v3.2.0')
+    _git(checkout_with_archive_file, 'checkout', '-q', '--detach')  # The archive of a tag names no branch
+
+    info = get_commit_info(_archive_of(checkout_with_archive_file, tmp_path / 'zip', revision='v3.2.0'))
+
+    assert info.tag == 'v3.2.0'
+    assert str(info) == f'{_head(checkout_with_archive_file)[:SHORT_HASH_LENGTH]} (tag v3.2.0, {COMMIT_DATE})'
+
+
+def test_the_archive_file_of_a_copy_says_nothing_because_git_did_not_fill_it(tmp_path_factory):
+    copy = tmp_path_factory.mktemp('copy')  # Not in a repository, and the placeholders are still there
+    (copy / ARCHIVE_FILE_NAME).write_text('$Format:%H$\n$Format:%cs$\n$Format:%D$\n')
+
+    assert get_commit_info(copy) is None
+
+
+def test_a_checkout_at_a_tag_knows_the_tag(checkout):
+    _git(checkout, 'tag', 'v3.2.0')
+
+    assert get_commit_info(checkout / 'ClearMap').tag == 'v3.2.0'
+
+
+def test_a_stamp_written_before_tags_were_recorded_is_still_read(tmp_path):
+    (tmp_path / STAMP_FILE_NAME).write_text('{"commit_hash": "abc", "commit_date": "2026-11-05", "branch": "v3.1.x"}')
+
+    assert get_commit_info(tmp_path) == CommitInfo('abc', '2026-11-05', 'v3.1.x')
