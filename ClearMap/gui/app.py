@@ -164,6 +164,7 @@ from ClearMap.Alignment.Stitching import layout_graph_utils  # noqa: F401 # WARN
 from ClearMap.Utils.utilities import title_to_snake, snake_to_title
 from ClearMap.config.config_adjusters.patch_ops import deep_merge
 from ClearMap.Utils.nvidia_utils import cuda_available, diagnose_nvidia_driver
+from ClearMap.Utils.git_info import get_commit_info
 from ClearMap.Utils.event_bus import EventBus, BusSubscriberMixin, GUI_THREAD
 from ClearMap.Utils.progress import ProgressWatcher
 from ClearMap.Utils.events import (ProgressMainStepNameChanged, ProgressSubStepNameChanged, ProgressMainValueChanged,
@@ -1031,12 +1032,9 @@ class ClearMapApp(ClearMapAppBase):
 
     def display_about(self):  # TODO: get authors list from separate file or documentation
         info = deepcopy(ABOUT_INFO)
-        try:
-            from ClearMap.config import commit_info # noqa
-            info.commit_info = (f' from commit {commit_info.commit_hash}, {commit_info.commit_date},'
-                                f' branch {commit_info.branch}')
-        except ImportError:
-            pass
+        commit_info = get_commit_info()
+        if commit_info is not None:
+            info.commit_info = str(commit_info)
         dialog = dlgs.AboutDialog(info)
         dialog.exec_()
 
