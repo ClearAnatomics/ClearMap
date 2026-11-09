@@ -114,14 +114,14 @@ class FakeMessageBox:
 
 @pytest.fixture(autouse=True)
 def fake_qt(monkeypatch):
-    qt_widgets = types.ModuleType('PyQt5.QtWidgets')
+    qt_widgets = types.ModuleType('qtpy.QtWidgets')
     qt_widgets.QTabWidget = FakeTabWidget
     qt_widgets.QToolBox = FakeToolBox
     for name in ('QDialog', 'QFileDialog', 'QInputDialog'):  # Fresh classes: the tool replaces their methods
         setattr(qt_widgets, name, type(name, (), {}))
     qt_widgets.QMessageBox = type('QMessageBox', (FakeMessageBox,), {})
-    monkeypatch.setitem(sys.modules, 'PyQt5', types.ModuleType('PyQt5'))
-    monkeypatch.setitem(sys.modules, 'PyQt5.QtWidgets', qt_widgets)
+    monkeypatch.setitem(sys.modules, 'qtpy', types.ModuleType('qtpy'))
+    monkeypatch.setitem(sys.modules, 'qtpy.QtWidgets', qt_widgets)
     monkeypatch.setattr(screenshots, 'PAGE_SETTLE_SECONDS', 0)
     return qt_widgets
 
@@ -299,9 +299,9 @@ class FakeMainWindow:
 
 
 def test_the_control_panel_is_widened_by_shrinking_the_dock_on_its_right(monkeypatch, capsys):
-    qt_core = types.ModuleType('PyQt5.QtCore')
+    qt_core = types.ModuleType('qtpy.QtCore')
     qt_core.Qt = types.SimpleNamespace(Horizontal='horizontal')
-    monkeypatch.setitem(sys.modules, 'PyQt5.QtCore', qt_core)
+    monkeypatch.setitem(sys.modules, 'qtpy.QtCore', qt_core)
     window = FakeMainWindow(total_width=1000, panel_width=200)
 
     screenshots.widen_control_panel(FakeApplication(), window, widening_percent=30)

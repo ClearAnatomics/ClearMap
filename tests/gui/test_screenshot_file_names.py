@@ -9,6 +9,7 @@ import pytest
 from tests.gui_screenshots import (DEFAULT_WINDOW_SIZE, UNTITLED, ScreenshotNamer, build_argument_parser,
                                    parse_widening_percent, parse_window_size, prepare_output_dir, slugify,
                                    widened_dock_width)
+from tests.qt_imports import QT_MODULES
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
@@ -76,7 +77,7 @@ def test_the_command_line_needs_the_output_folder_and_has_the_default_size(tmp_p
 def test_the_tool_imports_without_qt_and_without_clearmap():
     """The environment (offscreen, home folder) is set up before the first import of Qt and ClearMap"""
     code = ('import sys; import tests.gui_screenshots; '
-            'loaded = sorted(name for name in sys.modules if name.split(".")[0] in ("PyQt5", "ClearMap")); '
+            f'loaded = sorted(name for name in sys.modules if name.split(".")[0] in {QT_MODULES + ("ClearMap",)!r}); '
             'print(loaded); sys.exit(1 if loaded else 0)')
 
     result = subprocess.run([sys.executable, '-c', code], cwd=REPOSITORY_ROOT, capture_output=True, text=True)

@@ -183,7 +183,7 @@ def forbid_modal_dialogs() -> None:
     information box with an OK button, e.g. "No cells file found" on an experiment that has not been run), which are
     dismissed with OK and logged: a notice is what a new experiment legitimately shows.
     """
-    from PyQt5.QtWidgets import QDialog, QFileDialog, QInputDialog, QMessageBox
+    from qtpy.QtWidgets import QDialog, QFileDialog, QInputDialog, QMessageBox
 
     def refuse(description):
         def refuse_modal_dialog(*_args, **_kwargs):
@@ -224,7 +224,7 @@ def forbid_modal_dialogs() -> None:
 
 def close_other_dialogs(qapp, window) -> None:
     """Close what the first boot left open (the preferences dialog of a new installation): not part of any picture"""
-    from PyQt5.QtWidgets import QDialog
+    from qtpy.QtWidgets import QDialog
 
     for widget in qapp.topLevelWidgets():
         if widget is not window and isinstance(widget, QDialog) and widget.isVisible():
@@ -273,13 +273,13 @@ def settle(qapp, seconds: float) -> None:
 
 
 def _is_page_container(widget) -> bool:
-    from PyQt5.QtWidgets import QTabWidget, QToolBox
+    from qtpy.QtWidgets import QTabWidget, QToolBox
     return isinstance(widget, (QTabWidget, QToolBox))
 
 
 def containers_below(widget) -> list:
     """The tab widgets and toolboxes in ``widget`` that are not in another one (the ones of the next level)"""
-    from PyQt5.QtWidgets import QTabWidget, QToolBox
+    from qtpy.QtWidgets import QTabWidget, QToolBox
 
     top_level_containers = []
     for container in widget.findChildren((QTabWidget, QToolBox)):
@@ -292,7 +292,7 @@ def containers_below(widget) -> list:
 
 
 def page_title(container, index: int) -> str:
-    from PyQt5.QtWidgets import QToolBox
+    from qtpy.QtWidgets import QToolBox
     return container.itemText(index) if isinstance(container, QToolBox) else container.tabText(index)
 
 
@@ -353,7 +353,7 @@ def widen_control_panel(qapp, window, *, widening_percent: float) -> None:
     Do what dragging the right border of the control panel does: the data viewer dock on its right gets narrower and
     the panel wider. The window keeps its size. Reports the widths, because a dock cannot go below its minimum width.
     """
-    from PyQt5.QtCore import Qt
+    from qtpy.QtCore import Qt
 
     panel_width_before = window.tabWidget.width()
     dock_width = widened_dock_width(dock_width=window.graphDock.width(), panel_width=panel_width_before,
