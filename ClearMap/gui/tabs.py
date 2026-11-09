@@ -1628,7 +1628,7 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
             functools.partial(self.plot_binarization_results, plot_side_by_side=False))
 
         # ######################################## GRAPH ##############################
-        self.ui.buildGraphSelectAllCheckBox.stateChanged.connect(self.__select_all_graph_steps)
+        self.ui.buildGraphSelectAllCheckBox.toggled.connect(self.__select_all_graph_steps)
         self.ui.buildGraphPushButton.clicked.connect(self.build_graph)
         self.ui.unloadGraphsPushButton.clicked.connect(self.unload_temporary_graphs)
 
@@ -1858,11 +1858,11 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
 
     # ###########################  GRAPH  #############################
 
-    def __select_all_graph_steps(self, state) -> None:
+    def __select_all_graph_steps(self, checked: bool) -> None:
         for chk_bx in (self.ui.buildGraphSkeletonizeCheckBox, self.ui.buildGraphBuildCheckBox,
                        self.ui.buildGraphCleanCheckBox, self.ui.buildGraphReduceCheckBox,
                        self.ui.buildGraphTransformCheckBox, self.ui.buildGraphRegisterCheckBox):
-            chk_bx.setCheckState(state)  # TODO: check that not tristate
+            chk_bx.setChecked(checked)
 
     def run_all(self) -> None:
         """Run the complete vasculature pipeline."""

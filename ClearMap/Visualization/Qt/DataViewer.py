@@ -483,14 +483,14 @@ class DataViewer(QWidget):
 
             box.setMaximumWidth(50)
             box.setChecked(True)
-            box.stateChanged.connect(ft.partial(self.toggle_layer, i))
+            box.toggled.connect(ft.partial(self.toggle_layer, i))  # A bool (stateChanged gives an int)
             axis_tools_layout.addWidget(box, 1, i)
             self.axis_buttons.append(box)
 
         return axis_tools_layout, axis_tools_widget
 
-    def toggle_layer(self, i, state):
-        self.image_items[i].setVisible(state == Qt.Checked)
+    def toggle_layer(self, i, checked: bool):
+        self.image_items[i].setVisible(checked)
 
     def __get_colors(self, default_lut):
         if self.n_sources == 1:
