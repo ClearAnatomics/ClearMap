@@ -16,7 +16,10 @@ import numpy as np
 
 from qtpy import QtGui
 from qtpy.QtCore import QRectF
+from qtpy.QtWidgets import QApplication
 import pyqtgraph as pg
+
+from ClearMap.Utils.exceptions import ClearMapRuntimeError
 
 
 def screen_geometry(screen=None):
@@ -143,6 +146,39 @@ def link_dataviewers_cursors(dvs):
         pals = dvs.copy()
         pals.pop(i)
         dv.pals = pals
+
+
+def figures_as_web_views(figures):
+    """
+    Show matplotlib figures as interactive web pages (mpld3), one Qt web view each.
+
+    Arguments
+    ---------
+    figures : iterable of matplotlib.figure.Figure
+        The figures.
+
+    Returns
+    -------
+    list of QWebEngineView
+        One view per figure, in the same order.
+
+    Raises
+    ------
+    ClearMapRuntimeError
+        If no QApplication exists: Qt aborts the process on a widget made without one.
+    """
+    # The caller owns the application, whatever its name, hence the check before any widget
+    if QApplication.instance() is None:
+        raise ClearMapRuntimeError('Qt web views need a QApplication: create one first '
+                                   '(e.g. ClearMap.gui.gui_utils_base.ensure_qapp()) or use the matplotlib figures')
+    from qtpy.QtWebEngineWidgets import QWebEngineView  # Not at the top: only these views need QtWebEngine
+    import mpld3
+    views = []
+    for figure in figures:
+        view = QWebEngineView()
+        view.setHtml(mpld3.fig_to_html(figure))
+        views.append(view)
+    return views
 
   
 ############################################################################################################

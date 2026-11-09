@@ -4,8 +4,9 @@ The group plots (volcanoes, histograms) are returned as Qt web views by ``run_pl
 ``run_plots`` only imported ``QWebEngineView`` when the application was named 'ClearMap' (a guard copied from the
 Sphinx protection of the GUI tabs), so with any other application, e.g. one made by ``ensure_qapp()`` in a script, and
 with none, it raised an UnboundLocalError. Without an application it now says so before any widget is made (Qt aborts
-the process on a widget without a QApplication). Qt is faked here: the sandbox and the CI have no display, and the rule
-tested is the one of ClearMap, not of Qt.
+the process on a widget without a QApplication). The views are made by ClearMap.Visualization.Qt.utils, so that the
+orchestrator imports no Qt. Qt is faked here: the sandbox and the CI have no display, and the rule tested is the one of
+ClearMap, not of Qt.
 """
 import sys
 from types import ModuleType, SimpleNamespace
@@ -14,6 +15,7 @@ import pandas as pd
 import pytest
 
 from ClearMap.Utils.exceptions import ClearMapRuntimeError
+from ClearMap.Visualization.Qt import utils as qt_utils
 from ClearMap.pipeline_orchestrators.group_orchestrators import DensityGroupAnalysisOrchestrator
 
 GROUP_NAMES = ('control', 'treated')
@@ -48,9 +50,8 @@ def _fake_module(name, **attributes):
 
 @pytest.fixture()
 def fake_qt(monkeypatch):
-    """The Qt and mpld3 modules of run_plots, without a display"""
-    monkeypatch.setitem(sys.modules, 'qtpy', _fake_module('qtpy', __path__=[]))
-    monkeypatch.setitem(sys.modules, 'qtpy.QtWidgets', _fake_module('qtpy.QtWidgets', QApplication=FakeApplication))
+    """The Qt application, web view and mpld3 of the group plots, without a display"""
+    monkeypatch.setattr(qt_utils, 'QApplication', FakeApplication)
     monkeypatch.setitem(sys.modules, 'qtpy.QtWebEngineWidgets',
                         _fake_module('qtpy.QtWebEngineWidgets', QWebEngineView=FakeWebView))
     monkeypatch.setitem(sys.modules, 'mpld3', _fake_module('mpld3', fig_to_html=_html_of))
