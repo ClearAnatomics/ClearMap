@@ -56,7 +56,7 @@ dependencies:
   - pytest
   - jsonschema
   - mpld3  # WARNING Maybe pip
-  - lxml < 5.2  # lxml 5.2 breaks napari
+  - lxml  # gui/gui_logging.py (lxml.html); no longer < 5.2, napari >= 0.5 depends on lxml_html_clean
   - pip
   - pip:
     - itk~=5.4.5  # Not 5.4.4: it used np.bool, absent from NumPy 1.24 to 1.26 (fixed in ITK a637501, 5.4.5)
