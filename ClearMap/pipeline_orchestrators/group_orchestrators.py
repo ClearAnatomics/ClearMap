@@ -27,7 +27,7 @@ from ..config.compound_keys import CompoundKey
 if TYPE_CHECKING:
     from ClearMap.IO.workspace_asset import Asset
     from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
-    from PyQt5.QtWebEngineWidgets import QWebEngineView
+    from qtpy.QtWebEngineWidgets import QWebEngineView
 
 Pair = Tuple[str, str]
 
@@ -309,12 +309,12 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
                   channel: str, plot_kw_args: Dict) -> list['QWebEngineView']:
         # The views are Qt widgets: the caller owns the application, whatever its name (Qt aborts on a widget made
         # without one, hence the check before any widget)
-        from PyQt5.QtWidgets import QApplication
+        from qtpy.QtWidgets import QApplication
         if QApplication.instance() is None:
             raise ClearMapRuntimeError('run_plots makes Qt web views, which need a QApplication: create one first '
                                        '(e.g. ClearMap.gui.gui_utils_base.ensure_qapp()) or call the plot function '
                                        'directly for a matplotlib figure')
-        from PyQt5.QtWebEngineWidgets import QWebEngineView
+        from qtpy.QtWebEngineWidgets import QWebEngineView
         import mpld3
         dvs = []
         for gp1_name, gp2_name in comparisons:

@@ -83,7 +83,7 @@ class MachineConfig:
 
     def prompt_tmp_folder(self):
         # Not at the top: a headless run imports this module and must not need Qt (nor a display)
-        from PyQt5.QtWidgets import QFileDialog, QMessageBox, QInputDialog
+        from qtpy.QtWidgets import QFileDialog, QMessageBox, QInputDialog
         from ClearMap.gui.gui_utils_base import ensure_qapp
 
         app = ensure_qapp()

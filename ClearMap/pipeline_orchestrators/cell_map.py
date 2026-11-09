@@ -122,7 +122,7 @@ from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
 from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
 
 if TYPE_CHECKING:
-    from PyQt5.QtWidgets import QWidget
+    from qtpy.QtWidgets import QWidget
 
 
 class CellDetector(ChannelPipelineOrchestrator):

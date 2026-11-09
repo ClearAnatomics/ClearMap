@@ -49,10 +49,10 @@ def _fake_module(name, **attributes):
 @pytest.fixture()
 def fake_qt(monkeypatch):
     """The Qt and mpld3 modules of run_plots, without a display"""
-    monkeypatch.setitem(sys.modules, 'PyQt5', _fake_module('PyQt5', __path__=[]))
-    monkeypatch.setitem(sys.modules, 'PyQt5.QtWidgets', _fake_module('PyQt5.QtWidgets', QApplication=FakeApplication))
-    monkeypatch.setitem(sys.modules, 'PyQt5.QtWebEngineWidgets',
-                        _fake_module('PyQt5.QtWebEngineWidgets', QWebEngineView=FakeWebView))
+    monkeypatch.setitem(sys.modules, 'qtpy', _fake_module('qtpy', __path__=[]))
+    monkeypatch.setitem(sys.modules, 'qtpy.QtWidgets', _fake_module('qtpy.QtWidgets', QApplication=FakeApplication))
+    monkeypatch.setitem(sys.modules, 'qtpy.QtWebEngineWidgets',
+                        _fake_module('qtpy.QtWebEngineWidgets', QWebEngineView=FakeWebView))
     monkeypatch.setitem(sys.modules, 'mpld3', _fake_module('mpld3', fig_to_html=_html_of))
     monkeypatch.setattr(FakeApplication, 'current', None)
     return FakeApplication

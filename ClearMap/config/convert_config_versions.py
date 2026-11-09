@@ -12,7 +12,7 @@ import numpy as np
 from packaging.version import Version
 
 import qdarkstyle
-from PyQt5.QtWidgets import QApplication, QDialog
+from qtpy.QtWidgets import QApplication, QDialog
 
 from ClearMap.IO.assets_constants import CHANNELS_ASSETS_TYPES_CONFIG
 from ClearMap.IO.FileUtils import Rename, apply_renames
