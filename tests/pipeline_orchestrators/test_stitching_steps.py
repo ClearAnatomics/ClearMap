@@ -18,6 +18,11 @@ from ClearMap.Utils.exceptions import AssetNotFoundError, MissingRequirementExce
 
 from .conftest import RAW_FOLDER_NAME
 
+# ClearMap's own deprecated calls are errors here: the stitcher reads the tiles read-only and asks for the assets of a
+# sample by sample_id (a warning to users otherwise, for code they did not write)
+pytestmark = [pytest.mark.filterwarnings('error:Constructing MMPSource without explicit mode:FutureWarning'),
+              pytest.mark.filterwarnings("error:The 'prefix' argument is deprecated:DeprecationWarning")]
+
 N_TILES = 2
 OVERLAP = 8
 TILE_SHAPE = (24, 24, 32)  # z, y, x

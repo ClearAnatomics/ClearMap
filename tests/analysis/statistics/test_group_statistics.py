@@ -12,8 +12,7 @@ import pandas as pd
 import tifffile
 
 from ClearMap.Settings import clearmap_path
-from ClearMap.IO import IO as clearmap_io
-from ClearMap.IO import io_ops
+from ClearMap.IO import FileUtils, io_ops
 from ClearMap.Alignment import Annotation as annotation
 import ClearMap.Analysis.Measurements.Voxelization as voxelization
 from ClearMap.Analysis.Statistics.data_frame_operations import fix_df_column_names
@@ -144,7 +143,7 @@ def voxelize(folder):
     cells = pd.read_feather(os.path.join(folder, 'cells.feather'))
     coordinates = np.array([cells[axis] for axis in ['xt', 'yt', 'zt']]).T
     counts_file_path = os.path.join(folder, 'density_counts.tif')
-    clearmap_io.delete_file(counts_file_path)
+    FileUtils.delete_file(counts_file_path)
     voxelization.voxelize(coordinates, sink=counts_file_path, **voxelization_parameter)   # WARNING: prange
     return coordinates, counts_file_path
 
@@ -160,7 +159,7 @@ def voxelize_region(folder):
         density_array[region_mask] = row.cell_counts
 
     counts_file_path = os.path.join(folder, 'density_counts.tif')
-    clearmap_io.delete_file(counts_file_path)
+    FileUtils.delete_file(counts_file_path)
     tifffile.imsave(counts_file_path, density_array)
 
 

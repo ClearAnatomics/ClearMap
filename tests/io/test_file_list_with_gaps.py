@@ -5,7 +5,6 @@ A stack split in one file per plane is read by position along the planes. When t
 import numpy as np
 import pytest
 
-import ClearMap.IO.IO as clearmap_io
 from ClearMap.IO.source.backends.file_list_backend import FileListSource
 
 PLANE_SHAPE = (4, 3)

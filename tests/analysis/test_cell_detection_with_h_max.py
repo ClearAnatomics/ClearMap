@@ -4,7 +4,7 @@ a block is not an array of intensities.
 """
 import numpy as np
 
-import ClearMap.IO.IO as clearmap_io
+from ClearMap.IO import dispatch
 import ClearMap.ParallelProcessing.Block as block
 from ClearMap.ImageProcessing.Experts import Cells
 
@@ -19,7 +19,7 @@ def test_the_cells_of_a_block_are_found_with_an_h_max_transform():
                      maxima_detection=dict(h_max=50, shape=5, threshold=200, valid=True, save=False),
                      shape_detection=None, intensity_detection=None)
 
-    cells = Cells.detect_cells_block(block.Block(source=clearmap_io.as_source(image), slicing=ALL, valid_slicing=ALL),
+    cells = Cells.detect_cells_block(block.Block(source=dispatch.as_source(image), slicing=ALL, valid_slicing=ALL),
                                      parameter=parameter, n_threads=1)
 
     np.testing.assert_array_equal(np.sort(cells[['x', 'y', 'z']].to_numpy(), axis=0), [[4, 4, 4], [11, 11, 11]])

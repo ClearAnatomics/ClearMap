@@ -14,7 +14,7 @@ def tile(tmp_path):
     return path, data
 
 
-@pytest.mark.parametrize('processes', ['serial', 1], ids=['serial', 'pool'])
+@pytest.mark.parametrize('processes', [0, 1], ids=['serial', 'pool'])  # 0: in the calling process
 def test_convert_tile_writes_numeric_npy(tile, processes):
     path, data = tile
     sinks = conversion.convert_files([str(path)], extension='.npy', processes=processes)

@@ -5,7 +5,7 @@ A step which is disabled returns its input, so measuring it would silently give 
 import numpy as np
 import pytest
 
-import ClearMap.IO.IO as clearmap_io
+from ClearMap.IO import dispatch
 import ClearMap.ParallelProcessing.Block as block
 from ClearMap.ImageProcessing.Experts import Cells
 from ClearMap.Utils.exceptions import ClearMapValueError
@@ -24,7 +24,7 @@ def _detect_one_cell(background_correction, measure):
                      maxima_detection=dict(h_max=None, shape=5, threshold=0, valid=True, save=False),
                      shape_detection=dict(threshold=0, save=False),
                      intensity_detection=dict(method='max', shape=3, measure=measure))
-    cells = Cells.detect_cells_block(block.Block(source=clearmap_io.as_source(image), slicing=ALL, valid_slicing=ALL),
+    cells = Cells.detect_cells_block(block.Block(source=dispatch.as_source(image), slicing=ALL, valid_slicing=ALL),
                                      parameter=parameter, n_threads=1)
     return cells.loc[cells['source'].idxmax()]  # The brightest: the cell
 
