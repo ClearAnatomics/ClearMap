@@ -1,7 +1,6 @@
 """
-The data frame widget (the colocalization tables) runs with pandas 2 and later (ClearMap3.yml asks for pandas>=2.2.2,
-the first pandas that runs with NumPy 2): a Series indexed by the column names is not indexed by position any more
-(KeyError: 0 with pandas 3).
+The data frame widget (the colocalization tables) runs with pandas 2 and later (ClearMap3.yml no longer pins
+pandas<2): a Series indexed by the column names is not indexed by position any more (KeyError: 0 with pandas 3).
 """
 import pandas as pd
 
