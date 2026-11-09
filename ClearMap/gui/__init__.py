@@ -7,3 +7,7 @@ and to visualize the results.
 For a more advanced usage, the ClearMap classes can be used directly. See
 :mod:`cell_map_new_api` and :mod:`tube_map_new_api` for more information.
 """
+
+from ClearMap.gui.qt_binding import choose_qt_binding
+
+choose_qt_binding()  # Before the package imports Qt: qtpy and pyqtgraph read the binding when first imported

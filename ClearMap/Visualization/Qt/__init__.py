@@ -16,3 +16,7 @@ __author__    = 'Christoph Kirst <ckirst@rockefeller.edu>'
 __license__   = 'MIT License <http://www.opensource.org/licenses/mit-license.php>'
 __copyright__ = 'Copyright 2018 by Christoph Kirst, The Rockefeller University, New York City'
 __version__   = '0.1'
+
+from ClearMap.gui.qt_binding import choose_qt_binding
+
+choose_qt_binding()  # Before the package imports Qt: qtpy and pyqtgraph read the binding when first imported
