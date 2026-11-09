@@ -2742,7 +2742,7 @@ class NProcessesWidget(QWidget):
         layout.addWidget(self._label)
         layout.addWidget(self._spin)
 
-        self._spin.valueChanged[int].connect(self._on_spin_changed)
+        self._spin.valueChanged.connect(self._on_spin_changed)
 
     # API compatible with QSpinBox / ParamLink
     def value(self) -> int:

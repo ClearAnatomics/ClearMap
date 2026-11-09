@@ -243,7 +243,7 @@ def handle_exception(exc: Exception, parent: QWidget | None = None, context: str
             exc = wrapper
 
         dlg = ExceptionDialog(exc, parent=parent, context=context)
-        dlg.exec_()
+        dlg.exec()
         return dlg.chosen_action
 
     except Exception as meta_exc:

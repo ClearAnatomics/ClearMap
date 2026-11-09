@@ -1067,7 +1067,7 @@ def _test():
     DataViewer(img1)
     if not runs_on_spyder():
         instance = QApplication.instance()
-        instance.exec_()
+        instance.exec()
     points = np.array(np.where(img1 > 0.99)).T
     points.shape
 

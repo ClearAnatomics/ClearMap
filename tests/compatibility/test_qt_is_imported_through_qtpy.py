@@ -1,7 +1,8 @@
 """
 ClearMap imports Qt only through qtpy, so that it runs with the binding chosen by ``gui/qt_binding`` (PyQt6 or
 PyQt5). A module importing a binding directly (``from PyQt5.QtWidgets import ...``, ``from PyQt5 import sip``) or using
-PyQt's own names (``pyqtSignal``, ``pyqtSlot``) would tie it to one.
+PyQt's own names (``pyqtSignal``, ``pyqtSlot``) would tie it to one, and so would ``exec_()``, which PyQt6 does not
+have (``exec()`` is in both).
 """
 import ast
 
@@ -14,6 +15,7 @@ ALLOWED_MODULES = (
 )
 QT_BINDINGS = ('PyQt5', 'PyQt6', 'PySide2', 'PySide6', 'sip', 'shiboken2', 'shiboken6')
 PYQT_NAMES = ('pyqtSignal', 'pyqtSlot', 'pyqtProperty')
+PYQT5_ONLY_METHOD_NAME = 'exec_'
 
 
 def _syntax_trees():
@@ -48,3 +50,16 @@ def test_no_maintained_module_uses_the_pyqt_names_of_signals_and_slots():
             for node in ast.walk(tree) if _uses_a_pyqt_name(node)]
 
     assert not uses, f'Use qtpy.QtCore.Signal and Slot at {uses}'
+
+
+def _calls_exec_(node):
+    return isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and \
+        node.func.attr == PYQT5_ONLY_METHOD_NAME
+
+
+def test_no_maintained_module_calls_exec_():
+    # ClearMap only: the screenshot tool of the tests still refuses exec_ too, for the code that would call it
+    calls = [f'{path}:{node.lineno}' for path, tree in _syntax_trees() if path.parts[0] == 'ClearMap'
+             for node in ast.walk(tree) if _calls_exec_(node)]
+
+    assert not calls, f'Call exec() (PyQt6 has no exec_) at {calls}'

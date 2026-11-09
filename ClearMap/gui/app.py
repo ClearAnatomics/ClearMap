@@ -1035,7 +1035,7 @@ class ClearMapApp(ClearMapAppBase):
         if commit_info is not None:
             info.commit_info = str(commit_info)
         dialog = dlgs.AboutDialog(info)
-        dialog.exec_()
+        dialog.exec()
 
     def _get_global_view(self):  # FIXME: should use a sort of cfg_coordinator instead to also have display
         return {sec_name: self.config_loader.get_cfg(sec_name, must_exist=True)
