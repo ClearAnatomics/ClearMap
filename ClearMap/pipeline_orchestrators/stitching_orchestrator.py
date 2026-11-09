@@ -92,7 +92,7 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
     def convert_tiles_channel(self, channel, _force=False):
         self.stack_columns(channel)  # Tiles of one file per plane: their columns are converted
         if self.config['channels'][channel].get('use_npy', False) or _force:
-            asset = self.get('raw', channel=channel, prefix=self.sample_manager.prefix)
+            asset = self.get('raw', channel=channel, sample_id=self.sample_manager.prefix)
             n_procs = self.config['performance']['file_conversion']['n_processes']
             n_procs = sanitize_n_processes(n_procs)
             file_list = asset.file_list
@@ -171,7 +171,7 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
         Build and persist a real WobblyLayout for 'channel' from OME TileConfiguration.
         Marks the channel as 'use_existing_layout' so rigid placement can be skipped.
         """
-        raw_asset = self.get('raw', channel=channel, prefix=self.sample_manager.prefix, extension='.tif')
+        raw_asset = self.get('raw', channel=channel, sample_id=self.sample_manager.prefix, extension='.tif')
         if not raw_asset.file_list:
             raise FileNotFoundError(f"No tiles found for channel '{channel}'")
 
@@ -232,7 +232,7 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
         The planes are recognised by their Z tag besides the tile tags (e.g. ``..._xyz-Table Z<Z,4>.ome.tif``),
         whatever the text around it. Every use of the tiles calls this first (it is done once).
         """
-        asset = self.get('raw', channel=channel, prefix=self.sample_manager.prefix)
+        asset = self.get('raw', channel=channel, sample_id=self.sample_manager.prefix)
         planes_expression = asset.expression
         if 'Z' not in planes_expression.tag_names() or planes_expression.n_tags() < 2:
             return  # One file per tile, or the planes of a single stack (see copy_or_stack)
@@ -703,7 +703,7 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
 
     def __read_tile_middle_plane(self, tile_path, middle_z):
         if self.sample_manager.has_npy:  # use memmap
-            tile = io_ops.buffer(tile_path)[:, :, middle_z]
+            tile = io_ops.open_ro(tile_path)[:, :, middle_z]
         else:
             tile = io_ops.read(tile_path)[:, :, middle_z]
         return tile
