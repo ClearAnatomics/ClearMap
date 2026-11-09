@@ -1,3 +1,4 @@
+import importlib.util
 import os
 import re
 import sys
@@ -9,6 +10,7 @@ from pathlib import Path
 
 from setuptools import setup, find_packages, Extension
 from setuptools.command.build_ext import build_ext as _build_ext
+from setuptools.command.build_py import build_py as _build_py
 
 # Nothing is built when this file is imported (the tests do), only when it is run (see main): numpy and Cython are
 # imported where they are used.
@@ -267,6 +269,40 @@ def read_clearmap_version():
     return namespace['__version__']
 
 
+def load_git_info_module(source_root):
+    """ClearMap/Utils/git_info.py, loaded from its file (it needs only the standard library): ClearMap is not built"""
+    git_info_path = source_root / 'ClearMap' / 'Utils' / 'git_info.py'
+    spec = importlib.util.spec_from_file_location('clearmap_git_info', git_info_path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module  # dataclasses look their module up there
+    spec.loader.exec_module(module)
+    return module
+
+
+def stamp_installed_commit(source_root, built_package_directory):
+    """
+    Record the commit of the checkout at ``source_root`` in the built package, which is what gets installed.
+
+    An installed ClearMap is a copy in site-packages: it cannot ask git, and it is not the checkout it came from.
+    The stamp goes in the build folder, not in the source tree (git status stays clean).
+    """
+    git_info = load_git_info_module(source_root)
+    commit_info = git_info.get_commit_info(source_root / 'ClearMap')
+    if commit_info is None:
+        print(f'WARNING: {source_root} is not a git checkout (or git is not installed): '
+              f'the installed ClearMap will not know its commit')
+        return None
+    git_info.write_commit_stamp(commit_info, built_package_directory)
+    return commit_info
+
+
+class build_py_with_commit_stamp(_build_py):
+    def run(self):
+        super().run()
+        if not self.dry_run:
+            stamp_installed_commit(Path(__file__).resolve().parent, Path(self.build_lib) / 'ClearMap')
+
+
 def main():
     from Cython.Build import cythonize
 
@@ -297,7 +333,7 @@ def main():
         install_requires=requirements,
         packages=packages,
         ext_modules=ext_modules,
-        cmdclass={'build_ext': parallel_build_ext},
+        cmdclass={'build_ext': parallel_build_ext, 'build_py': build_py_with_commit_stamp},
         entry_points={
             'gui_scripts': [
                 'clearmap-ui = ClearMap.gui.app:entry_point'
