@@ -1352,7 +1352,7 @@ class GuiController(BusSubscriberMixin):
         self.window = self._build_main_window()
         self._install_or_update_tabs()
         self.window._init_sample_tab_mgr()  # Not great to call from outside but... needs to happen after install_or_update_tabs
-        self._post_show_setup(app_, centered)
+        self._post_show_setup(centered)
         self.window.show()
         self.window.fix_styles()
         app_.processEvents()
@@ -1397,12 +1397,12 @@ class GuiController(BusSubscriberMixin):
         window.fix_styles()
         return window
 
-    def _post_show_setup(self, app_, centered: bool) -> None:
+    def _post_show_setup(self, centered: bool) -> None:
         win = self.window
         if win.preference_editor.params.start_full_screen:
             win.showMaximized()
         if centered:
-            screen = app_.desktop().screenGeometry(win)
+            screen = win.screen().geometry()  # QApplication.desktop() is gone in Qt 6; QWidget.screen() is Qt >= 5.14
             fg = win.frameGeometry()
             fg.moveCenter(screen.center())
             win.move(fg.topLeft())
