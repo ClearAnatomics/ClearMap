@@ -13,7 +13,6 @@ from ClearMap.Alignment.Stitching import stitching_rigid as stitching_rigid
 
 from ClearMap.IO import conversion, io_ops, source_geometry
 from ClearMap.IO.assets_constants import EXTENSIONS
-from ClearMap.IO import IO as clearmap_io
 from ClearMap.IO.FileUtils import link_or_copy
 from ClearMap.IO.source.backends.tif_backend import parse_ome_info
 
@@ -704,7 +703,7 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
 
     def __read_tile_middle_plane(self, tile_path, middle_z):
         if self.sample_manager.has_npy:  # use memmap
-            tile = clearmap_io.buffer(tile_path)[:, :, middle_z]
+            tile = io_ops.buffer(tile_path)[:, :, middle_z]
         else:
             tile = io_ops.read(tile_path)[:, :, middle_z]
         return tile

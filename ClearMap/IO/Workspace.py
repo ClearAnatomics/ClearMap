@@ -30,8 +30,8 @@ from collections import OrderedDict
 
 import numpy as np
 
-import ClearMap.IO.IO as clearmap_io
-from ClearMap.IO import dispatch, io_ops
+from ClearMap.IO import FileUtils, dispatch, io_ops
+from ClearMap.IO.source.backends import file_list_backend
 from ClearMap.Utils.tag_expression import Expression
 # import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as array_processing
 import ClearMap.Visualization.Plot3d as q_plot_3d
@@ -367,7 +367,7 @@ def file_name(f_type, dirtype=None, ws_type=None, directory=None, default_direct
         f_name = f'{os.path.splitext(f_name)[0]}{extension}'
 
     if directory:
-        f_name = clearmap_io.join(directory, f_name)
+        f_name = FileUtils.join(directory, f_name)
 
     return f_name
 
@@ -583,10 +583,10 @@ class Workspace:
         return positions
 
     def extension(self, *args, **kwargs):
-        return clearmap_io.file_extension(self.file_name(*args, **kwargs))
+        return FileUtils.file_extension(self.file_name(*args, **kwargs))
   
     def file_list(self, *args, **kwargs):
-        return clearmap_io.file_list(self.file_name(*args, **kwargs))
+        return file_list_backend.file_list(self.file_name(*args, **kwargs))
   
     def create(self, f_type=None, dtype=None, shape=None, order=None, **kwargs):
         filename = self.file_name(f_type=f_type, **kwargs)
@@ -683,7 +683,7 @@ class Workspace:
                                                  f'that is not in tile_axes={tile_axes_}')
 
                         # construct tiling
-                        files = clearmap_io.file_list(expression)
+                        files = file_list_backend.file_list(expression)
                         if files:
                             if i == 0:
                                 out += f'{header.format(dirtype, f_type)}: '
@@ -694,14 +694,14 @@ class Workspace:
             else:
                 f_name = self.file_name(f_type)
 
-                if check_directory and clearmap_io.is_directory(f_name):
+                if check_directory and FileUtils.is_directory(f_name):
                     out += f'{header.format(dirtype, f_type)}: directory\n'
                 else:
                     files = []
-                    if clearmap_io.is_file(f_name):
+                    if FileUtils.is_file(f_name):
                         files += [f_name]
                     f_name = self.file_name(f_type, postfix='*')
-                    files += clearmap_io.file_list(f_name)
+                    files += file_list_backend.file_list(f_name)
                     if files:
                         files = [os.path.relpath(f, start=self.directory) for f in files]
 

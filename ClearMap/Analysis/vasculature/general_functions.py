@@ -22,7 +22,6 @@ import numpy as np
 
 import igraph
 
-import ClearMap.IO.IO as clearmap_io
 import ClearMap.Alignment.Annotation as annotation
 from ClearMap.Analysis.graphs import graph_gt
 

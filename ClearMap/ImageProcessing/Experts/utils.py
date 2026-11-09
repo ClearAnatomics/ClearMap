@@ -1,4 +1,3 @@
-import ClearMap.IO.IO as clearmap_io
 from ClearMap.IO import source_initialization
 
 from ClearMap.ParallelProcessing.DataProcessing import ArrayProcessing as ap

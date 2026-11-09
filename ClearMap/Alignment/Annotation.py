@@ -41,7 +41,6 @@ from scipy.ndimage import distance_transform_edt
 import ClearMap.Settings
 import ClearMap.Settings as settings
 
-from ClearMap.IO import IO as clearmap_io
 from ClearMap.IO import io_ops
 import ClearMap.IO.FileUtils as fu
 
@@ -880,7 +879,7 @@ class Annotation:
 
         cm = self.color_map(alpha=False, as_int=True)
 
-        extension = clearmap_io.file_extension(file_path)
+        extension = fu.file_extension(file_path)
         if extension == 'pal':
             col.write_PAL(file_path, cm)
         elif extension == 'lut':

@@ -88,7 +88,7 @@ from typing import Optional, Dict, Any, Union, Callable
 import numpy as np
 import pandas as pd
 
-import ClearMap.IO.IO as clearmap_io
+from ClearMap.IO import FileUtils as file_utils, io_ops
 from ClearMap.IO.source.Source import Source
 from ClearMap.IO.workspace2 import Workspace2
 from ClearMap.IO.workspace_asset import Asset
@@ -140,7 +140,6 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
-from ..IO import io_ops
 
 DEEP_FILL_REQUIRED_V_RAM = 22_000  # MiB (as reported by nvidia-smi) of free VRAM needed by the deep fill
 MAX_PLOT_VERTICES = 300_000  # Empirical max number of vertices that can safely be plotted
@@ -272,7 +271,7 @@ class BinaryVesselProcessorSteps(ProcessorSteps):
         """Delete the pending temp file once the next step has consumed its input."""
         for to_clean in self._pending_cleanup:
             try:
-                clearmap_io.delete_file(to_clean)
+                file_utils.delete_file(to_clean)
             except Exception:
                 pass
         self._pending_cleanup = []
@@ -683,7 +682,7 @@ class BinaryVesselProcessor(TubeMapOrchestrator):
                                      processes=sanitize_n_processes(perf_params['n_processes']), verbose=True)
         else:  # We expect to have at least all_vessels_channel
             source = self.steps[self.all_vessels_channel].get_last_output()
-            clearmap_io.copy_file(source, sink_asset.path)
+            file_utils.copy_file(source, sink_asset.path)
 
         self.post_process_binary_combined()
         if self.config['binarization']['combined'].get('compress'):
@@ -702,7 +701,7 @@ class BinaryVesselProcessor(TubeMapOrchestrator):
                                     processing_parameter=block_params,
                                     processes=sanitize_n_processes(-1), verbose=True)  # TODO: n_processes in config?
         else:
-            clearmap_io.link_file(source, sink, overwrite=True)
+            file_utils.link_file(source, sink, overwrite=True)
 
     def plot_vessel_filling_results(self, parent=None, channel='', arrange=False):
         from ClearMap.Visualization.Qt import Plot3d as q_p3d
@@ -1495,7 +1494,7 @@ class VesselGraphProcessor(TubeMapOrchestrator):
         return voxelize_branch_parameter
 
     def __voxelize(self, vertices, voxelize_branch_parameter: dict[str, Any], density_path: Path):
-        clearmap_io.delete_file(density_path)
+        file_utils.delete_file(density_path)
         self.branch_density = voxelization.voxelize(vertices,
                                                     sink=density_path,
                                                     dtype='float32',

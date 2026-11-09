@@ -90,7 +90,6 @@ import numpy as np
 import pandas as pd
 
 # noinspection PyPep8Naming
-import ClearMap.IO.IO as clearmap_io
 from ClearMap.IO import io_ops
 from ClearMap.IO.assets_specs import weighted_sub_type
 from ClearMap.IO.workspace2 import Workspace2

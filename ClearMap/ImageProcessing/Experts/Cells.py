@@ -28,7 +28,6 @@ import cv2
 import pandas as pd
 import scipy.ndimage as ndi
 
-import ClearMap.IO.IO as clearmap_io
 
 import ClearMap.ParallelProcessing.BlockProcessing as bp
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
@@ -307,7 +306,7 @@ def detect_cells(source, sink=None, cell_detection_parameter=default_cell_detect
     n_processes = sanitize_n_processes(processing_parameter.get('processes'))
     n_threads = max(1, int(available_cpu_count() / n_processes))  # Number of threads so that * n_processes, fills CPUs
 
-    sink_location = clearmap_io.location(sink) if sink is not None else None
+    sink_location = source_geometry.location(sink) if sink is not None else None
     sink_path = Path(sink_location) if sink_location is not None else None
     result_directory = Path(tempfile.mkdtemp(prefix='cells_blocks_',
                                              dir=sink_path.parent if sink_path is not None else None))

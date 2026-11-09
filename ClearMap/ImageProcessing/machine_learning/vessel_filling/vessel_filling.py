@@ -20,7 +20,6 @@ import numpy as np
 import torch
 
 
-import ClearMap.IO.IO as clearmap_io
 
 import ClearMap.ParallelProcessing.BlockProcessing as block_processing
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as array_processing

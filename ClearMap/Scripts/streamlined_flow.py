@@ -11,7 +11,6 @@ import tifffile
 
 from ClearMap.IO import io_ops
 from ClearMap.Settings import atlas_folder
-import ClearMap.IO.IO as clearmap_io
 
 from ClearMap.Analysis.vasculature.vasc_graph_utils import set_artery_vein_if_missing, filter_graph_degrees
 from ClearMap.Analysis.vasculature.general_functions import (graph_to_edge_coords_and_vectors, get_artery_vein_edge_coords_and_vectors,
