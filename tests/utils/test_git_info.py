@@ -169,6 +169,13 @@ def test_a_checkout_at_a_tag_knows_the_tag(checkout):
     assert get_commit_info(checkout / 'ClearMap').tag == 'v3.2.0'
 
 
+def test_a_tagged_commit_on_a_branch_is_described_by_its_tag():
+    # A tag names one commit for good, a branch moves on: the tag says which release it is
+    info = CommitInfo(commit_hash='0123456789abcdef', commit_date=COMMIT_DATE, branch=BRANCH, tag='v3.2.0')
+
+    assert str(info) == f'{info.commit_hash[:SHORT_HASH_LENGTH]} (tag v3.2.0, {COMMIT_DATE})'
+
+
 def test_a_stamp_written_before_tags_were_recorded_is_still_read(tmp_path):
     (tmp_path / STAMP_FILE_NAME).write_text('{"commit_hash": "abc", "commit_date": "2026-11-05", "branch": "v3.1.x"}')
 

@@ -45,10 +45,6 @@ class CommitInfo:
             ref_label = DETACHED_HEAD_LABEL
         return f'{short_hash} ({ref_label}, {self.commit_date})'
 
-    def __str__(self):
-        ref = self.branch or (f'tag {self.tag}' if self.tag else DETACHED_HEAD_LABEL)
-        return f'{self.commit_hash[:SHORT_HASH_LENGTH]} ({ref}, {self.commit_date})'
-
 
 def _run_git(directory, *arguments):
     """The output of ``git <arguments>`` in ``directory``, or None if git cannot answer (no git, not a repository)."""
