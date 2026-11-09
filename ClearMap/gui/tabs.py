@@ -1181,7 +1181,7 @@ class CellCounterTab(PostProcessingTab["CellDetector"]):
 
     def voxelize(self, channel: str) -> None:
         """Creates the cell density plot"""
-        if self.sample_manager.get('cells', channel=channel, postfix='filtered').exists:
+        if self.sample_manager.get('cells', channel=channel, asset_sub_type='filtered').exists:
             worker = self.get_worker(channel)
             self.wrap_step('Voxelization', worker.voxelize,
                            step_kw_args={'weights_column': self.params[channel].voxelization_weights},
