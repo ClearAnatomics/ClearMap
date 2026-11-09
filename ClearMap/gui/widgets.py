@@ -1518,13 +1518,10 @@ class LandmarksSelectorDialog(WizardWidget):  # TODO: bind qColorDialog to color
 
     def __initialize_viewers(self):
         for img_type, dv in self.data_viewers.items():
-            scatter = pg.ScatterPlotItem()
             dv.enable_mouse_clicks()
-            dv.view.addItem(scatter)
-            dv.scatter = scatter
-            dv.scatter_coords = Scatter3D(self.get_coords(img_type),
-                                          colors=np.array(self.colors),
-                                          z_radius=3)
+            dv.overlay_scatter(Scatter3D(self.get_coords(img_type),
+                                         colors=np.array(self.colors),
+                                         z_radius=3))
             dv.mouse_clicked.connect(functools.partial(self.set_current_coords, img_type=img_type))
 
     @property
