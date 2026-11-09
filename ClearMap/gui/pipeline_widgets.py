@@ -13,6 +13,14 @@ _TICK_COLOR  = QColor('#5c9e5c')   # muted sage-green
 _CROSS_COLOR = QColor('#b85c5c')   # muted dusty-red
 
 
+def _event_x(event):
+    """Return the x coordinate of a mouse event, on Qt 6 (``position()``) and on Qt 5 (``localPos()``)."""
+    try:
+        return event.position().x()
+    except AttributeError:
+        return event.localPos().x()  # Qt 5 has no position()
+
+
 class StepChip(QWidget):
     """Single step tile — click to toggle enabled/disabled."""
     #: Triggered when step is toggled
@@ -85,8 +93,8 @@ class StepChip(QWidget):
         p.drawText(self._W - self._ICON_ZONE, 0, self._ICON_ZONE, self._H, Qt.AlignCenter, action)
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            x = event.x()
+        if event.button() == Qt.MouseButton.LeftButton:
+            x = _event_x(event)
             if x <= self._ICON_ZONE: # left zone → toggle enable
                 self._step.enabled = not self._step.enabled
                 self.update()
