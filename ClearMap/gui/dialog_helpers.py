@@ -8,7 +8,7 @@ from qtpy.QtWidgets import QFileDialog, QMessageBox, QInputDialog, QDialog, QVBo
 
 from ClearMap.Utils.path_utils import clean_path
 from ClearMap.config.defaults_provider import get_defaults_provider
-from ClearMap.gui.gui_utils_base import create_clearmap_widget, UI_FOLDER
+from ClearMap.gui.gui_utils_base import create_clearmap_widget, UI_FOLDER, DIALOG_ACCEPTED
 
 _defaults = get_defaults_provider()
 DISPLAY_CONFIG = _defaults.get('display')
@@ -16,7 +16,8 @@ DISPLAY_CONFIG = _defaults.get('display')
 
 def get_directory_dlg(start_folder, title="Choose the source directory"):
     diag = QFileDialog()  # REFACTOR: move to gui_utils
-    opt = QFileDialog.Options(QFileDialog.DontUseNativeDialog)
+    # Native dialogs misbehave on some desktops. The flag itself is passed: PyQt6 has no QFileDialog.Options wrapper
+    opt = QFileDialog.DontUseNativeDialog
     start_folder = clean_path(start_folder)
     src_folder = diag.getExistingDirectory(parent=diag, caption=title,
                                            directory=start_folder, options=opt)
@@ -40,7 +41,7 @@ def input_dialog(title, msg, data_type=str):
     dlg.setWindowTitle(title)
     dlg.setLabelText(msg)
 
-    if dlg.exec() == QDialog.Accepted:
+    if dlg.exec() == DIALOG_ACCEPTED:
         output_functions = {
             str: dlg.textValue,
             int: dlg.intValue,
@@ -97,7 +98,8 @@ def warning_popup(base_msg, msg=''):
     return dlg.exec()
 
 
-def abort_retry_popup(base_msg, msg):  # REFACTOR: duplicate code
+def abort_retry_popup(base_msg, msg) -> bool:  # REFACTOR: duplicate code
+    """Ask whether to retry or abort: True to retry"""
     dlg = QMessageBox()
     dlg.setIcon(QMessageBox.Warning)
     dlg.setWindowTitle('Warning')
@@ -105,7 +107,9 @@ def abort_retry_popup(base_msg, msg):  # REFACTOR: duplicate code
     dlg.setInformativeText(msg)
     dlg.setStandardButtons(QMessageBox.Abort | QMessageBox.Retry)
     dlg.setDefaultButton(QMessageBox.Abort)
-    return dlg.exec()
+    dlg.exec()
+    # The button clicked, as a StandardButton with both bindings (exec() gives an int, never equal to a PyQt6 enum)
+    return dlg.standardButton(dlg.clickedButton()) == QMessageBox.Retry
 
 
 def make_nested_progress_dialog(title='Processing', overall_maximum=100, sub_process_name='', abort_callback=None, parent=None):

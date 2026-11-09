@@ -12,7 +12,7 @@ import numpy as np
 from packaging.version import Version
 
 import qdarkstyle
-from qtpy.QtWidgets import QApplication, QDialog
+from qtpy.QtWidgets import QApplication
 
 from ClearMap.IO.assets_constants import CHANNELS_ASSETS_TYPES_CONFIG
 from ClearMap.IO.FileUtils import Rename, apply_renames
@@ -26,7 +26,7 @@ from ClearMap.config.registration_channels import MOVING_OTHER
 
 from ClearMap.gui.dialogs import RenameChannelsDialog, VerifyRenamingDialog
 from ClearMap.gui.dialog_helpers import get_directory_dlg
-from ClearMap.gui.gui_utils_base import ensure_qapp
+from ClearMap.gui.gui_utils_base import ensure_qapp, DIALOG_ACCEPTED
 
 
 SUPPORTED_VERSIONS = [Version(v) for v in ('2.1', '3.0', '3.1')]
@@ -465,7 +465,7 @@ class ExperimentUpgrade_2_1_to_3_0(ExperimentConfigConverter):
 
         # Pop up dialog to rename channels and define data_type
         dialog = RenameChannelsDialog(channels)
-        if dialog.exec() == QDialog.Accepted:
+        if dialog.exec() == DIALOG_ACCEPTED:
             self.new_channels = dialog.get_new_channels()
         else:
             self.new_channels = {}
@@ -516,7 +516,7 @@ class ExperimentUpgrade_2_1_to_3_0(ExperimentConfigConverter):
         dialog = VerifyRenamingDialog(renames, title='Verify renaming',
                                       message='The files of the sample are renamed to the names of ClearMap 3. '
                                               'Untick a file to leave it as it is.')
-        if dialog.exec() == QDialog.Accepted:
+        if dialog.exec() == DIALOG_ACCEPTED:
             return dialog.selected_renames
         self._aborted = True
         return []

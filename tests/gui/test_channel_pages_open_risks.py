@@ -386,7 +386,7 @@ class FakeRenamingDialog:
         type(self).shown.append(self)
 
     def exec(self):
-        return params.QDialog.Accepted if self.accepted else params.QDialog.Rejected
+        return 1 if self.accepted else 0  # exec() gives an int: 1 accepted, 0 rejected
 
 
 @pytest.fixture()

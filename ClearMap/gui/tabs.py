@@ -108,7 +108,7 @@ from qtpy.QtCore import QSignalBlocker
 
 from ClearMap.Utils.tag_expression import Expression
 
-from qtpy.QtWidgets import QApplication, QButtonGroup, QWidget, QDialog, QMessageBox
+from qtpy.QtWidgets import QApplication, QButtonGroup, QWidget
 import pyqtgraph as pg
 from natsort import natsorted
 
@@ -148,7 +148,7 @@ from .widgets import (PatternDialog, DataFrameWidget, LandmarksSelectorDialog,
                       CheckableListWidget, FileDropListWidget, ensure_inline_histogram,
                       GraphFilterList, NProcessesWidget, BlockProcessingWidget)
 from .gui_utils_base import (format_long_nb, replace_widget, add_missing_combobox_items,
-                             populate_combobox, delete_widget)
+                             populate_combobox, delete_widget, DIALOG_ACCEPTED)
 from .gui_utils_images import np_to_qpixmap
 from .params import (VesselParams, SampleParameters, StitchingParams, CellMapParams, GroupAnalysisParams,
                      BatchProcessingParams, RegistrationParams, TractMapParams, ColocalizationParams,
@@ -327,7 +327,7 @@ class SampleInfoTab(ExperimentTab):
         dlg = PatternDialog(self.src_folder, self.params,
                             min_file_number=self.main_window.preference_editor.params.pattern_finder_min_n_files,
                             tile_extension=self.params.shared_sample_params.default_tile_extension)
-        if dlg.exec():
+        if dlg.exec() == DIALOG_ACCEPTED:
             specs = dlg.get_results()
             self._apply_pattern_specs(specs)
         self.detached = False
@@ -348,7 +348,7 @@ class SampleInfoTab(ExperimentTab):
         current = dict(self.sample_manager.workspace.resource_type_to_folder)
 
         dlg = ResourceTypeToFolderDialog(current, parent=self.main_window)
-        if dlg.exec_() != QDialog.Accepted:
+        if dlg.exec() != DIALOG_ACCEPTED:
             return  # user cancelled
 
         new_mapping, migrate = dlg.result()
@@ -1833,7 +1833,7 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
                 return
             except ClearMapVRamException as err:
                 self.main_window.print_warning_msg(str(err))
-                if abort_retry_popup(INSUFFICIENT_V_RAM_TITLE, str(err)) != QMessageBox.Retry:
+                if not abort_retry_popup(INSUFFICIENT_V_RAM_TITLE, str(err)):
                     raise
 
     def combine(self) -> None:

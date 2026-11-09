@@ -27,6 +27,11 @@ from qtpy.QtWidgets import QLayout, QApplication, QWidget, \
 
 warnings.filterwarnings('ignore', category=RuntimeWarning, module='ClearMap.gui.gui_utils_base')  # For surface_project
 
+# What QDialog.exec() returns (the values of QDialog.DialogCode, fixed by Qt). Compared as ints: with PyQt6 the
+# QDialog.Accepted enum is not guaranteed to compare equal to the int of exec()
+DIALOG_REJECTED = 0
+DIALOG_ACCEPTED = 1
+
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
 __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2022 by Charly Rousseau'

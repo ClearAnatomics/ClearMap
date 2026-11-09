@@ -13,7 +13,7 @@ import numpy as np
 
 from qtpy.QtCore import Qt, QTimer, QSignalBlocker
 from qtpy.QtWidgets import (QToolBox, QCheckBox, QLabel, QHBoxLayout, QVBoxLayout,
-                             QSpinBox, QLineEdit, QDoubleSpinBox, QRadioButton, QFrame, QDialog, QButtonGroup,
+                             QSpinBox, QLineEdit, QDoubleSpinBox, QRadioButton, QFrame, QButtonGroup,
                              QMessageBox)
 
 from ClearMap.Analysis.graphs.graph_filters import GraphFilter, combined_filters_name
@@ -42,7 +42,7 @@ from ClearMap.Utils.events import (UiChannelRenamed, UiCropChanged, UiOrientatio
 
 from .dialogs import VerifyRenamingDialog
 from .exception_handler import handle_exception
-from .gui_utils_base import replace_widget
+from .gui_utils_base import replace_widget, DIALOG_ACCEPTED
 from .params_mixins import OrthoviewerSlicingMixin
 from .pipeline_model import BINARIZATION_STEPS, PipelineStep, LinearPipeline
 from .pipeline_widgets import LinearPipelineWidget
@@ -454,7 +454,7 @@ class SampleParameters(ChannelsUiParameterCollection):
                                               f'they are renamed too, the pipeline does not find them under the '
                                               f'name {new_name!r}. Untick a file to leave it as it is.',
                                       accept_text='Rename the channel and its files', parent=self.tab)
-        if dialog.exec() != QDialog.Accepted:
+        if dialog.exec() != DIALOG_ACCEPTED:
             return None
         return dialog.selected_renames
 
