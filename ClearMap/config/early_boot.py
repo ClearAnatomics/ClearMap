@@ -83,40 +83,8 @@ class MachineConfig:
 
     def prompt_tmp_folder(self):
         # Not at the top: a headless run imports this module and must not need Qt (nor a display)
-        from qtpy.QtWidgets import QFileDialog, QMessageBox, QInputDialog
-        from ClearMap.gui.gui_utils_base import ensure_qapp
-
-        app = ensure_qapp()
-
-        # Plan A, proper folder using QT directory dialog
-        tmp_folder = QFileDialog.getExistingDirectory(
-            None, f'Select temporary folder (>={self.min_temp_folder_gb} GB free recommended)',
-            str(pathlib.Path.home()),
-            QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks,
-        )
-        if tmp_folder:
-            tmp_folder = pathlib.Path(tmp_folder).expanduser()
-            if self._is_valid_tmp(tmp_folder):
-                return str(tmp_folder)
-            else:
-                QMessageBox.warning(None, 'Folder not suitable',
-                    f'"{tmp_folder}" is not writeable or does not have enough free space.\n'
-                    'Please choose another.',
-                )
-        # Plan B, pure string for e.g. non existing folders (or cancel)
-        text, ok = QInputDialog.getText(None, 'Enter temporary folder',
-            f'No valid folder selected.\n'
-            f'Enter an absolute path with ≥ {self.min_temp_folder_gb} GB free:',
-        )
-        if ok and text.strip():
-            tmp_folder = pathlib.Path(text.strip()).expanduser()
-            if self._is_valid_tmp(tmp_folder, self.min_temp_folder_gb):
-                return str(tmp_folder)
-            else:
-                QMessageBox.critical(None, "Invalid folder",
-                    f"‘{tmp_folder}’ is not writeable or does not have enough free space.",
-                )
-        return None
+        from ClearMap.gui.early_boot_dialogs import prompt_tmp_folder
+        return prompt_tmp_folder(min_free_gb=self.min_temp_folder_gb, is_valid=self._is_valid_tmp)
 
     def _read_cfg(self):
         self._ensure_cfg_exists()
