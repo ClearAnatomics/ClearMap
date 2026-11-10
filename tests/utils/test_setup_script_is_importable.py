@@ -66,6 +66,7 @@ def setup_calls(monkeypatch):
     cython = types.ModuleType('Cython')
     cython_build = types.ModuleType('Cython.Build')
     cython_build.cythonize = cythonize_nothing
+    cython.__version__ = '3.1.0'  # The build signature reads it
     cython.Build = cython_build
     monkeypatch.setitem(sys.modules, 'Cython', cython)
     monkeypatch.setitem(sys.modules, 'Cython.Build', cython_build)
