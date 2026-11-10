@@ -30,7 +30,7 @@ class Qt6MouseEvent:
         self._x = x
 
     def button(self):
-        return pipeline_widgets.Qt.LeftButton
+        return pipeline_widgets.Qt.MouseButton.LeftButton
 
     def position(self):
         return Point(self._x)
@@ -41,7 +41,7 @@ class Qt5MouseEvent:
         self._x = x
 
     def button(self):
-        return pipeline_widgets.Qt.LeftButton
+        return pipeline_widgets.Qt.MouseButton.LeftButton
 
     def localPos(self):
         return Point(self._x)
