@@ -26,7 +26,7 @@ from ClearMap.IO import source_geometry, io_ops, dtypes
 
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
 
-import ClearMap.ParallelProcessing.DataProcessing.StatisticsPointListCode as code
+import ClearMap.ParallelProcessing.DataProcessing.statistics.StatisticsPointListCode as code
 
 ###############################################################################
 ### Voxelization
