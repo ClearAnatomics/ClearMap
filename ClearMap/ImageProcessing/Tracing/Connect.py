@@ -21,7 +21,7 @@ import ClearMap.ImageProcessing.Differentiation.Hessian as cur
 import ClearMap.ImageProcessing.Topology.Topology3d as t3d
 
 import ClearMap.Visualization.Plot3d as p3d
-from ClearMap.Utils.utilities import sanitize_n_processes
+from ClearMap.Utils.utilities import sanitize_n_processes, worker_pool_context
 
 
 def extractNeighbourhood(data, center, radius):
@@ -510,7 +510,7 @@ def addConnections(data, mask, skeleton, points, radius = 20,
       result = [processSingleConnection(a) for a in argdata];
     else:
       #mp.process.current_process()._counter = mp.process.itertools.count(1); #reset worker counter
-      pool = mp.Pool(processes = processes);
+      pool = worker_pool_context().Pool(processes=processes)
       #for i,_ in enumerate(pool.imap_unordered(processSingleConnection, argdata)):
       #  if i % 100 == 0:
       #    timer.printElapsedTime('Iteration %d / %d' % (i + ranges[b], npts));

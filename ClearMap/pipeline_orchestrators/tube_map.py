@@ -120,7 +120,7 @@ from ClearMap.Analysis.graphs.graph_weights import GraphWeight
 from ClearMap.IO.assets_specs import weighted_sub_type
 
 from ClearMap.Utils.events import WorkspaceChannelsUpdated
-from ClearMap.Utils.utilities import sanitize_n_processes
+from ClearMap.Utils.utilities import sanitize_n_processes, worker_pool_context
 from ..Utils.nvidia_utils import get_free_v_ram, clear_cuda_cache
 from ClearMap.Utils.exceptions import (PlotGraphError, ClearMapVRamException, ChannelsNotPixelAlignedError,
                                        MissingRequirementException, MissingAssetError, AssetNotFoundError,
@@ -686,7 +686,8 @@ class BinaryVesselProcessor(TubeMapOrchestrator):
 
         self.post_process_binary_combined()
         if self.config['binarization']['combined'].get('compress'):
-            with ProcessPoolExecutor(max_workers=1) as executor:  # Send to separate process to avoid blocking
+            # Send to separate process to avoid blocking
+            with ProcessPoolExecutor(max_workers=1, mp_context=worker_pool_context()) as executor:
                 executor.submit(sink_asset.compress, algorithm='bz2')
 
     def post_process_binary_combined(self):

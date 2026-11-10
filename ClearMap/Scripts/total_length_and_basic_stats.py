@@ -14,6 +14,7 @@ from ClearMap.Analysis.vasculature.vasc_graph_utils import remove_surface
 from ClearMap.Alignment.Annotation import Annotation
 from ClearMap.Analysis.graphs import graph_gt
 from ClearMap.config.atlas import ATLAS_NAMES_MAP
+from ClearMap.Utils.utilities import worker_pool_context
 
 MAX_PROCS = 28  # Max number of processes to use for parallel processing
 MIN_CHUNK_SIZE = 5
@@ -107,7 +108,7 @@ def get_total_length(graph, coordinates_type):
     try:  # try parallel processing
         n_chunks_per_core = int((len(coordinates_chunks) / MAX_PROCS) / 2)
         n_chunks_per_core = max(MIN_CHUNK_SIZE, n_chunks_per_core)
-        with ProcessPoolExecutor(MAX_PROCS) as executor:
+        with ProcessPoolExecutor(MAX_PROCS, mp_context=worker_pool_context()) as executor:
             results = executor.map(get_length, coordinates_chunks, chunksize=n_chunks_per_core)
         results = list(results)
         lengths = np.array(results)
@@ -121,7 +122,7 @@ def compute_stat_on_radii(graph, stat_func=np.std):
     try:  # try parallel processing
         n_chunks_per_core = int((len(radii_chunks) / MAX_PROCS) / 2)
         n_chunks_per_core = max(MIN_CHUNK_SIZE, n_chunks_per_core)
-        with ProcessPoolExecutor(MAX_PROCS) as executor:
+        with ProcessPoolExecutor(MAX_PROCS, mp_context=worker_pool_context()) as executor:
             results = executor.map(stat_func, radii_chunks, chunksize=n_chunks_per_core)
         results = list(results)
         stats = np.array(results)
@@ -146,7 +147,7 @@ def get_edge_annotations(graph):
     try:  # try parallel processing
         n_chunks_per_core = int((len(annotation_chunks) / MAX_PROCS) / 2)
         n_chunks_per_core = max(MIN_CHUNK_SIZE, n_chunks_per_core)
-        with ProcessPoolExecutor(MAX_PROCS) as executor:
+        with ProcessPoolExecutor(MAX_PROCS, mp_context=worker_pool_context()) as executor:
             results = executor.map(vote_annotation, annotation_chunks, chunksize=n_chunks_per_core)
         results = list(results)
         _ = np.array(results)

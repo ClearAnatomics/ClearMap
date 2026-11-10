@@ -43,7 +43,7 @@ from ClearMap.Alignment.Stitching.layout_graph_utils import (get_connected_compo
                                                              get_positions_from_tree)
 from ClearMap.Utils.exceptions import ClearMapIoException, ClearMapFileNotFoundError
 
-from ClearMap.Utils.utilities import CancelableProcessPoolExecutor, sanitize_n_processes
+from ClearMap.Utils.utilities import CancelableProcessPoolExecutor, sanitize_n_processes, worker_pool_context
 
 from ClearMap.Utils.Lazy import lazy_mixin
 
@@ -2828,7 +2828,7 @@ def align_layout(layout, max_shifts = 10, clip = None, background = None, proces
     else:
         layout.sources_as_virtual()
         alignments = layout.alignments
-        with concurrent.futures.ProcessPoolExecutor(processes) as executor:
+        with concurrent.futures.ProcessPoolExecutor(processes, mp_context=worker_pool_context()) as executor:
             results = executor.map(_align, [a.pre for a in alignments], [a.post for a in alignments], range(n_alignments))
         results = list(results)
         #layout.sources_as_real()
@@ -2910,7 +2910,7 @@ def align_layout_on_tiling(layout, overlaps = 10, max_shifts = 10, clip = None, 
     else:
         layout.sources_as_virtual()
         alignments = layout.alignments
-        with concurrent.futures.ProcessPoolExecutor(processes) as executor:
+        with concurrent.futures.ProcessPoolExecutor(processes, mp_context=worker_pool_context()) as executor:
             results = executor.map(_align, [a.pre for a in alignments], [a.post for a in alignments], axes, range(n_alignments))
         results = list(results)
         #layout.sources_as_real()
@@ -2998,7 +2998,7 @@ def align_layout_axis(layout, axis = 2, depth = 10, max_shifts = 10, axis_range 
         layout.sources_as_virtual()
         alignments = layout.alignments
         #print('align_axis')
-        with concurrent.futures.ProcessPoolExecutor(processes) as executor:
+        with concurrent.futures.ProcessPoolExecutor(processes, mp_context=worker_pool_context()) as executor:
             results = executor.map(_align, [a.pre for a in alignments], [a.post for a in alignments], range(n_alignments))
         results = list(results)
 
@@ -3274,7 +3274,7 @@ def align_layout_rigid_mips(layout, depth = 10, max_shifts = 10, ranges = None, 
         layout.sources_as_virtual()
         alignments = layout.alignments
         print('align_axis')
-        with concurrent.futures.ProcessPoolExecutor(processes) as executor:
+        with concurrent.futures.ProcessPoolExecutor(processes, mp_context=worker_pool_context()) as executor:
             results = executor.map(_align, [a.pre for a in alignments], [a.post for a in alignments], range(n_alignments))
         results = list(results)
 

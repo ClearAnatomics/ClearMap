@@ -16,7 +16,7 @@ from ClearMap.IO.source.backends.mmp_backend import MMPSource
 from ClearMap.IO.workspace2 import Workspace2
 
 from ClearMap.Utils.exceptions import MissingRequirementException
-from ClearMap.Utils.utilities import sanitize_n_processes
+from ClearMap.Utils.utilities import sanitize_n_processes, worker_pool_context
 
 from ClearMap.config.config_coordinator import ConfigCoordinator
 
@@ -319,7 +319,7 @@ class TractMapProcessor(ChannelPipelineOrchestrator):
                                  dtype='int64', shape=(coordinates_transformed.shape[0], 1),
                                  return_buffer=False)
 
-        with AnnotationManager() as manager:
+        with AnnotationManager(ctx=worker_pool_context()) as manager:
             annotator = manager.Annotation(self.registration_processor.annotator_of(self.channel))
             labeling_fn = functools.partial(label_points_wrapper, annotator)
             labeling_fn.__name__ = 'label_points'  # for block_processing prints

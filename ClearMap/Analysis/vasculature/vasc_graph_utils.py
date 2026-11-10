@@ -7,7 +7,7 @@ import igraph
 import numpy as np
 
 from ClearMap.Alignment import Annotation as annotation, Annotation as ano
-from ClearMap.Utils.utilities import sanitize_n_processes
+from ClearMap.Utils.utilities import sanitize_n_processes, worker_pool_context
 
 """These are the values of the "nkind" property of the edges in the graph
 these are used to have an integer value for the edges that can be used in the linear system"""
@@ -327,7 +327,7 @@ def parallel_get_vessels_lengths(graph, edge_coordinates_name='coordinates', cli
     if n_processes > 1:
         try:  # try parallel processing
             chunk_size = max(min_chunk_size, len(vessels_coordinates) // (2 * n_processes))
-            with ProcessPoolExecutor(n_processes) as executor:
+            with ProcessPoolExecutor(n_processes, mp_context=worker_pool_context()) as executor:
                 results = executor.map(get_vessel_length, vessels_coordinates, chunksize=chunk_size)
             vessels_lengths = np.array(list(results))
         except BrokenProcessPool:  # Go single threaded

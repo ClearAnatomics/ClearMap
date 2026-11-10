@@ -22,8 +22,6 @@ from pathlib import Path
 import numpy as np
 import scipy.ndimage as ndi
 
-import multiprocessing as mp
-
 from ClearMap.IO.source import Source as source_mod
 import ClearMap.IO.FileUtils as fu
 from ClearMap import Settings as settings
@@ -34,7 +32,7 @@ import ClearMap.ParallelProcessing.BlockProcessing as bp
 import ClearMap.ParallelProcessing.DataProcessing.ArrayProcessing as ap
 
 import ClearMap.Utils.Timer as tmr
-from ClearMap.Utils.utilities import sanitize_n_processes
+from ClearMap.Utils.utilities import sanitize_n_processes, worker_pool_context
 from ClearMap.IO import source_initialization, io_ops
 
 
@@ -297,7 +295,7 @@ def generate_lookup_table(function = index_to_smoothing, verbose = True, process
     #import concurrent.futures as cf
     #with cf.ProcessPoolExecutor(max_workers=processes) as executor:
     #  lut = executor.map(function, range(2**27));
-    pool = mp.Pool(processes)
+    pool = worker_pool_context().Pool(processes)
     lut = pool.map(function, range(2**27), chunksize=2**27//8//processes)
     pool.close()
     pool.join()

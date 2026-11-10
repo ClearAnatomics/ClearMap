@@ -23,7 +23,6 @@ import functools
 from pathlib import Path
 
 import numpy as np
-import multiprocessing as mp
 
 import ClearMap.ImageProcessing.Topology.Topology3d as t3d
  
@@ -35,7 +34,7 @@ import ClearMap.Utils.Timer as tmr
 import ClearMap.IO.FileUtils as fu
 from ClearMap import Settings as settings
 from ClearMap.IO import io_ops
-from ClearMap.Utils.utilities import sanitize_n_processes, available_cpu_count
+from ClearMap.Utils.utilities import sanitize_n_processes, available_cpu_count, worker_pool_context
 
 
 ###############################################################################
@@ -242,7 +241,7 @@ def match_non_removable(index, verbose = True):
 def generate_lookup_table(function = match_index, verbose = True):
   """Generates lookup table for templates"""
    
-  pool = mp.Pool(available_cpu_count())
+  pool = worker_pool_context().Pool(available_cpu_count())
   lut = pool.map(function, range(2**26),chunksize=2**26/8/available_cpu_count())
   lut = list(lut)
   

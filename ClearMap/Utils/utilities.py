@@ -13,6 +13,7 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import inspect
+import multiprocessing
 import os
 import platform
 import re
@@ -76,6 +77,26 @@ def is_headless() -> bool:
     )
 
 
+def worker_pool_context():
+    """
+    The multiprocessing context in which every ClearMap pool of worker processes is created.
+
+    The workers of ClearMap inherit the state of their parent (module globals, open memory maps, the status of the
+    assets, local classes), which only a forked process does. Linux used to fork by default, but Python 3.14 makes
+    ``forkserver`` the default there: a pool created without a context would then start workers that miss that state.
+    The start method is therefore named here, once, for all the pools. The other platforms keep their own default
+    (``spawn`` on macOS and Windows, where ``fork`` is unsafe or missing).
+
+    Returns
+    -------
+    multiprocessing.context.BaseContext
+        ``fork`` on Linux, the default context of the platform otherwise.
+    """
+    if sys.platform.startswith('linux'):
+        return multiprocessing.get_context('fork')
+    return multiprocessing.get_context()
+
+
 class CancelableProcessPoolExecutor(ProcessPoolExecutor):
     """
     A :class:`~concurrent.futures.ProcessPoolExecutor` that can be shut down by another thread than the one using it.
@@ -86,8 +107,8 @@ class CancelableProcessPoolExecutor(ProcessPoolExecutor):
     a file descriptor that is already closed (``OSError: [Errno 9] Bad file descriptor``) or, worse, already reused.
     The shutdowns are therefore serialized: the later ones wait for the first and find nothing left to do.
     """
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, max_workers=None, mp_context=None, *args, **kwargs):
+        super().__init__(max_workers, mp_context or worker_pool_context(), *args, **kwargs)
         self._shutdown_serializer = threading.Lock()
 
     def shutdown(self, wait=True, *, cancel_futures=False):

@@ -70,7 +70,8 @@ from ClearMap.IO.tile_patterns import pattern_finders_from_base_dir, ChannelPatt
 from ClearMap.config.channel import ChannelId
 from ClearMap.config.compound_keys import compound_channel_parts
 from ClearMap.Utils.exceptions import ClearMapValueError
-from ClearMap.Utils.utilities import bytes_to_human, trim_or_pad, available_cpu_count, sanitize_n_processes
+from ClearMap.Utils.utilities import (bytes_to_human, trim_or_pad, available_cpu_count, sanitize_n_processes,
+                                      worker_pool_context)
 from ClearMap.Utils.nvidia_utils import gpu_params
 from ClearMap.Visualization import Plot3d as plot_3d
 from ClearMap.Visualization.Qt.widgets import Scatter3D
@@ -1759,7 +1760,7 @@ class PerfMonitor(QWidget):
         self.cpu_proc_file_path = tempfile.mkstemp(suffix='_clearmap_cpu.proc')[-1]
         self.file_watcher = QtCore.QFileSystemWatcher([self.gpu_proc_file_path, self.cpu_proc_file_path])
         self.file_watcher.fileChanged.connect(self.handle_proc_changed)
-        self.pool = ProcessPoolExecutor(max_workers=1)
+        self.pool = ProcessPoolExecutor(max_workers=1, mp_context=worker_pool_context())
 
         # psutil.process_iter() takes ~0.2 s: sample in a background thread, never on the main thread
         self._cpu_sampler = ThreadPoolExecutor(max_workers=1, thread_name_prefix='perf_monitor_cpu')
