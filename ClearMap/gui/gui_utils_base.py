@@ -366,10 +366,18 @@ def populate_combobox(box: "QComboBox", items: list[str]):
         box.blockSignals(False)
 
 
-def ensure_qapp() -> QApplication:
+def ensure_qapp(*, style_sheet: str = '') -> QApplication:
+    """
+    The running QApplication, else a new one with ``style_sheet``.
+
+    A running application keeps its style sheet: the GUI has the one of its theme, which a dialog opened from it (e.g.
+    the upgrade of an experiment) must not replace.
+    """
     app = QApplication.instance()
     if app is None:
         app = QApplication([])
+        if style_sheet:
+            app.setStyleSheet(style_sheet)
     return app
 
 

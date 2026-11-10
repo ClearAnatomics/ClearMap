@@ -19,6 +19,7 @@ from ClearMap.config.config_adjusters.dict_ops import (try_get_item_recursive, s
                                                        del_item_recursive)
 from ClearMap.config.config_adjusters.patch_ops import deep_merge
 from ClearMap.config.config_handler import ConfigHandler, ALTERNATIVES_REG, VERSION_SUFFIX
+from ClearMap.config.early_boot import MachineConfig
 from ClearMap.config.registration_channels import MOVING_OTHER
 
 
@@ -606,14 +607,15 @@ class ExperimentUpgrade_2_1_to_3_0(ExperimentConfigConverter):
 
 def _prepare_the_dialogs():
     """
-    Make the QApplication of the dialogs of an upgrade, in the dark style.
+    Make the QApplication of the dialogs of an upgrade, in the theme of the machine configuration. Started from the
+    GUI, the upgrade uses its application, whose style is left as it is.
 
     The Qt of this module is imported only by the functions that show a dialog: an upgrade that asks nothing (3.0 to
     3.1, with the folder given) runs without Qt, e.g. on a cluster node.
     """
     from ClearMap.gui.gui_utils_base import ensure_qapp
-    from ClearMap.gui.style import dark_style_sheet
-    ensure_qapp().setStyleSheet(dark_style_sheet())
+    from ClearMap.gui.style import application_style_sheet
+    ensure_qapp(style_sheet=application_style_sheet(MachineConfig().theme))
 
 
 def _experiment_folder_from_a_dialog() -> str:
