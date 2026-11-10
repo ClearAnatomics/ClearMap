@@ -18,26 +18,32 @@ REPOSITORY_FOLDER = Path(__file__).resolve().parents[2]
 CREATOR_FOLDER = REPOSITORY_FOLDER / 'ClearMap' / 'gui' / 'creator'
 UI_FILES = sorted(CREATOR_FOLDER.glob('*.ui'))
 NO_QT_KEY = 'no_qt'
+BUILDING_MARKER = 'BUILDING'
 
 BUILD_EVERY_DESIGNER_FILE = '''
 import json, sys
 sys.path.insert(0, sys.argv[1])
 try:
+    import ClearMap.gui  # Chooses the binding (gui/qt_binding), as in the GUI, before qtpy is imported
     from qtpy import QtWidgets
 except Exception as error:  # ImportError, or qtpy's error when it finds no binding
     print(json.dumps({"%(no_qt)s": repr(error)}))
     sys.exit(0)
+print("%(building)s (Qt imported)", flush=True)
 from ClearMap.gui.gui_utils_base import load_ui_into
+print("%(building)s (ClearMap.gui.gui_utils_base imported)", flush=True)
 app = QtWidgets.QApplication([])
+print("%(building)s (QApplication created)", flush=True)
 results = {}
 for ui_name, class_name in json.loads(sys.argv[2]).items():
+    print(f"%(building)s {ui_name}", flush=True)  # The last one names the file of a crash
     try:
         load_ui_into(getattr(QtWidgets, class_name)(), ui_name)
         results[ui_name] = None
     except Exception as error:
         results[ui_name] = f"{type(error).__name__}: {error}"
 print(json.dumps(results))
-''' % {'no_qt': NO_QT_KEY}
+''' % {'no_qt': NO_QT_KEY, 'building': BUILDING_MARKER}
 
 
 def _root_class(ui_file):
@@ -48,9 +54,12 @@ def _root_class(ui_file):
 def build_errors():
     root_classes = {ui_file.name: _root_class(ui_file) for ui_file in UI_FILES}
     environment = {**os.environ, 'QT_QPA_PLATFORM': 'offscreen'}
-    result = subprocess.run([sys.executable, '-I', '-c', BUILD_EVERY_DESIGNER_FILE, str(REPOSITORY_FOLDER),
-                             json.dumps(root_classes)], capture_output=True, text=True, env=environment, timeout=300)
-    assert result.returncode == 0, result.stderr
+    # -X faulthandler: a crash of Qt (a segmentation fault) prints the Python stack instead of nothing
+    result = subprocess.run([sys.executable, '-I', '-X', 'faulthandler', '-c', BUILD_EVERY_DESIGNER_FILE,
+                             str(REPOSITORY_FOLDER), json.dumps(root_classes)],
+                            capture_output=True, text=True, env=environment, timeout=300)
+    assert result.returncode == 0, (f'exit code {result.returncode}, last output: {result.stdout[-500:]!r}\n'
+                                    f'{result.stderr}')
     errors = json.loads(result.stdout.strip().splitlines()[-1])
     if NO_QT_KEY in errors:
         pytest.skip(f'no Qt in {sys.executable}: {errors[NO_QT_KEY]}')
