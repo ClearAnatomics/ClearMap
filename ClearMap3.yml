@@ -54,7 +54,6 @@ dependencies:
   - psutil
   - pytest
   - jsonschema
-  - mpld3  # WARNING Maybe pip
   - lxml  # gui/gui_logging.py (lxml.html); no longer < 5.2, napari >= 0.5 depends on lxml_html_clean
   - pip
   - pip:
