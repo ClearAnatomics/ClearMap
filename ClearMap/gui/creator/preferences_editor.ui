@@ -420,6 +420,27 @@
            </property>
           </widget>
          </item>
+         <item row="3" column="0">
+          <widget class="QLabel" name="themeLabel">
+           <property name="text">
+            <string>Theme (applies at the next start)</string>
+           </property>
+          </widget>
+         </item>
+         <item row="3" column="1">
+          <widget class="QComboBox" name="themeComboBox">
+           <item>
+            <property name="text">
+             <string>qdarkstyle</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>system</string>
+            </property>
+           </item>
+          </widget>
+         </item>
         </layout>
        </widget>
       </item>

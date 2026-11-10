@@ -377,6 +377,9 @@ class ClearMapAppBase(QMainWindow):
 
     def fix_styles(self):
         """The meta function calling all the style functions"""
+        if _machine_cfg.theme != style.THEME_QDARKSTYLE:
+            self.fix_sizes()  # The colours of ClearMap are made for qdarkstyle: another theme keeps its own
+            return
         self.setStyleSheet(style.BTN_STYLE_SHEET)  # Makes it look qdarkstyle
         # self.fix_btns_stylesheet()
         self.fix_widgets_backgrounds()
@@ -1736,7 +1739,7 @@ def main(app_, splash_):
     tab_registry = TabRegistry()
     gui = GuiController(bus, experiment, tab_registry, group_controller)
 
-    app_.setStyleSheet(style.dark_style_sheet())
+    app_.setStyleSheet(style.application_style_sheet(_machine_cfg.theme))
     gui.start(app_, centered=True)
 
     splash_.finish(gui.window)

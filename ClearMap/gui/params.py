@@ -29,6 +29,7 @@ from ClearMap.config.registration_channels import (ALIGN_WITH_NOTHING, ALIGN_WIT
                                                    REGISTRATION_DIRECTIONS,
                                                    partner_change, registration_direction)
 from ClearMap.Utils.exceptions import ChannelNameTakenError, ClearMapConfigError, ClearMapValueError
+from ClearMap.gui import style
 from ClearMap.Utils.utilities import snake_to_title, trim_or_pad
 from ClearMap.config.config_adjusters.dict_ops import set_item_recursive
 from ClearMap.config.config_adjusters.patch_ops import REPLACE
@@ -2204,6 +2205,7 @@ class PreferencesParams(UiParameter):
     start_full_screen: bool
     lut: str
     font_size: int
+    theme: str
     pattern_finder_min_n_files: int
     three_d_plot_bg: str
 
@@ -2216,6 +2218,7 @@ class PreferencesParams(UiParameter):
             "lut": ParamLink(["default_lut"], self.tab.lutComboBox,
                              cast_to_ui=self.str_to_capitalize, cast_from_ui=self.str_to_lower, default="viridis"),
             "font_size": ParamLink(["font_size"], self.tab.fontSizeSpinBox,),
+            "theme": ParamLink(["theme"], self.tab.themeComboBox, default=style.DEFAULT_THEME),
             "pattern_finder_min_n_files": ParamLink(["pattern_finder_min_n_files"],
                                                     self.tab.patternFinderMinFilesSpinBox, default=2),
             "three_d_plot_bg": ParamLink(["three_d_plot_bg"], self.tab.threeDPlotsBackgroundComboBox,
