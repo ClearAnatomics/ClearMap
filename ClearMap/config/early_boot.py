@@ -169,6 +169,11 @@ class MachineConfig:
         return (self.get('verbosity', 'info')).lower()
 
     @cached_property
+    def theme(self) -> str:
+        """The name of the theme of the GUI (see ClearMap.gui.style.THEMES), not checked here"""
+        return str(self.get('theme', 'qdarkstyle')).lower()
+
+    @cached_property
     def start_full_screen(self) -> bool:
         return self.get('start_full_screen', False)
 

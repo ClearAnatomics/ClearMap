@@ -16,6 +16,13 @@ import qdarkstyle
 import qtpy
 from qdarkstyle import DarkPalette
 
+from ClearMap.Utils.exceptions import ClearMapConfigError
+
+THEME_QDARKSTYLE = 'qdarkstyle'  # The look ClearMap is tested with: its colours below are made for it
+THEME_SYSTEM = 'system'  # No style sheet: the widgets keep the Qt style (and palette) of the desktop
+THEMES = (THEME_QDARKSTYLE, THEME_SYSTEM)
+DEFAULT_THEME = THEME_QDARKSTYLE
+
 QDARKSTYLE_BACKGROUND = '#2E3436'
 WARNING_YELLOW = '#FADF11'
 DARK_BACKGROUND = '#282D2F'
@@ -35,6 +42,24 @@ QPushButton {{
 def dark_style_sheet() -> str:
     """The qdarkstyle style sheet for the Qt binding that qtpy loaded (qtpy.API: 'pyqt5', 'pyqt6'...)"""
     return qdarkstyle.load_stylesheet(qt_api=qtpy.API)
+
+
+def application_style_sheet(theme: str) -> str:
+    """
+    The style sheet of the whole application for a theme of THEMES: the one of qdarkstyle, or none (empty) for the
+    system theme.
+
+    Raises
+    ------
+    ClearMapConfigError
+        If the theme is not one of THEMES.
+    """
+    if theme == THEME_QDARKSTYLE:
+        return dark_style_sheet()
+    if theme == THEME_SYSTEM:
+        return ''
+    raise ClearMapConfigError(f'Unknown theme "{theme}", expected one of {THEMES}; '
+                              f'set "theme" in the machine configuration (or in the preferences) to one of them')
 
 HIGHLIGHTED_BTN_STYLE = f"""
     background-color: {HIGHLIGHTED_BTN_BG};

@@ -139,3 +139,14 @@ def test_cell_filter_distance_from_surface_must_be_a_non_negative_integer(src_di
     cfg['channels']['cells']['cell_filtration']['distance_from_surface_px'] = bad_distance
 
     assert list(validator.iter_errors(cfg)), f'{bad_distance!r} should not be a valid distance from the surface'
+
+
+@pytest.mark.parametrize('theme, valid', [('qdarkstyle', True), ('system', True), ('adwaita', False), ('', False),
+                                          (None, False)])
+def test_the_machine_config_validates_with_a_theme_of_the_gui(src_dir: Path, schemas_dir: Path, schema_registry,
+                                                              theme, valid):
+    schema = _load_schema(schemas_dir / 'machine.schema.yaml')
+    config = _load_yaml(src_dir / 'machine.yml')
+    config['theme'] = theme
+
+    assert (not list(Validator(schema, registry=schema_registry).iter_errors(config))) is valid
