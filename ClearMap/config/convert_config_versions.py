@@ -6,7 +6,7 @@ import warnings
 from copy import deepcopy
 from functools import wraps
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Dict, Tuple
+from typing import Callable, Dict, Tuple
 
 import numpy as np
 from packaging.version import Version
@@ -25,9 +25,6 @@ from ClearMap.gui.dialogs import RenameChannelsDialog, VerifyRenamingDialog
 from ClearMap.gui.dialog_helpers import get_directory_dlg
 from ClearMap.gui.gui_utils_base import ensure_qapp, DIALOG_ACCEPTED
 from ClearMap.gui.style import dark_style_sheet
-
-if TYPE_CHECKING:
-    from qtpy.QtWidgets import QApplication
 
 
 SUPPORTED_VERSIONS = [Version(v) for v in ('2.1', '3.0', '3.1')]
@@ -407,9 +404,8 @@ def convert(cfg_path, *, prev_v: str | Version = '2.1', new_v: str | Version = '
     return current_path
 
 class ExperimentConfigConverter:
-    def __init__(self, root: Path, app: QApplication):
+    def __init__(self, root: Path):
         self.root = Path(root).expanduser().resolve()
-        self.app = app
         self.cfg_loader = ConfigHandler(self.root)
         self._aborted = False
 
@@ -434,8 +430,8 @@ class ExperimentUpgrade_2_1_to_3_0(ExperimentConfigConverter):
     Handles upgrade of a full experiment folder from 2.1 → 3.0.
     """
 
-    def __init__(self, root: Path, app: QApplication):
-        super().__init__(root, app)
+    def __init__(self, root: Path):
+        super().__init__(root)
         self.sample_cfg_path: Path | None = None
         self.alignment_cfg_path: Path | None = None
         self.cell_map_cfg_path: Path | None = None
@@ -618,7 +614,7 @@ def convert_2_1_to_3_0(main_folder='', create_app=True):
     if not main_folder:
         return
 
-    upgrader = ExperimentUpgrade_2_1_to_3_0(main_folder, app)
+    upgrader = ExperimentUpgrade_2_1_to_3_0(main_folder)
     upgrader.run()
 
 
@@ -819,8 +815,8 @@ class ExperimentUpgrade_3_0_to_3_1(ExperimentConfigConverter):
     - bump clearmap_version to 3.1.0
     """
 
-    def __init__(self, root: Path, app: QApplication):
-        super().__init__(root, app)
+    def __init__(self, root: Path):
+        super().__init__(root)
         self.sample_cfg_path: Path | None = None
 
     def _convert_sample(self):
@@ -863,7 +859,7 @@ def convert_3_0_to_3_1(main_folder: str | Path = '', create_app: bool = True):
     if not main_folder:
         return
 
-    upgrader = ExperimentUpgrade_3_0_to_3_1(main_folder, app)
+    upgrader = ExperimentUpgrade_3_0_to_3_1(main_folder)
     upgrader.run()
 
 
