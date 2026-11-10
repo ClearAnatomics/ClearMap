@@ -47,9 +47,10 @@ dependencies:
   - graph-tool  # Graph.remove_self_loops finds the function in generation (recent) or stats (<= 2.45)
   - python-igraph
 #  - pytorch<=2.2
-  - mkl<2024.1  # Breaks pytorch (https://github.com/pytorch/pytorch/issues/123097)
+  - mkl<2024.1  # Breaks pytorch (https://github.com/pytorch/pytorch/issues/123097). For the conda pytorch:
+  #               the installer removes it when it installs pytorch with pip
 #  - pytorch-cuda
-  - cudatoolkit=11.8
+  - cudatoolkit=11.8  # Placeholder: the installer (install_utils.patch_env) replaces or removes it for the machine
   - xmltodict  # to compensate for old tifffile
   - psutil
   - pytest
