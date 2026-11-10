@@ -331,6 +331,7 @@ def main():
         version=read_clearmap_version(),
         description='3D cell counting and vasculature analysis for lightsheet microscopy',
         install_requires=requirements,
+        python_requires='>=3.11',  # enum.StrEnum (config_adjusters/policy_specs.py)
         packages=packages,
         ext_modules=ext_modules,
         cmdclass={'build_ext': parallel_build_ext, 'build_py': build_py_with_commit_stamp},
