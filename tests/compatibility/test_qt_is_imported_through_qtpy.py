@@ -9,16 +9,13 @@ import ast
 from tests.source_scan import maintained_syntax_trees
 
 SCANNED_DIRECTORIES = ('ClearMap', 'tests')
-ALLOWED_MODULES = (
-    'ClearMap/gui/pyuic_utils.py',  # FIXME: replaced by qtpy.uic.loadUi in the Qt 6 series (B6)
-)
 QT_BINDINGS = ('PyQt5', 'PyQt6', 'PySide2', 'PySide6', 'sip', 'shiboken2', 'shiboken6')
 PYQT_NAMES = ('pyqtSignal', 'pyqtSlot', 'pyqtProperty')
 PYQT5_ONLY_METHOD_NAME = 'exec_'
 
 
 def _syntax_trees():
-    return maintained_syntax_trees(SCANNED_DIRECTORIES, allowed_modules=ALLOWED_MODULES)
+    return maintained_syntax_trees(SCANNED_DIRECTORIES)
 
 
 def _binding_imported_by(node):

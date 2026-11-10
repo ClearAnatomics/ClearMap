@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 import ClearMap.gui
-from ClearMap.gui.pyuic_utils import ui_without_resource_includes
+from ClearMap.gui.gui_utils_base import ui_without_resource_includes
 
 CREATOR_FOLDER = Path(ClearMap.gui.__file__).parent / 'creator'
 UI_FILES = sorted(CREATOR_FOLDER.glob('*.ui'))

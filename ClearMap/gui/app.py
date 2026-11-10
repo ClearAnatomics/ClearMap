@@ -40,7 +40,6 @@ __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 from ClearMap.gui.gui_utils_base import unique_connect
-from ClearMap.gui.widgets import ClickableFrame
 
 print('Starting base imports...', flush=True)
 import os
@@ -187,7 +186,6 @@ from ClearMap.pipeline_orchestrators.experiment_controller import ExperimentCont
 from ClearMap.gui.tabs_interfaces import GenericTab, ExperimentTab, GroupTab
 from ClearMap.gui.preferences import PreferenceUi
 from ClearMap.gui.gui_logging import Printer
-from ClearMap.gui.pyuic_utils import loadUiType
 from ClearMap.gui import widgets as cmp_widgets
 from ClearMap.gui import style
 from ClearMap.gui import dialogs as dlgs
@@ -206,11 +204,7 @@ ABOUT_INFO = AboutInfo(software_name=f'You are running ClearMap version {CLEARMA
 
 HARD_DEFAULT_FONT_SIZE = 11
 
-Ui_ClearMapGui, _ = loadUiType(os.path.join(base_utils.UI_FOLDER, 'creator', 'mainwindow.ui'),
-                               patch_parent_class=False, customWidgets={"ClickableFrame": ClickableFrame})
-
-
-class ClearMapAppBase(QMainWindow, Ui_ClearMapGui):
+class ClearMapAppBase(QMainWindow):
     """
     The interface for the ClearMapGui class
 
@@ -744,7 +738,7 @@ class ClearMapApp(ClearMapAppBase):
         self.experiment_controller = experiment_controller
         self.gui_controller = gui_controller
 
-        self.setupUi(self)
+        base_utils.load_ui_into(self, 'mainwindow.ui')
         self.setWindowIcon(CLEARMAP_ICON)
 
         self.config_loader = ConfigHandler('')

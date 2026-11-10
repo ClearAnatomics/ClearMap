@@ -14,15 +14,17 @@ import os
 from math import sqrt, ceil, floor
 
 import warnings
+import xml.etree.ElementTree as ET
+from io import StringIO
 from pathlib import Path
 from typing import Optional, Callable
 
+from qtpy import QtWidgets
 from qtpy.QtCore import Signal
 from qtpy.QtWidgets import QLayout, QApplication, QWidget, \
     QToolBox  # REFACTOR: local imports or strings for annotations?
 
 # WARNING: declared here for dependency visibility but imported locally where used
-# from ClearMap.gui.pyuic_utils import loadUiType
 # from ClearMap.gui.widget_monkeypatch_callbacks import recursive_patch_widgets  # WARNING: local import
 
 warnings.filterwarnings('ignore', category=RuntimeWarning, module='ClearMap.gui.gui_utils_base')  # For surface_project
@@ -40,6 +42,7 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 
 UI_FOLDER = str(Path(__file__).resolve().parent)
+RESOURCES_ELEMENT_TAG = 'resources'
 
 
 
@@ -117,15 +120,64 @@ class TmpDebug:  # FIXME: move as part of workspace
         self.workspace.debug = False
 
 
-def create_clearmap_widget(ui_name: str, patch_parent_class: bool, window_title: Optional[str] = None) -> QWidget:
+def ui_without_resource_includes(ui_file):
+    """
+    A Qt Designer file without its ``<resources>`` element, as a file-like object.
+
+    The ``<include location="icons.qrc"/>`` of a designer file makes the PyQt loaders import a generated Python module
+    (``icons_rc``), which ClearMap does not have: the resources are compiled and registered with Qt by
+    :mod:`ClearMap.gui.qt_resources`, so the ``:/icons/...`` paths of the file work without it. The file on disk is
+    unchanged, Designer still shows its icons.
+
+    Arguments
+    ---------
+    ui_file : str or pathlib.Path or file-like
+        The designer file.
+
+    Returns
+    -------
+    io.StringIO
+    """
+    tree = ET.parse(ui_file)
+    root = tree.getroot()
+    for resources in root.findall(RESOURCES_ELEMENT_TAG):
+        root.remove(resources)
+    ui_text = StringIO()
+    tree.write(ui_text, encoding='unicode')
+    ui_text.seek(0)
+    return ui_text
+
+
+def load_ui_into(widget: QWidget, ui_name: str) -> None:
+    """
+    Build the content of a Qt Designer file of ``ClearMap/gui/creator`` into an existing widget.
+
+    The properties of the root of the file (title, geometry, sizes...) are set on ``widget``, and its children become
+    attributes of ``widget``, named after their objectName. ``widget`` must be an instance of the root class of the file
+    (or of a subclass). The ``<resources>`` of the file are ignored (:func:`ui_without_resource_includes`).
+
+    Parameters
+    ----------
+    widget : QWidget
+        The widget to build into.
+    ui_name : str
+        The name of the file, with or without ``.ui``.
+    """
     if not ui_name.endswith('.ui'):
         ui_name += '.ui'
-    from ClearMap.gui.pyuic_utils import loadUiType
-    widget_class, _ = loadUiType(os.path.join(UI_FOLDER, 'creator', ui_name), patch_parent_class=patch_parent_class)
-    widget = widget_class()
+    from qtpy import uic  # Local: see the warning of the module docstring
+    uic.loadUi(ui_without_resource_includes(os.path.join(UI_FOLDER, 'creator', ui_name)), widget)
+
+
+def create_clearmap_widget(ui_name: str, widget_class_name: str, window_title: Optional[str] = None) -> QWidget:
+    """
+    A widget of the Qt class ``widget_class_name`` (e.g. 'QDialog') built from a Qt Designer file of
+    ``ClearMap/gui/creator``, with the methods of its compound boxes (``widget_monkeypatch_callbacks``).
+    """
+    widget = getattr(QtWidgets, widget_class_name)()
+    load_ui_into(widget, ui_name)
     if window_title is not None:
-        widget.setWindowTitle(window_title)
-    widget.setupUi()
+        widget.setWindowTitle(window_title)  # After the load, which sets the title of the file
     from ClearMap.gui.widget_monkeypatch_callbacks import recursive_patch_widgets
     recursive_patch_widgets(widget)
     return widget

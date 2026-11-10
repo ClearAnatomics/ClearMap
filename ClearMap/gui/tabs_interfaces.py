@@ -117,7 +117,7 @@ class GenericUi:
         self.params: UiParameter | UiParameterCollection | None = None
 
     def _load_dot_ui(self) -> QWidget:
-        return create_clearmap_widget(self.ui_file_name, patch_parent_class=self.widget_class_name)
+        return create_clearmap_widget(self.ui_file_name, widget_class_name=self.widget_class_name)
 
     def _init_ui(self) -> None:
         self.ui = self._load_dot_ui()
@@ -413,7 +413,7 @@ class GenericTab(GenericUi, BusSubscriberMixin):
         page = tab_widget.get_channel_widget(channel)
         creating = not page
         if creating:
-            page = create_clearmap_widget(self.channels_ui_name, patch_parent_class='QWidget')
+            page = create_clearmap_widget(self.channels_ui_name, widget_class_name='QWidget')
             channel = tab_widget.add_channel_widget(page, name=channel)
         self._assign_channel_page_id(page, channel)
         return channel, page, creating

@@ -113,7 +113,7 @@ def abort_retry_popup(base_msg, msg) -> bool:  # REFACTOR: duplicate code
 
 
 def make_nested_progress_dialog(title='Processing', overall_maximum=100, sub_process_name='', abort_callback=None, parent=None):
-    dlg = create_clearmap_widget('nested_progress_dialog.ui', patch_parent_class='QDialog', window_title='Progress')
+    dlg = create_clearmap_widget('nested_progress_dialog.ui', widget_class_name='QDialog', window_title='Progress')
 
     progress_icon_path = os.path.join(UI_FOLDER, 'creator', 'graphics_resources', 'searching_mouse.png')
     dlg.progressImageLabel.setPixmap(QPixmap(progress_icon_path))  # TODO: why doesn't work with qrc ??

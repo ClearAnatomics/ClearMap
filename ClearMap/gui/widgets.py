@@ -608,7 +608,7 @@ class WizardWidget:
     This class needs a src_folder, a ui_name, a ui_title. The ui names and titles are used to build
     a dialog from the ui file of the same name and parametrise the dialog
     """
-    def __init__(self, ui_name, ui_title, src_folder="", params=None, app=None, size=None, patch_parent_class='QDialog'):
+    def __init__(self, ui_name, ui_title, src_folder="", params=None, app=None, size=None, widget_class_name='QDialog'):
         """
         Initialize the dialog
 
@@ -631,7 +631,7 @@ class WizardWidget:
         self.params = params
         self.app = app or QtWidgets.QApplication.instance()
 
-        dlg = create_clearmap_widget(ui_name, patch_parent_class=patch_parent_class, window_title=ui_title)
+        dlg = create_clearmap_widget(ui_name, widget_class_name=widget_class_name, window_title=ui_title)
 
         if size is not None:
             if size[0] is None:
@@ -956,7 +956,7 @@ class ManageAssetsWidget(WizardWidget):
         return params
 
     def crop_dialog(self):
-        dlg = create_clearmap_widget('crop_dialog.ui', patch_parent_class='QDialog')  # FIXME: create ui file
+        dlg = create_clearmap_widget('crop_dialog.ui', widget_class_name='QDialog')  # FIXME: create ui file
         self.ortho_viewer.setup(self.selected_assets[0].source, self.params, dlg)
         dvs = self.ortho_viewer.plot_orthogonal_views()
 
@@ -989,7 +989,7 @@ class ManageAssetsWidget(WizardWidget):
             return True
 
     def resample_dialog(self):
-        dlg = create_clearmap_widget('resample_dialog.ui', patch_parent_class='QDialog')  # FIXME: create ui file
+        dlg = create_clearmap_widget('resample_dialog.ui', widget_class_name='QDialog')  # FIXME: create ui file
         dlg.xScaleSpinBox.valueChanged.connect(functools.partial(self.update_resample_params, 'x_scale'))
         dlg.yScaleSpinBox.valueChanged.connect(functools.partial(self.update_resample_params, 'y_scale'))
         dlg.zScaleSpinBox.valueChanged.connect(functools.partial(self.update_resample_params, 'z_scale'))
@@ -1148,7 +1148,7 @@ class PatternDialog(WizardWidget):
         Add a new group of widgets to the dialog
         This is a group of widgets to define a pattern for a set of image files (typically a channel)
         """
-        group_controls = create_clearmap_widget('image_group_ctrls.ui', patch_parent_class='QWidget')
+        group_controls = create_clearmap_widget('image_group_ctrls.ui', widget_class_name='QWidget')
         self.dlg.patternToolBox.addItem(group_controls, f'Image group {self.n_image_groups}')
 
         group_controls.patternButtonBox.button(QDialogButtonBox.Apply).clicked.connect(self.validate_pattern)
@@ -2422,7 +2422,7 @@ class ComparisonsWidgetAdapter:
 class GroupPage:
     """Wrapper around one sample_group_controls.ui page."""
     def __init__(self, *, ui_name: str = 'sample_group_controls.ui', start_folder_getter=lambda: ""):
-        self._widget: QWidget = create_clearmap_widget(ui_name, patch_parent_class='QWidget')
+        self._widget: QWidget = create_clearmap_widget(ui_name, widget_class_name='QWidget')
         self._start = start_folder_getter
         self._config_connected = False  # avoid dupes when wiring up new pages in GroupsWidgetAdapter
 
