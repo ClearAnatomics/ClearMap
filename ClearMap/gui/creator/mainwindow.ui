@@ -23,9 +23,6 @@
    <iconset resource="icons.qrc">
     <normaloff>:/icons/icons/logo_cyber.png</normaloff>:/icons/icons/logo_cyber.png</iconset>
   </property>
-  <property name="styleSheet">
-   <string notr="true">background-color: rgb(46, 52, 54);</string>
-  </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout_5">
     <item>

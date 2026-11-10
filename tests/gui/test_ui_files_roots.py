@@ -21,3 +21,13 @@ def test_only_the_main_window_is_a_qmainwindow():
     main_windows = [ui_file.name for ui_file in ui_files if _root_class(ui_file) == 'QMainWindow']
 
     assert main_windows == [MAIN_WINDOW_UI_FILE_NAME]
+
+
+def test_no_designer_file_sets_a_style_sheet_on_its_root_widget():
+    """The loader sets every property of the root: a root style sheet made for the preview would apply in the GUI"""
+    ui_files = sorted(CREATOR_FOLDER.glob('*.ui'))
+    with_style_sheet = [ui_file.name for ui_file in ui_files if any(
+        root_property.get('name') == 'styleSheet' and (root_property.findtext('string') or '').strip()
+        for root_property in ET.parse(ui_file).getroot().find('widget').findall('property'))]
+
+    assert not with_style_sheet, f'{with_style_sheet}: see gui/creator/README.rst for a dark preview in Designer'
