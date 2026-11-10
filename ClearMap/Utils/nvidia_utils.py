@@ -12,9 +12,14 @@ __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
+import shutil
 import subprocess
 
 from ClearMap.Utils.exceptions import SmiError
+
+NVIDIA_SMI_EXECUTABLE = 'nvidia-smi'
+NVIDIA_SMI_TIMEOUT_S = 10
+"""How long to wait for ``nvidia-smi``: when the driver is broken it can hang instead of failing."""
 
 
 def smi_query(var_name, units=False):
@@ -40,10 +45,10 @@ def smi_query(var_name, units=False):
     subprocess.CalledProcessError
         If ``nvidia-smi`` fails (e.g. there is no NVIDIA GPU).
     """
-    cmd = f'nvidia-smi --query-gpu={var_name} --format=noheader,csv'
+    output_format = 'noheader,csv'
     if not units:
-        cmd += ',nounits'
-    output = subprocess.check_output(cmd, shell=True)
+        output_format += ',nounits'
+    output = subprocess.check_output([NVIDIA_SMI_EXECUTABLE, f'--query-gpu={var_name}', f'--format={output_format}'])
     if "Failed to initialize NVML: Driver/library version mismatch" in output.decode('ascii'):
         raise SmiError(output)
     return output
@@ -101,9 +106,10 @@ def gpu_params(dest_file_path):  # Uses 1 query instead of 3 because too time-co
     dest_file_path : str | Path
         The file to write to: one line ``used (MiB), total (MiB), utilisation (%)`` per GPU, without units.
     """
-    cmd = 'nvidia-smi --query-gpu=memory.used,memory.total,utilization.gpu --format=noheader,csv,nounits'
-    cmd += f' > {dest_file_path}'
-    subprocess.Popen(cmd, shell=True)
+    cmd = [NVIDIA_SMI_EXECUTABLE, '--query-gpu=memory.used,memory.total,utilization.gpu',
+           '--format=noheader,csv,nounits']
+    with open(dest_file_path, 'w') as dest_file:  # The child keeps its own copy of the handle
+        subprocess.Popen(cmd, stdout=dest_file)
 
 
 def clear_cuda_cache():
@@ -116,3 +122,36 @@ def cuda_available() -> bool:
     """Whether torch can use a CUDA device (torch is imported here, so that the callers do not use it directly)"""
     import torch
     return torch.cuda.is_available()
+
+
+def diagnose_nvidia_driver():
+    """
+    Check that the NVIDIA driver answers, when the machine has one.
+
+    A machine without ``nvidia-smi`` (no NVIDIA card, a Mac...) is not an error. When the program exists but fails,
+    the driver and the kernel module are most likely out of sync, which happens after an update of either until the
+    machine is rebooted. The graphics stack (viewers, CUDA) then fails with many unrelated messages.
+
+    Returns
+    -------
+    str | None
+        None if there is no NVIDIA driver to check or if it answers. Otherwise a message for the user which says what
+        ``nvidia-smi`` reported and what to do.
+    """
+    if shutil.which(NVIDIA_SMI_EXECUTABLE) is None:
+        return None
+    try:
+        result = subprocess.run([NVIDIA_SMI_EXECUTABLE, '-L'], capture_output=True, text=True, check=False,
+                                timeout=NVIDIA_SMI_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        report = f'did not answer within {NVIDIA_SMI_TIMEOUT_S} s'
+    except OSError as err:
+        report = f'could not be run ({err})'
+    else:
+        if result.returncode == 0:
+            return None
+        output_lines = (result.stdout + result.stderr).strip().splitlines()
+        report = f'failed: "{output_lines[0] if output_lines else f"exit status {result.returncode}"}"'
+    return (f'{NVIDIA_SMI_EXECUTABLE} {report}. The NVIDIA driver and the kernel module are probably out of sync '
+            f'(this happens after an update of the driver or of the kernel). Reboot the machine and start ClearMap '
+            f'again. Until then the GPU analyses and the viewers may fail.')
