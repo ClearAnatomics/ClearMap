@@ -369,7 +369,7 @@ def open_application(sample_dir: Path, window_size: tuple[int, int], *, panel_wi
     import ClearMap.gui.app as app_module  # WARNING: runs the first boot and shows the splash screen at import
     from ClearMap.Utils.event_bus import EventBus, GUI_THREAD
     from ClearMap.gui.event_delivery import GuiThreadDelivery
-    from ClearMap.gui.style import dark_style_sheet
+    from ClearMap.gui.style import application_style_sheet
     from ClearMap.gui.tab_registry import TabRegistry
 
     qapp = app_module.app
@@ -380,7 +380,7 @@ def open_application(sample_dir: Path, window_size: tuple[int, int], *, panel_wi
     experiment, group_controller = app_module.build_business_objects(bus)
     gui = app_module.GuiController(bus, experiment, TabRegistry(), group_controller)
 
-    qapp.setStyleSheet(dark_style_sheet())
+    qapp.setStyleSheet(application_style_sheet(app_module._machine_cfg.theme))  # As app.main
     gui.start(qapp, centered=False)
     window = gui.window
     app_module.splash.finish(window)
