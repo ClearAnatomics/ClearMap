@@ -20,7 +20,7 @@ from .utils import init_sample_manager_and_processors
 from ..Alignment.utils import get_all_region_ids
 from ..Analysis.Statistics.group_assets import GroupResultsAssets
 from ..IO.assets_constants import CHANNELS_ASSETS_TYPES_CONFIG
-from ..Utils.exceptions import GroupStatsError, MissingRequirementException
+from ..Utils.exceptions import ClearMapRuntimeError, GroupStatsError, MissingRequirementException
 from ..config.atlas import ATLAS_NAMES_MAP
 from ..config.compound_keys import CompoundKey
 
@@ -307,11 +307,14 @@ class DensityGroupAnalysisOrchestrator(GroupOrchestratorBase):
 
     def run_plots(self, plot_function, comparisons: List[Pair], *,
                   channel: str, plot_kw_args: Dict) -> list['QWebEngineView']:
+        # The views are Qt widgets: the caller owns the application, whatever its name (Qt aborts on a widget made
+        # without one, hence the check before any widget)
         from PyQt5.QtWidgets import QApplication
-        app = QApplication.instance()
-        if app is not None and app.applicationName() == 'ClearMap':
-            from PyQt5.QtWebEngineWidgets import QWebEngineView
-
+        if QApplication.instance() is None:
+            raise ClearMapRuntimeError('run_plots makes Qt web views, which need a QApplication: create one first '
+                                       '(e.g. ClearMap.gui.gui_utils_base.ensure_qapp()) or call the plot function '
+                                       'directly for a matplotlib figure')
+        from PyQt5.QtWebEngineWidgets import QWebEngineView
         import mpld3
         dvs = []
         for gp1_name, gp2_name in comparisons:
