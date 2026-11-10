@@ -17,7 +17,6 @@ import os
 import pathlib
 import platform
 import shutil
-import subprocess
 import tempfile
 from functools import cached_property
 from typing import Optional, TypedDict, Any, Dict, TypeAlias
@@ -280,19 +279,9 @@ def first_boot(*, allow_prompt: bool = True) -> BootResult:
     version_tag = f'v{major}_{minor}'
 
     # TODO: move into build instead
-    creator_folder = pathlib.Path(__file__).parent.parent / 'gui' / 'creator'
-    qrc_path = creator_folder / 'icons.qrc'
-    py_rc_path = creator_folder / 'icons_rc.py'
-    if not py_rc_path.exists() or qrc_path.stat().st_mtime > py_rc_path.stat().st_mtime:
-        subprocess.run(['pyrcc5', str(qrc_path), '-o', str(py_rc_path)], check=True)
-    import ClearMap.gui.creator.icons_rc  # noqa: F401
-
-    graphics_resources_qrc_path = creator_folder / 'graphics_resources.qrc'
-    graphics_resources_py_rc_path = creator_folder / 'graphics_resources_rc.py'
-    if (not graphics_resources_py_rc_path.exists() or
-            graphics_resources_qrc_path.stat().st_mtime > graphics_resources_py_rc_path.stat().st_mtime):
-        subprocess.run(['pyrcc5', graphics_resources_qrc_path, '-o', graphics_resources_py_rc_path], check=True)
-    import ClearMap.gui.creator.graphics_resources_rc  # noqa: F401  (the images of the help, ':/graphics_resources/')
+    # Not at the top: a headless run imports this module and must not need Qt. first_boot is called by the GUI only
+    from ClearMap.gui.qt_resources import register_resources
+    register_resources()  # The icons and the images of the help (':/icons/', ':/graphics_resources/')
 
     is_first_run = _is_first_run(version_tag)
 
