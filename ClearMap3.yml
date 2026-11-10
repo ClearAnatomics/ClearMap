@@ -34,8 +34,8 @@ dependencies:
   - matplotlib
   - seaborn  #=0.12.2
   - tifffile
-  - pyqt<6
-  - qtpy  # for qdarkstyle
+  - pyqt6  # PyQt5 also works: replace by pyqt=5 (and select it with QT_API=pyqt5 if both are installed)
+  - qtpy  # ClearMap imports Qt through qtpy only (binding chosen by ClearMap.gui.qt_binding)
   - pyqtgraph>=0.13.5  # NumPy 2 fixes in 0.13.4 and 0.13.5; needs Qt >= 5.15
   - pygments
   - qdarkstyle
