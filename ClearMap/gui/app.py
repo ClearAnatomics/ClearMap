@@ -206,9 +206,8 @@ ABOUT_INFO = AboutInfo(software_name=f'You are running ClearMap version {CLEARMA
 
 HARD_DEFAULT_FONT_SIZE = 11
 
-Ui_ClearMapGui, _ = loadUiType(os.path.join(base_utils.UI_FOLDER, 'creator', 'mainwindow.ui'), from_imports=True,
-                               import_from='ClearMap.gui.creator', patch_parent_class=False,
-                               customWidgets={"ClickableFrame": ClickableFrame})
+Ui_ClearMapGui, _ = loadUiType(os.path.join(base_utils.UI_FOLDER, 'creator', 'mainwindow.ui'),
+                               patch_parent_class=False, customWidgets={"ClickableFrame": ClickableFrame})
 
 
 class ClearMapAppBase(QMainWindow, Ui_ClearMapGui):

@@ -6,33 +6,69 @@ pyuic_utils
 Essentially a reimplementation of loadUiType from PyQt5 to allow monkey patching the classes
 """
 
+import xml.etree.ElementTree as ET
 from io import StringIO
 
 from PyQt5 import QtWidgets
 from PyQt5.uic.Compiler import compiler
 
+RESOURCES_ELEMENT_TAG = 'resources'
 
-def loadUiType(uifile, from_imports=False, resource_suffix='_rc', import_from='.',
-               patch_parent_class='', replace_pairs=None,  customWidgets=None):
+
+def ui_without_resource_includes(ui_file):
     """
-    loadUiType(uifile, from_imports=False, resource_suffix='_rc', import_from='.') -> (form class, base class)
+    A Qt Designer file without its ``<resources>`` element, as a file-like object.
 
-    Load a Qt Designer .ui file and return the generated form class and the Qt
-    base class.
+    The ``<include location="icons.qrc"/>`` of a designer file makes the loader import a generated Python module
+    (``icons_rc``), which ClearMap does not have: the resources are compiled and registered with Qt by
+    :mod:`ClearMap.gui.qt_resources`, so the ``:/icons/...`` paths of the file work without it. The file on disk is
+    unchanged, Designer still shows its icons.
 
-    uifile is a file name or file-like object containing the .ui file.
-    from_imports is optionally set to generate relative import statements.  At
-    the moment this only applies to the import of resource modules.
-    resource_suffix is the suffix appended to the basename of any resource file
-    specified in the .ui file to create the name of the Python module generated
-    from the resource file by pyrcc4.  The default is '_rc', i.e. if the .ui
-    file specified a resource file called foo.qrc then the corresponding Python
-    module is foo_rc.
-    import_from is optionally set to the package used for relative import
-    statements.  The default is ``'.'``.
+    Arguments
+    ---------
+    ui_file : str or pathlib.Path or file-like
+        The designer file.
+
+    Returns
+    -------
+    io.StringIO
+    """
+    tree = ET.parse(ui_file)
+    root = tree.getroot()
+    for resources in root.findall(RESOURCES_ELEMENT_TAG):
+        root.remove(resources)
+    ui_text = StringIO()
+    tree.write(ui_text, encoding='unicode')
+    ui_text.seek(0)
+    return ui_text
+
+
+def loadUiType(uifile, patch_parent_class='', replace_pairs=None, customWidgets=None):
+    """
+    loadUiType(uifile, patch_parent_class='', replace_pairs=None, customWidgets=None) -> (form class, base class)
+
+    Load a Qt Designer .ui file and return the generated form class and the Qt base class.
+
+    The ``<resources>`` of the file are ignored (see :func:`ui_without_resource_includes`): the
+    ``:/icons/...`` paths work because :mod:`ClearMap.gui.qt_resources` registers the compiled resources with Qt,
+    not because the generated code imports a module (as the PyQt5 function this one reimplements does).
+
+    Parameters
+    ----------
+    uifile : str or pathlib.Path or file-like
+        The .ui file.
+    patch_parent_class : str
+        Name of the Qt class (e.g. 'QDialog') that the form class derives from, instead of ``object``. The
+        form then sets itself up (``setupUi(self)`` takes no parent argument).
+    replace_pairs : list of tuple, optional
+        (old, new) texts replaced in each line of the generated code (only with ``patch_parent_class``).
+    customWidgets : dict, optional
+        The classes of the custom widgets of the file, by name.
     """
     code_string = StringIO()
-    winfo = compiler.UICompiler().compileUi(uifile, code_string, from_imports, resource_suffix, import_from)
+    # The imports of the resource modules, the only use of these three arguments, are not generated: no resources
+    winfo = compiler.UICompiler().compileUi(ui_without_resource_includes(uifile), code_string, from_imports=False,
+                                            resource_suffix='_rc', import_from='.')
 
     ui_globals = {}
     if customWidgets:

@@ -121,8 +121,7 @@ def create_clearmap_widget(ui_name: str, patch_parent_class: bool, window_title:
     if not ui_name.endswith('.ui'):
         ui_name += '.ui'
     from ClearMap.gui.pyuic_utils import loadUiType
-    widget_class, _ = loadUiType(os.path.join(UI_FOLDER, 'creator', ui_name), from_imports=True,
-                                 import_from='ClearMap.gui.creator', patch_parent_class=patch_parent_class)
+    widget_class, _ = loadUiType(os.path.join(UI_FOLDER, 'creator', ui_name), patch_parent_class=patch_parent_class)
     widget = widget_class()
     if window_title is not None:
         widget.setWindowTitle(window_title)
