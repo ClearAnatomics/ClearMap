@@ -21,10 +21,6 @@ from ClearMap.config.config_adjusters.patch_ops import deep_merge
 from ClearMap.config.config_handler import ConfigHandler, ALTERNATIVES_REG, VERSION_SUFFIX
 from ClearMap.config.registration_channels import MOVING_OTHER
 
-from ClearMap.gui.dialogs import RenameChannelsDialog, VerifyRenamingDialog
-from ClearMap.gui.dialog_helpers import get_directory_dlg
-from ClearMap.gui.gui_utils_base import ensure_qapp, DIALOG_ACCEPTED
-from ClearMap.gui.style import dark_style_sheet
 
 
 SUPPORTED_VERSIONS = [Version(v) for v in ('2.1', '3.0', '3.1')]
@@ -461,6 +457,8 @@ class ExperimentUpgrade_2_1_to_3_0(ExperimentConfigConverter):
         channels = {name: data for name, data in self.sample_cfg['channels'].items() if data['path']}
 
         # Pop up dialog to rename channels and define data_type
+        from ClearMap.gui.dialogs import RenameChannelsDialog  # Local: see _prepare_the_dialogs
+        from ClearMap.gui.gui_utils_base import DIALOG_ACCEPTED
         dialog = RenameChannelsDialog(channels)
         if dialog.exec() == DIALOG_ACCEPTED:
             self.new_channels = dialog.get_new_channels()
@@ -510,6 +508,8 @@ class ExperimentUpgrade_2_1_to_3_0(ExperimentConfigConverter):
             apply_renames(renames)
 
     def verify_renaming(self, renames: list[Rename]) -> list[Rename]:
+        from ClearMap.gui.dialogs import VerifyRenamingDialog  # Local: see _prepare_the_dialogs
+        from ClearMap.gui.gui_utils_base import DIALOG_ACCEPTED
         dialog = VerifyRenamingDialog(renames, title='Verify renaming',
                                       message='The files of the sample are renamed to the names of ClearMap 3. '
                                               'Untick a file to leave it as it is.')
@@ -604,13 +604,29 @@ class ExperimentUpgrade_2_1_to_3_0(ExperimentConfigConverter):
         return files_to_rename, folders_to_rename, main_folder
 
 
+def _prepare_the_dialogs():
+    """
+    Make the QApplication of the dialogs of an upgrade, in the dark style.
+
+    The Qt of this module is imported only by the functions that show a dialog: an upgrade that asks nothing (3.0 to
+    3.1, with the folder given) runs without Qt, e.g. on a cluster node.
+    """
+    from ClearMap.gui.gui_utils_base import ensure_qapp
+    from ClearMap.gui.style import dark_style_sheet
+    ensure_qapp().setStyleSheet(dark_style_sheet())
+
+
+def _experiment_folder_from_a_dialog() -> str:
+    """The experiment folder chosen by the user ('' if cancelled); call _prepare_the_dialogs first"""
+    from ClearMap.gui.dialog_helpers import get_directory_dlg
+    return get_directory_dlg('~/')
+
+
 @project_converter('2.1', '3.0')
 def convert_2_1_to_3_0(main_folder='', create_app=True):
-    app = ensure_qapp()
-    app.setStyleSheet(dark_style_sheet())
-
+    _prepare_the_dialogs()  # This upgrade always asks: the names and types of the channels, the renaming
     if not main_folder:
-        main_folder = get_directory_dlg('~/')
+        main_folder = _experiment_folder_from_a_dialog()
     if not main_folder:
         return
 
@@ -851,11 +867,9 @@ class ExperimentUpgrade_3_0_to_3_1(ExperimentConfigConverter):
 
 @project_converter('3.0', '3.1')
 def convert_3_0_to_3_1(main_folder: str | Path = '', create_app: bool = True):
-    app = ensure_qapp()
-    app.setStyleSheet(dark_style_sheet())
-
-    if not main_folder:
-        main_folder = get_directory_dlg('~/')
+    if not main_folder:  # This upgrade asks nothing else: with the folder given, no Qt
+        _prepare_the_dialogs()
+        main_folder = _experiment_folder_from_a_dialog()
     if not main_folder:
         return
 
