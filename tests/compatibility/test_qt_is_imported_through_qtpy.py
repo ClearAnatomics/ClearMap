@@ -11,7 +11,6 @@ from tests.source_scan import maintained_syntax_trees
 SCANNED_DIRECTORIES = ('ClearMap', 'tests')
 ALLOWED_MODULES = (
     'ClearMap/gui/pyuic_utils.py',  # FIXME: replaced by qtpy.uic.loadUi in the Qt 6 series (B6)
-    'ClearMap/gui/creator/graphics_resources_rc.py',  # FIXME: pyrcc5 output, moved to qtpy in the Qt 6 series (B7)
 )
 QT_BINDINGS = ('PyQt5', 'PyQt6', 'PySide2', 'PySide6', 'sip', 'shiboken2', 'shiboken6')
 PYQT_NAMES = ('pyqtSignal', 'pyqtSlot', 'pyqtProperty')

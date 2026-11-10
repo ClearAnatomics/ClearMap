@@ -1,15 +1,15 @@
 """
-The images of the GUI built in Qt resources (.qrc, compiled by pyrcc5 at boot) exist, and every resource path of
+The images of the GUI built in Qt resources (.qrc, compiled by rcc at boot) exist, and every resource path of
 the designer files (':/<prefix>/<file>') is one of them (#135: the figure of the rigid stitcher help was missing,
-and referenced at a path no resource had; pyrcc5 stops on a missing file).
+and referenced at a path no resource had; rcc stops on a missing file).
 """
 import re
-import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
 
 import ClearMap.gui
+from ClearMap.gui.qt_resources import resource_files
 
 CREATOR_FOLDER = Path(ClearMap.gui.__file__).parent / 'creator'
 QRC_FILES = sorted(CREATOR_FOLDER.glob('*.qrc'))
@@ -17,14 +17,7 @@ QRC_FILES = sorted(CREATOR_FOLDER.glob('*.qrc'))
 
 def _resources():
     """{':/<prefix>/<file>': path on disk} of all the qrc files"""
-    resources = {}
-    for qrc in QRC_FILES:
-        for qresource in ET.parse(qrc).getroot().iter('qresource'):
-            prefix = qresource.get('prefix', '/').strip('/')
-            for file in qresource.iter('file'):
-                resource_path = ':/' + '/'.join(part for part in (prefix, file.text.strip()) if part)
-                resources[resource_path] = qrc.parent / file.text.strip()
-    return resources
+    return {resource_path: file for qrc in QRC_FILES for resource_path, file in resource_files(qrc).items()}
 
 
 @pytest.mark.parametrize('resource_path, file_path', sorted(_resources().items()))
