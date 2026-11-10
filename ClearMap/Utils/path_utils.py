@@ -10,6 +10,11 @@ def clean_path(path: str | Path) -> str:
     return os.path.normpath(os.path.expanduser(str(path)))
 
 
+def is_newer(path: str | Path, other: str | Path) -> bool:
+    """Whether ``path`` was modified after ``other`` (both must exist)."""
+    return Path(path).stat().st_mtime > Path(other).stat().st_mtime
+
+
 def de_duplicate_path(root: Path, sub_dir) -> Path:
     """
     Remove sub_dir from root if root already ends with sub_dir
