@@ -16,13 +16,14 @@ from dataclasses import dataclass
 
 import qdarkstyle
 import qtpy
-from qdarkstyle import DarkPalette
+from qdarkstyle import DarkPalette, LightPalette
 
 from ClearMap.Utils.exceptions import ClearMapConfigError
 
 THEME_QDARKSTYLE = 'qdarkstyle'  # The look ClearMap is tested with: its colours below are made for it
+THEME_QDARKSTYLE_LIGHT = 'qdarkstyle-light'  # The light palette of qdarkstyle
 THEME_SYSTEM = 'system'  # No style sheet: the widgets keep the Qt style (and palette) of the desktop
-THEMES = (THEME_QDARKSTYLE, THEME_SYSTEM)
+THEMES = (THEME_QDARKSTYLE, THEME_QDARKSTYLE_LIGHT, THEME_SYSTEM)
 DEFAULT_THEME = THEME_QDARKSTYLE
 
 QDARKSTYLE_BACKGROUND = '#2E3436'
@@ -45,10 +46,15 @@ def dark_style_sheet() -> str:
     return qdarkstyle.load_stylesheet(qt_api=qtpy.API)
 
 
+def light_style_sheet() -> str:
+    """The style sheet of the light palette of qdarkstyle for the Qt binding that qtpy loaded"""
+    return qdarkstyle.load_stylesheet(qt_api=qtpy.API, palette=LightPalette)
+
+
 def application_style_sheet(theme: str) -> str:
     """
-    The style sheet of the whole application for a theme of THEMES: the one of qdarkstyle, or none (empty) for the
-    system theme.
+    The style sheet of the whole application for a theme of THEMES: the one of qdarkstyle, dark or light, or none
+    (empty) for the system theme.
 
     Raises
     ------
@@ -57,6 +63,8 @@ def application_style_sheet(theme: str) -> str:
     """
     if theme == THEME_QDARKSTYLE:
         return dark_style_sheet()
+    if theme == THEME_QDARKSTYLE_LIGHT:
+        return light_style_sheet()
     if theme == THEME_SYSTEM:
         return ''
     raise _unknown_theme_error(theme)
@@ -93,6 +101,8 @@ def message_colours(theme: str, *, background_is_dark: bool) -> MessageColours:
     """
     if theme == THEME_QDARKSTYLE:
         return MESSAGE_COLOURS_ON_DARK
+    if theme == THEME_QDARKSTYLE_LIGHT:
+        return MESSAGE_COLOURS_ON_LIGHT
     if theme == THEME_SYSTEM:
         return MESSAGE_COLOURS_ON_DARK if background_is_dark else MESSAGE_COLOURS_ON_LIGHT
     raise _unknown_theme_error(theme)
@@ -101,8 +111,8 @@ def message_colours(theme: str, *, background_is_dark: bool) -> MessageColours:
 def tooltip_colours(theme: str) -> tuple[str, str] | None:
     """
     The (background, text) colours of the tooltips and of QWhatsThis, which take them from the palette of the
-    application, not from the style sheet: those of the qdarkstyle palette, or None for the system theme (the
-    palette of the desktop stays).
+    application, not from the style sheet: those of the dark or light qdarkstyle palette, or None for the system theme
+    (the palette of the desktop stays).
 
     Raises
     ------
@@ -111,6 +121,8 @@ def tooltip_colours(theme: str) -> tuple[str, str] | None:
     """
     if theme == THEME_QDARKSTYLE:
         return DarkPalette.COLOR_BACKGROUND_2, DarkPalette.COLOR_TEXT_2
+    if theme == THEME_QDARKSTYLE_LIGHT:
+        return LightPalette.COLOR_BACKGROUND_2, LightPalette.COLOR_TEXT_2
     if theme == THEME_SYSTEM:
         return None
     raise _unknown_theme_error(theme)

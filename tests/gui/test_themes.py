@@ -1,6 +1,6 @@
 """
 The theme of the GUI is a preference of the machine configuration: qdarkstyle (the look ClearMap is tested with, the
-default) or system (no style sheet, the style of the desktop). The names are written once, in gui.style.THEMES; the
+default), qdarkstyle-light (its light palette) or system (no style sheet, the style of the desktop). The names are written once, in gui.style.THEMES; the
 default of the machine configuration and its schema list the same.
 """
 import dataclasses
@@ -21,6 +21,7 @@ MACHINE_DEFAULTS = CONFIG_FOLDER / 'defaults' / 'v3.1' / 'machine.yml'
 MACHINE_SCHEMA = CONFIG_FOLDER / 'schemas' / 'v3.1' / 'machine.schema.yaml'
 CSS_COLOUR_NAMES = frozenset(CSS4_COLORS)
 DARK_STYLE_SHEET = 'QWidget { background: dark }'
+LIGHT_STYLE_SHEET = 'QWidget { background: light }'
 
 
 def test_the_qdarkstyle_theme_is_the_default_and_the_style_sheet_of_qdarkstyle(monkeypatch):
@@ -28,6 +29,12 @@ def test_the_qdarkstyle_theme_is_the_default_and_the_style_sheet_of_qdarkstyle(m
 
     assert style.DEFAULT_THEME == style.THEME_QDARKSTYLE
     assert style.application_style_sheet(style.THEME_QDARKSTYLE) == DARK_STYLE_SHEET
+
+
+def test_the_qdarkstyle_light_theme_has_the_style_sheet_of_the_light_palette_of_qdarkstyle(monkeypatch):
+    monkeypatch.setattr(style, 'light_style_sheet', lambda: LIGHT_STYLE_SHEET)
+
+    assert style.application_style_sheet(style.THEME_QDARKSTYLE_LIGHT) == LIGHT_STYLE_SHEET
 
 
 def test_the_system_theme_has_no_style_sheet():
@@ -78,6 +85,17 @@ def test_the_qdarkstyle_theme_has_the_message_colours_made_for_a_dark_background
                                                           (False, style.MESSAGE_COLOURS_ON_LIGHT)])
 def test_the_system_theme_has_the_message_colours_of_the_background_of_the_desktop(background_is_dark, expected):
     assert style.message_colours(style.THEME_SYSTEM, background_is_dark=background_is_dark) == expected
+
+
+@pytest.mark.parametrize('background_is_dark', [True, False])
+def test_the_qdarkstyle_light_theme_has_the_message_colours_made_for_a_light_background(background_is_dark):
+    assert (style.message_colours(style.THEME_QDARKSTYLE_LIGHT, background_is_dark=background_is_dark)
+            == style.MESSAGE_COLOURS_ON_LIGHT)
+
+
+def test_the_qdarkstyle_light_theme_gives_its_light_palette_to_the_tooltips():
+    assert style.tooltip_colours(style.THEME_QDARKSTYLE_LIGHT) == (style.LightPalette.COLOR_BACKGROUND_2,
+                                                                   style.LightPalette.COLOR_TEXT_2)
 
 
 def test_the_qdarkstyle_theme_gives_its_palette_to_the_tooltips_and_the_system_theme_leaves_them_alone():

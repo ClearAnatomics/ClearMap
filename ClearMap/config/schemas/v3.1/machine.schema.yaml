@@ -29,7 +29,7 @@ properties:
   three_d_plot_bg: { type: string }
   particle_plot_z_sphere_radius: { $ref: "./typedefs.schema.yaml#/$defs/nonNegativeInteger" }
   font_size:       { $ref: "./typedefs.schema.yaml#/$defs/positiveInteger" }
-  theme:           { type: string, enum: ["qdarkstyle", "system"] }
+  theme:           { type: string, enum: ["qdarkstyle", "qdarkstyle-light", "system"] }
 
   pattern_finder_min_n_files: { $ref: "./typedefs.schema.yaml#/$defs/positiveInteger" }
 

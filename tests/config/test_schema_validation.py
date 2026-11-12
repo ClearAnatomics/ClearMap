@@ -141,7 +141,7 @@ def test_cell_filter_distance_from_surface_must_be_a_non_negative_integer(src_di
     assert list(validator.iter_errors(cfg)), f'{bad_distance!r} should not be a valid distance from the surface'
 
 
-@pytest.mark.parametrize('theme, valid', [('qdarkstyle', True), ('system', True), ('adwaita', False), ('', False),
+@pytest.mark.parametrize('theme, valid', [('qdarkstyle', True), ('qdarkstyle-light', True), ('system', True), ('adwaita', False), ('', False),
                                           (None, False)])
 def test_the_machine_config_validates_with_a_theme_of_the_gui(src_dir: Path, schemas_dir: Path, schema_registry,
                                                               theme, valid):
