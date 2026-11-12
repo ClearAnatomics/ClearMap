@@ -7,9 +7,6 @@ import pandas as pd
 from pandas import DataFrame
 from scipy import stats
 
-
-# from PyQt5.QtWidgets import QApplication
-
 from ClearMap.IO import io_ops
 from ClearMap.Analysis.Statistics.group_statistics import (generate_summary_table, group_region_counts,
                                                            remove_p_val_nans, stack_voxelizations, get_colored_p_vals)

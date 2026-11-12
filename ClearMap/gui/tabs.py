@@ -112,9 +112,6 @@ from qtpy.QtWidgets import QApplication, QButtonGroup, QWidget
 import pyqtgraph as pg
 from natsort import natsorted
 
-# app = QApplication.instance()
-# if app is not None and app.applicationName() == 'ClearMap':
-#     from PyQt5.QtWebEngineWidgets import QWebEngineView
 from qdarkstyle import DarkPalette
 
 

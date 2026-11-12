@@ -1,7 +1,8 @@
 gui
 ===
 
-This package implements the ClearMap Graphical User Interface, built on PyQt5.
+This package implements the ClearMap Graphical User Interface, built on Qt through qtpy (PyQt6 by default, PyQt5
+also works).
 It provides a frontend to all ClearMap pipelines — CellMap, TubeMap, TractMap,
 Colocalization, and group-level statistics — without requiring any scripting.
 
@@ -36,6 +37,25 @@ Running
 
 The GUI will guide you and create the required config files with sensible defaults that
 you can edit through the widgets
+
+
+Qt binding and theme
+====================
+
+ClearMap imports Qt only through `qtpy <https://github.com/spyder-ide/qtpy>`_. The binding is chosen once, at the
+start, by :mod:`ClearMap.gui.qt_binding`: the one named by the ``QT_API`` environment variable (``pyqt6`` or
+``pyqt5``), otherwise PyQt6 if it is installed, else PyQt5. PySide is not supported.
+
+The environment file ``ClearMap3.yml`` installs PyQt6. To use PyQt5 instead, replace ``pyqt6`` by ``pyqt=5`` in it
+before running ``install_gui.sh`` (the installer then also drops the ``qt6-main`` line), or set ``QT_API=pyqt5`` if
+both bindings are installed.
+
+The icons are compiled at the first start by the ``rcc`` of the loaded Qt (:mod:`ClearMap.gui.qt_resources`), into
+``ClearMap/gui/creator/*.qt5.rcc`` or ``*.qt6.rcc``; nothing to do by hand.
+
+The theme is a preference (**Preferences**, applied at the next start), stored as ``theme`` in the machine
+configuration: ``qdarkstyle`` (the default, the look ClearMap is tested with), ``qdarkstyle-light``, or ``system``
+(the style of the desktop).
 
 Structure
 =========
@@ -102,7 +122,14 @@ gui_utils_images
     Image conversion utilities for GUI display (numpy → QPixmap, etc.).
 
 style
-    Colour constants and stylesheet fragments used throughout the GUI.
+    The themes (style sheet, message and tooltip colours of each), colour constants and stylesheet fragments used
+    throughout the GUI.
+
+qt_binding
+    Chooses the Qt binding (``QT_API``) before any Qt import, for qtpy and pyqtgraph.
+
+qt_resources
+    Compiles the icon resources with the ``rcc`` of the loaded Qt and registers them.
 
 tab_registry
     ``TabRegistry``: determines which tabs are valid given the current
@@ -111,10 +138,6 @@ tab_registry
 widget_monkeypatch_callbacks
     Functions bound at runtime to compound Qt widgets (doublets, triplets,
     etc.) to give them a uniform value-changed interface.
-
-pyuic_utils
-    Customised ``pyuic5`` loader that patches parent classes of generated *.ui*
-    files.
 
 event_bus integration
     The GUI communicates with backend workers through typed events

@@ -57,9 +57,6 @@ from pathlib import Path
 
 from statistics import mode
 
-# # WARNING: Necessary for QCoreApplication creation
-# from PyQt5.QtWebEngineWidgets import QWebEngineView  # noqa: F401
-
 print('Importing Qt...', flush=True)
 from qtpy import QtGui
 from qtpy.QtGui import QGuiApplication
