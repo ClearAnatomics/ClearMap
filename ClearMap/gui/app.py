@@ -68,7 +68,7 @@ from qtpy.QtWidgets import (QApplication, QMainWindow, QWidget, QPushButton, QSp
                              QComboBox, QLineEdit, QMessageBox, QToolBox, QProgressBar, QLabel,
                              QStyle, QAction, QDockWidget)
 
-from qdarkstyle import DarkPalette
+from ClearMap.gui import style
 
 print('Running first ClearMap imports...', flush=True)
 import ClearMap.gui.dialog_helpers
@@ -89,10 +89,12 @@ CLEARMAP_VERSION = _machine_cfg._version
 print('Building application...', flush=True)
 # To show the splash screen during imports
 app = base_utils.ensure_qapp()
-palette = app.palette()  # WARNING: necessary because QWhatsThis does not follow stylesheets
-palette.setColor(QtGui.QPalette.ColorRole.ToolTipBase, QtGui.QColor(DarkPalette.COLOR_BACKGROUND_2))
-palette.setColor(QtGui.QPalette.ColorRole.ToolTipText, QtGui.QColor(DarkPalette.COLOR_TEXT_2))
-app.setPalette(palette)  # noqa
+TOOLTIP_COLOURS = style.tooltip_colours(_machine_cfg.theme)
+if TOOLTIP_COLOURS is not None:  # WARNING: necessary because QWhatsThis does not follow stylesheets
+    palette = app.palette()
+    palette.setColor(QtGui.QPalette.ColorRole.ToolTipBase, QtGui.QColor(TOOLTIP_COLOURS[0]))
+    palette.setColor(QtGui.QPalette.ColorRole.ToolTipText, QtGui.QColor(TOOLTIP_COLOURS[1]))
+    app.setPalette(palette)  # noqa
 
 # Attempt to force appearance
 app.setApplicationName('ClearMap')
@@ -176,7 +178,7 @@ from ClearMap.config.config_coordinator import make_cfg_coordinator_factory
 from ClearMap.config.config_handler import ConfigHandler, CLEARMAP_CFG_DIR, ALTERNATIVES_REG, \
     scan_folder_for_experiments, config_needs_upgrade
 
-from ClearMap.gui.gui_utils_images import get_current_res
+from ClearMap.gui.gui_utils_images import get_current_res, is_dark
 from ClearMap.gui.tab_registry import TabRegistry
 from ClearMap.gui.event_delivery import GuiThreadDelivery
 from ClearMap.gui.widget_monkeypatch_callbacks import recursive_patch_widgets
@@ -187,7 +189,6 @@ from ClearMap.gui.tabs_interfaces import GenericTab, ExperimentTab, GroupTab
 from ClearMap.gui.preferences import PreferenceUi
 from ClearMap.gui.gui_logging import Printer
 from ClearMap.gui import widgets as cmp_widgets
-from ClearMap.gui import style
 from ClearMap.gui import dialogs as dlgs
 from ClearMap.gui.about import AboutInfo
 ### END SLOW IMPORTS ###
@@ -218,7 +219,10 @@ class ClearMapAppBase(QMainWindow):
         self.graphs = []
         self._reload_icon = self.style().standardIcon(QStyle.SP_BrowserReload)
         self.logger = None
-        self.progress_logger = Printer(logger_type='progress')
+        # The palette of the desktop: no style sheet changes it (the system theme only reads it)
+        self.message_colours = style.message_colours(_machine_cfg.theme,
+                                                     background_is_dark=is_dark(app.palette().window().color()))
+        self.progress_logger = Printer(logger_type='progress', warning_colour=self.message_colours.warning)
         self.error_logger = None
         self.progress_dialog = None
         self.progress_watcher = ProgressWatcher(bus, timer_interval_ms=250)
@@ -282,7 +286,7 @@ class ClearMapAppBase(QMainWindow):
         """
         if isinstance(msg, Exception):
             msg = str(msg)
-        self.__print_status_msg(msg, '#ff5555')  # red from qdarkstyle palette
+        self.__print_status_msg(msg, self.message_colours.error)
 
     def _warn_if_nvidia_driver_is_broken(self):
         """Tell the user (statusbar and log) when the NVIDIA driver does not answer, see :func:`diagnose_nvidia_driver`"""
@@ -293,25 +297,25 @@ class ClearMapAppBase(QMainWindow):
 
     def print_warning_msg(self, msg: str):
         """
-        Print a message in yellow in the statusbar
+        Print a message in the warning colour of the theme (yellow on a dark one) in the statusbar
 
         Parameters
         ----------
         msg : str
             The message to be printed
         """
-        self.__print_status_msg(msg, 'yellow')
+        self.__print_status_msg(msg, self.message_colours.warning)
 
     def print_status_msg(self, msg: str):
         """
-        Print a message in green in the statusbar
+        Print a message in the success colour of the theme (green) in the statusbar
 
         Parameters
         ----------
         msg : str
             The message to be printed
         """
-        self.__print_status_msg(msg, 'green')
+        self.__print_status_msg(msg, self.message_colours.success)
 
     def set_font_size(self, target_font_size=dlg_helpers.DISPLAY_CONFIG[CURRENT_RES]['font_size']):
         """
@@ -1006,9 +1010,10 @@ class ClearMapApp(ClearMapAppBase):
         self.progress_logger.set_file(src_folder / 'progress.log')
 
     def reset_loggers(self):
-        self.logger = Printer(redirects='stdout')
+        self.logger = Printer(redirects='stdout', warning_colour=self.message_colours.warning)
         self.logger.text_updated.connect(self.textBrowser.append)
-        self.error_logger = Printer(color='red', logger_type='error', redirects='stderr')
+        self.error_logger = Printer(color='red', logger_type='error', redirects='stderr',
+                                    warning_colour=self.message_colours.warning)
         self.error_logger.text_updated.connect(self.textBrowser.append)
         if DEBUG:
             self.patch_warnings_color()

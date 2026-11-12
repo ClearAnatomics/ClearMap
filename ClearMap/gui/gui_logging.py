@@ -29,7 +29,7 @@ from pygments.lexers.python import PythonTracebackLexer  # noqa
 
 from qdarkstyle import DarkPalette
 
-from ClearMap.gui.style import WARNING_YELLOW
+from ClearMap.gui.style import MESSAGE_COLOURS_ON_DARK
 _ANSI_RE = re.compile(
     r'(?:'
     r'\x1b\[[0-9;]*[A-Za-z]'           # CSI sequence  ESC [ ... X
@@ -49,11 +49,13 @@ class Printer(QWidget):
     original_std_out = sys.stdout
     original_std_err = sys.stderr
 
-    def __init__(self, log_path=None, color=None, logger_type='info', app=None, open_mode='a', redirects=None, parent=None):
+    def __init__(self, log_path=None, color=None, logger_type='info', app=None, open_mode='a', redirects=None, parent=None,
+                 warning_colour=MESSAGE_COLOURS_ON_DARK.warning):
         super().__init__(parent)
         self.file = None
         self.n_lines = 0
         self.color = color
+        self.warning_colour = warning_colour  # Readable on the background of the theme (see gui.style.message_colours)
         self.type = logger_type
         # if logger_type == 'error':
         #     self.setup_except_hook()
@@ -170,7 +172,7 @@ class Printer(QWidget):
             pass
 
     def warning_disclaimer(self):
-        self.write(f'<strong><p style="color:{WARNING_YELLOW}">'
+        self.write(f'<strong><p style="color:{self.warning_colour}">'
                    f'THIS IS A WARNING AND CAN NORMALLY BE SAFELY IGNORED</p></strong>')
 
     def fileno(self):
@@ -203,7 +205,7 @@ class Printer(QWidget):
                 is_html = False
             if force or not is_html:
                 if len(msg.split(':')) > 2 and msg.split(':')[2].endswith('Warning'):
-                    html_col = cnames['yellow']
+                    html_col = self.warning_colour
                 else:
                     html_col = cnames[self.color]
                 colour_msg = f'<p style="color:{html_col}">{msg}</p>'
