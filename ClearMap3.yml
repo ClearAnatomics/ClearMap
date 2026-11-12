@@ -28,11 +28,11 @@ dependencies:
   - scikit-image
   - scikit-learn
   - opencv
-  - configobj
+  - configobj  # config/config_handler.py and Settings.py import it (lazily in the installer and config/utils.py)
   - natsort
   - tqdm
   - matplotlib
-  - seaborn  #=0.12.2
+  - seaborn  # Scripts/total_length_and_basic_stats.py and Scripts/vasculature_stats_scripts.py
   - tifffile
   - pyqt6  # PyQt5 also works: replace by pyqt=5 (and select it with QT_API=pyqt5 if both are installed)
   - qtpy  # ClearMap imports Qt through qtpy only (binding chosen by ClearMap.gui.qt_binding)
@@ -40,10 +40,11 @@ dependencies:
   - pygments
   - qdarkstyle
   - vispy
-  - pyvista
+  - pyvista  # Not imported yet: replaces vispy gradually. Here so that the environment stays solvable with it
   - vtk
   - pyopengl
-  - napari
+  - napari  # Not imported by ClearMap: users want it in the same environment, so it must stay solvable with
+  #           our pins (Qt, NumPy, ...). Do not remove it to simplify a solve
   - graph-tool  # Graph.remove_self_loops finds the function in generation (recent) or stats (<= 2.45)
   - python-igraph
 #  - pytorch<=2.2
