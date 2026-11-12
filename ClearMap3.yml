@@ -15,7 +15,8 @@ channels:
   - conda-forge
 
 dependencies:
-  - python=3.11  # constraining seems to speed up resolution
+  - python=3.12  # Constrained to speed up resolution. Not 3.11: conda-forge builds NumPy >= 2.5 and the current
+  #                tifffile for 3.12 and later only, and with Qt 6.11.3 a 3.11 environment falls back to NumPy 1
   - cython>=3  # The Cython headers of NumPy 2 refuse an older Cython
   - ipython
   - jupyter
@@ -35,6 +36,10 @@ dependencies:
   - seaborn  # Scripts/total_length_and_basic_stats.py and Scripts/vasculature_stats_scripts.py
   - tifffile
   - pyqt6  # PyQt5 also works: replace by pyqt=5 (and select it with QT_API=pyqt5 if both are installed)
+  - qt6-main>=6.11.3  # Qt 6.11.1 crashes (segmentation fault in FcCharSetHasChar) as soon as a widget shows a
+  #                     character missing from the default font when a fallback font has no charset, e.g. the .woff
+  #                     files of EB Garamond (fixed by qtbase 91d7ff41af58 in 6.11.3). Linux only: the installer
+  #                     removes this line on the other systems. Remove it with pyqt=5
   - qtpy  # ClearMap imports Qt through qtpy only (binding chosen by ClearMap.gui.qt_binding)
   - pyqtgraph>=0.13.5  # NumPy 2 fixes in 0.13.4 and 0.13.5; needs Qt >= 5.15
   - pygments
