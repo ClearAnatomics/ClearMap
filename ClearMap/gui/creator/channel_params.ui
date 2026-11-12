@@ -229,7 +229,7 @@
           <string>The orientation of the sample during acquisition</string>
          </property>
          <property name="whatsThis">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The order in which are represented the X, Y and Z axes. &lt;/p&gt;&lt;p&gt;A &lt;span style=&quot; font-weight:700;&quot;&gt;negative value&lt;/span&gt; indicates an &lt;span style=&quot; font-weight:700;&quot;&gt;inversion&lt;/span&gt; of the axis direction.&lt;/p&gt;&lt;p&gt;The value 0 means this axis is undefined.&lt;/p&gt;&lt;p&gt;Orientation is invalid untill all axes are specified.&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;/&gt;&lt;span style=&quot; font-weight:700; color:#edd400;&quot;&gt;WARNING: do not select the same order for multiple axes.&lt;/span&gt;&lt;/p&gt;&lt;p&gt;Once selected, select &lt;span style=&quot; font-weight:700;&quot;&gt;update workspace&lt;/span&gt; and then,&lt;/p&gt;&lt;p&gt;click on the magnifying glass to view the result.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The order in which are represented the X, Y and Z axes. &lt;/p&gt;&lt;p&gt;A &lt;span style=&quot; font-weight:700;&quot;&gt;negative value&lt;/span&gt; indicates an &lt;span style=&quot; font-weight:700;&quot;&gt;inversion&lt;/span&gt; of the axis direction.&lt;/p&gt;&lt;p&gt;The value 0 means this axis is undefined.&lt;/p&gt;&lt;p&gt;Orientation is invalid untill all axes are specified.&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;/&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;WARNING: do not select the same order for multiple axes.&lt;/span&gt;&lt;/p&gt;&lt;p&gt;Once selected, select &lt;span style=&quot; font-weight:700;&quot;&gt;update workspace&lt;/span&gt; and then,&lt;/p&gt;&lt;p&gt;click on the magnifying glass to view the result.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
          <property name="text">
           <string>Orientation
@@ -304,7 +304,7 @@
           <string>How the sample is cropped along X</string>
          </property>
          <property name="whatsThis">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How to crop the atlas along X to match the sample. &lt;span style=&quot; color:#729fcf;&quot;&gt;NOTE: Values in pixels.&lt;/span&gt; To select the appropriate values, open the atlas in the same orientation (in ClearMap/Resources/Atlas).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How to crop the atlas along X to match the sample. &lt;span style=&quot; font-style:italic;&quot;&gt;NOTE: Values in pixels.&lt;/span&gt; To select the appropriate values, open the atlas in the same orientation (in ClearMap/Resources/Atlas).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
          <property name="text">
           <string>Crop X</string>
@@ -559,7 +559,7 @@
           <string>How the sample is cropped along Z</string>
          </property>
          <property name="whatsThis">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How to crop the atlas along Z to match the sample. &lt;span style=&quot; color:#729fcf;&quot;&gt;NOTE: Values in pixels.&lt;/span&gt; To select the appropriate values, open the atlas in the same orientation (in ClearMap/Resources/Atlas).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How to crop the atlas along Z to match the sample. &lt;span style=&quot; font-style:italic;&quot;&gt;NOTE: Values in pixels.&lt;/span&gt; To select the appropriate values, open the atlas in the same orientation (in ClearMap/Resources/Atlas).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
          <property name="text">
           <string>Crop Z</string>
@@ -583,7 +583,7 @@
           <string>How the sample is cropped along Y</string>
          </property>
          <property name="whatsThis">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How to crop the atlas along Y to match the sample. &lt;span style=&quot; color:#729fcf;&quot;&gt;NOTE: Values in pixels.&lt;/span&gt; To select the appropriate values, open the atlas in the same orientation (in ClearMap/Resources/Atlas).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How to crop the atlas along Y to match the sample. &lt;span style=&quot; font-style:italic;&quot;&gt;NOTE: Values in pixels.&lt;/span&gt; To select the appropriate values, open the atlas in the same orientation (in ClearMap/Resources/Atlas).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
          <property name="text">
           <string>Crop Y</string>
