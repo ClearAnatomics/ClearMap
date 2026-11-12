@@ -71,9 +71,17 @@ class MachineConfig:
 
         return ConfigHandler.copy_if_missing(default_path, user_path)
 
-    def _patch_temp_dir_cfg(self, path_str: str):
+    def set_value(self, key: str, value: ConfigValueType) -> None:
+        """
+        Write value for key in the machine config of the user (created from the packaged default if missing). Only
+        that line changes: the comments and the other lines stay as they are.
+        """
         self._ensure_cfg_exists()
-        set_flat_yaml_value(self.cfg_path, 'temp_folder', path_str)  # edit specific line only. keep comments
+        set_flat_yaml_value(self.cfg_path, key, value)  # edit specific line only. keep comments
+        self.__dict__.pop('defaults', None)  # The cached values are stale
+
+    def _patch_temp_dir_cfg(self, path_str: str):
+        self.set_value('temp_folder', path_str)
 
     def _patch_temp_dir_env(self, path_str: str):
         for var in ('TMP', 'TEMP', 'TMPDIR'):

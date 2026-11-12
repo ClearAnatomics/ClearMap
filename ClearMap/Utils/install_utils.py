@@ -429,11 +429,10 @@ def ensure_config_folder():
 
 
 def set_elastix_path(elastix_path):
-    import configobj  # Local import to avoid dependency of whole module on configobj
-    machine_params_path = str(clearmap_settings.clearmap_cfg_dir / 'machine_params_v3_0.cfg')
-    cfg = configobj.ConfigObj(machine_params_path, encoding="UTF8", indent_type='    ', unrepr=True, file_error=True)
-    cfg['elastix_path'] = elastix_path
-    cfg.write()
+    """Record the elastix that the user installed in the machine configuration, where Settings.elastix_path reads it"""
+    # Not at the top: this module is imported in the bootstrap environment of install_gui.sh, without ClearMap.config
+    from ClearMap.config.early_boot import MachineConfig
+    MachineConfig().set_value('elastix_path', str(elastix_path))
 
 
 if __name__ == '__main__':
