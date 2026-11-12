@@ -15,6 +15,8 @@ See Also
     * :const:`atlas_folder`
     * :const:`resources_path`
     * :const:`external_path`
+    * ``elastix_path``: the ``elastix_path`` of the machine configuration (see :func:`__getattr__`), else the elastix
+      bundled with ClearMap
     * :const:`ilastik_path`
 """
 __author__ = 'Christoph Kirst <christoph.kirst.ck@gmail.com>'
@@ -26,8 +28,6 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import os
 from pathlib import Path
-
-import configobj
 
 
 ###############################################################################
@@ -86,49 +86,62 @@ when the folder of the program cannot be written."""
 # ## Paths to external programs and resources
 ###############################################################################
 
-cfg_path = str(clearmap_cfg_dir / 'machine_params_v3_0.cfg')
-if os.path.exists(cfg_path):
-    config = configobj.ConfigObj(cfg_path, encoding="UTF8", indent_type='    ', unrepr=True, file_error=True)
-else:
-    package_machine_path = os.path.join(clearmap_path, 'config', 'machine_params_v3_0.cfg')
-    if os.path.exists(package_machine_path):
-        config = configobj.ConfigObj(package_machine_path, encoding="UTF8", indent_type='    ',
-                                     unrepr=True, file_error=True)
-    else:
-        config = {}
-
 default_elastix_path = os.path.join(external_path, 'elastix', 'build')
-elastix_path = config.get('elastix_path', default_elastix_path)
-if elastix_path is None:
-    elastix_path = default_elastix_path
-"""Absolute path to the elastix installation
+"""Absolute path to the elastix bundled with ClearMap, used when the machine configuration has no ``elastix_path``
 
 Note
 ----
   `Elastix Webpage <https://elastix.lumc.nl/>`_
 """
 
-tera_stitcher_path = config.get('tera_stitcher_path')
-"""Absolute path to the TeraStitcher installation
+EXTERNAL_PROGRAM_PATH_NAMES = ('elastix_path', 'tera_stitcher_path', 'imagej_path', 'ilastik_path')
+"""The attributes of this module that the machine configuration sets, resolved at their first access"""
 
-Note
-----
-  `TeraSticher Webpage <https://abria.github.io/TeraStitcher/>`_
-"""
 
-imagej_path = config.get('imagej_path')
-"""Absolute path to the ImageJ/Fiji installation
+def __getattr__(name):
+    """
+    The paths to external programs that the machine configuration sets, read at their first access, then kept (PEP 562).
 
-Note
-----
-  `ImageJ/Fiji Webpage <https://fiji.sc/>`_
-"""
+    ``elastix_path``
+        Absolute path to the elastix installation (the bundled one if the machine configuration has none).
+        `Elastix Webpage <https://elastix.lumc.nl/>`_
+    ``tera_stitcher_path``
+        Absolute path to the TeraStitcher installation, None if the machine configuration has none.
+        `TeraStitcher Webpage <https://abria.github.io/TeraStitcher/>`_
+    ``imagej_path``
+        Absolute path to the ImageJ/Fiji installation, None if the machine configuration has none.
+        `ImageJ/Fiji Webpage <https://fiji.sc/>`_
+    ``ilastik_path``
+        Absolute path to the Ilastik installation, None if the machine configuration has none.
+        `Ilastik Webpage <https://ilastik.org/>`_, `Ilastik Download <https://www.ilastik.org/download.html>`_
 
-ilastik_path = config.get('ilastik_path')
-"""Absolute path to the Ilastik installation
+    Not at import: :mod:`ClearMap.config` imports this module, and the installation script imports it before the
+    machine configuration exists.
+    """
+    if name not in EXTERNAL_PROGRAM_PATH_NAMES:
+        raise AttributeError(f'module {__name__!r} has no attribute {name!r}')
+    value = _machine_configuration_value(name)
+    if value is None and name == 'elastix_path':
+        value = default_elastix_path
+    globals()[name] = value  # The next access finds it without coming here
+    return value
 
-Note
-----
-  `Ilastik Webpage <https://ilastik.org/>`_ 
-  `Ilastik Download <https://www.ilastik.org/download.html>`_
-"""
+
+def _machine_configuration_value(key):
+    """
+    The value of key in the machine configuration of this version, else in the 3.0 machine parameters when the machine
+    configuration of this version does not exist (not upgraded yet), else None (also for a ``null`` value or a missing
+    key).
+    """
+    # Not at the top: ClearMap.config imports this module
+    from ClearMap.config.early_boot import MachineConfig
+
+    machine_config = MachineConfig()
+    if machine_config.cfg_path.exists():
+        return machine_config.get(key)
+
+    from ClearMap.config.config_handler import ConfigHandler  # Only to read the machine parameters of 3.0
+    legacy_path = ConfigHandler.get_global_path('machine', must_exist=False, version='3.0')
+    if not legacy_path.exists():
+        return None
+    return ConfigHandler.get_cfg_from_path(legacy_path).get(key)
