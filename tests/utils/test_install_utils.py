@@ -237,3 +237,18 @@ def test_the_qt_pin_against_the_linux_font_crash_goes_on_other_systems_but_the_p
     assert QT_PACKAGE_NAME in dependencies  # Listed without a version: only the pin is gone
     assert not [dep for dep in dependencies if dep.startswith(QT_PACKAGE_NAME) and dep != QT_PACKAGE_NAME]
     assert 'pyqt6' in dependencies
+
+
+@pytest.mark.parametrize('system_name', ['Linux', 'Darwin', 'Windows'])
+def test_qt6_main_is_not_installed_when_the_environment_file_selects_pyqt5(tmp_path, system_name, monkeypatch):
+    cfg = {'name': 'test_env', 'channels': ['conda-forge'],
+           'dependencies': ['python=3.12', 'pyqt=5', QT_PIN, 'numpy']}
+    src = tmp_path / 'env_src.yml'
+    dest = tmp_path / 'env_dest.yml'
+    src.write_text(yaml.dump(cfg))
+
+    _patch_env_on(system_name, src, dest, monkeypatch)
+
+    dependencies = _conda_dependencies(dest)
+    assert not [dep for dep in dependencies if dep.startswith(QT_PACKAGE_NAME)]
+    assert 'pyqt=5' in dependencies

@@ -31,6 +31,7 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 # The pin of these packages in the environment file is for a crash of Linux only (Qt 6.11.1 and fontconfig, see
 # ClearMap3.yml). Elsewhere it only narrows the solve, and conda-forge has no PyQt6 for Qt 6.11.3 on Intel macOS and
 # Windows. The packages stay: another dependency (pyqt6) requires them anyway, only their version is let go.
+# With PyQt5 (no pyqt6 line in the file) Qt 6 is not used at all and the lines go.
 LINUX_ONLY_PINNED_PACKAGE_NAMES = ('qt6-main',)
 
 
@@ -75,6 +76,10 @@ class EnvFileManager:
 
     def get_env_name(self):
         return self.cfg['name']
+
+    def has_dependency(self, package_name):
+        return any(isinstance(dep, str) and CondaPackage(dep).name == package_name
+                   for dep in self.cfg['dependencies'])
 
     def get_package_version(self, package_name):
         for dep in self.cfg['dependencies']:
@@ -344,7 +349,9 @@ def patch_env(cfg_path, dest_path, use_cuda_torch=True, pip_mode=False, use_spyd
         elif env_mgr.python_version.startswith('3.11'):
             env_mgr.patch_environment_package_line('pyqt', '5.15', comparison_operator='=')
 
-    if not platform.system().startswith('Linux'):
+    if not env_mgr.has_dependency('pyqt6'):
+        env_mgr.remove_dependencies(LINUX_ONLY_PINNED_PACKAGE_NAMES)  # PyQt5 (pyqt=5) does not use Qt 6 at all
+    elif not platform.system().startswith('Linux'):
         for package_name in LINUX_ONLY_PINNED_PACKAGE_NAMES:
             env_mgr.patch_environment_package_line(package_name)  # No version: the pin goes, the package stays
 
