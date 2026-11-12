@@ -17,7 +17,6 @@ from pathlib import Path
 from typing import Callable, Optional, Any, Dict, List, Mapping, Sequence, Tuple, Set
 from functools import cached_property
 
-import configobj
 from packaging.version import Version
 
 from ClearMap._version import CURRENT_CONFIG_VERSION
@@ -359,6 +358,8 @@ def to_configobj(path: Path, data: dict) -> None:
     data: dict
         Data to write
     """
+    import configobj  # Not at the top: only the .cfg/.ini files of 3.0 and earlier need it
+
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     cfg = configobj.ConfigObj(encoding='UTF8', indent_type='    ', unrepr=True)
@@ -487,6 +488,8 @@ def get_configobj_cfg(cfg_path: Path | str, must_exist: bool = True) -> ConfigPr
     ConfigParsingError
         If the file cannot be parsed.
     """
+    import configobj  # Not at the top: only the .cfg/.ini files of 3.0 and earlier need it
+
     cfg_path = str(clean_path(cfg_path))  # str to be future-proof. ConfigObj wants str
     try:
         cobj = configobj.ConfigObj(cfg_path, encoding="UTF8", indent_type='    ', unrepr=True, file_error=must_exist)

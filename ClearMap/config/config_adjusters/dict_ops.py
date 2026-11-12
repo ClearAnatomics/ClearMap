@@ -6,8 +6,6 @@ from operator import getitem
 from types import MappingProxyType, NoneType
 from typing import Dict, Any, Set, Tuple, Optional
 
-from configobj import ConfigObj
-
 TuplePath = Tuple[str, ...]
 
 def resolve_path(section: str, path: str) -> TuplePath:
@@ -159,8 +157,9 @@ def get_item_recursive(container, keys):
     except (TypeError, KeyError) as err:
         err_type = type(err).__name__
         err_msg = f'{err_type} attempting to read "{keys}"'
-        if isinstance(container, ConfigObj):
-            err_msg += f' path: {container.filename}'
+        file_name = getattr(container, 'filename', None)  # A ConfigObj, or the ConfigProxy of any format
+        if file_name:
+            err_msg += f' path: {file_name}'
         print(f'{err_msg} from "{container}"')
         raise err
 
