@@ -12,6 +12,8 @@ __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
+from dataclasses import dataclass
+
 import qdarkstyle
 import qtpy
 from qdarkstyle import DarkPalette
@@ -58,8 +60,61 @@ def application_style_sheet(theme: str) -> str:
         return dark_style_sheet()
     if theme == THEME_SYSTEM:
         return ''
-    raise ClearMapConfigError(f'Unknown theme "{theme}", expected one of {THEMES}; '
-                              f'set "theme" in the machine configuration (or in the preferences) to one of them')
+    raise _unknown_theme_error(theme)
+
+
+def _unknown_theme_error(theme: str) -> ClearMapConfigError:
+    return ClearMapConfigError(f'Unknown theme "{theme}", expected one of {THEMES}; '
+                               f'set "theme" in the machine configuration (or in the preferences) to one of them')
+
+
+@dataclass(frozen=True)
+class MessageColours:
+    """The colours of the messages of ClearMap (status bar, log), readable on the background of a theme"""
+    error: str
+    warning: str
+    success: str
+
+
+# CSS colour names, which Qt style sheets, the HTML of the log and matplotlib (CSS4_COLORS) all understand.
+# Contrast with the background of the theme: dark (#2E3436) 4.3, 9.0 and 2.5; light (white) 6.7, 4.2 and 5.1.
+MESSAGE_COLOURS_ON_DARK = MessageColours(error='tomato', warning='gold', success='green')
+MESSAGE_COLOURS_ON_LIGHT = MessageColours(error='firebrick', warning='olive', success='green')
+
+
+def message_colours(theme: str, *, background_is_dark: bool) -> MessageColours:
+    """
+    The colours of the messages for a theme of THEMES. The system theme has those of the background of the desktop
+    (background_is_dark: the window colour of the palette of the application, which no style sheet changes there).
+
+    Raises
+    ------
+    ClearMapConfigError
+        If the theme is not one of THEMES.
+    """
+    if theme == THEME_QDARKSTYLE:
+        return MESSAGE_COLOURS_ON_DARK
+    if theme == THEME_SYSTEM:
+        return MESSAGE_COLOURS_ON_DARK if background_is_dark else MESSAGE_COLOURS_ON_LIGHT
+    raise _unknown_theme_error(theme)
+
+
+def tooltip_colours(theme: str) -> tuple[str, str] | None:
+    """
+    The (background, text) colours of the tooltips and of QWhatsThis, which take them from the palette of the
+    application, not from the style sheet: those of the qdarkstyle palette, or None for the system theme (the
+    palette of the desktop stays).
+
+    Raises
+    ------
+    ClearMapConfigError
+        If the theme is not one of THEMES.
+    """
+    if theme == THEME_QDARKSTYLE:
+        return DarkPalette.COLOR_BACKGROUND_2, DarkPalette.COLOR_TEXT_2
+    if theme == THEME_SYSTEM:
+        return None
+    raise _unknown_theme_error(theme)
 
 HIGHLIGHTED_BTN_STYLE = f"""
     background-color: {HIGHLIGHTED_BTN_BG};
