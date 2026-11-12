@@ -28,6 +28,11 @@ __copyright__ = 'Copyright (c) 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
+# The pin of these packages in the environment file is for a crash of Linux only (Qt 6.11.1 and fontconfig, see
+# ClearMap3.yml). Elsewhere it only narrows the solve, and conda-forge has no PyQt6 for Qt 6.11.3 on Intel macOS and
+# Windows. The packages stay: another dependency (pyqt6) requires them anyway, only their version is let go.
+LINUX_ONLY_PINNED_PACKAGE_NAMES = ('qt6-main',)
+
 
 class CondaPackage:
     split_pattern = re.compile(r'^(?P<name>[\w\.\-]+)(?P<version>[\s=><,]+[\d\.\*]+)?(?:\s*(?P<comment>\#.*))?$')
@@ -338,6 +343,10 @@ def patch_env(cfg_path, dest_path, use_cuda_torch=True, pip_mode=False, use_spyd
             env_mgr.patch_environment_package_line('pyqt', '5.13', comparison_operator='<=')
         elif env_mgr.python_version.startswith('3.11'):
             env_mgr.patch_environment_package_line('pyqt', '5.15', comparison_operator='=')
+
+    if not platform.system().startswith('Linux'):
+        for package_name in LINUX_ONLY_PINNED_PACKAGE_NAMES:
+            env_mgr.patch_environment_package_line(package_name)  # No version: the pin goes, the package stays
 
     pytorch_v_mgr = PytorchVersionManager(cfg_path, env_mgr.python_version, env_mgr.get_package_version('pytorch'))
     if pip_mode:

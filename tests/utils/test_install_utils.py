@@ -180,3 +180,60 @@ def test_no_toolkit_pin_for_cpu(env_yaml, monkeypatch):
         tmp_dir="/tmp",
     )
     assert _read_toolkit_pin(dest) is None
+
+# ── packages pinned for Linux only ────────────────────────────────────────
+#
+# Qt 6.11.1 crashes on Linux only (fontconfig), so ClearMap3.yml pins qt6-main: the installer keeps that pin on Linux
+# and lets the version go elsewhere, where it only narrows the solve (no PyQt6 for Qt 6.11.3 on Intel macOS and
+# Windows). The package itself stays: pyqt6 requires it anyway.
+
+QT_PACKAGE_NAME = 'qt6-main'
+QT_PIN = f'{QT_PACKAGE_NAME}>=6.11.3'
+
+
+@pytest.fixture
+def env_yaml_with_qt_pin(tmp_path):
+    cfg = {'name': 'test_env', 'channels': ['conda-forge'],
+           'dependencies': ['python=3.12', 'pyqt6', QT_PIN, 'numpy']}
+    src = tmp_path / 'env_src.yml'
+    dest = tmp_path / 'env_dest.yml'
+    src.write_text(yaml.dump(cfg))
+    return src, dest
+
+
+def _conda_dependencies(dest_path):
+    with open(dest_path) as fh:
+        return [dep for dep in yaml.safe_load(fh)['dependencies'] if isinstance(dep, str)]
+
+
+def _patch_env_on(system_name, src, dest, monkeypatch):
+    def system():
+        return system_name
+
+    def processor():
+        return 'arm'
+
+    monkeypatch.setattr('ClearMap.Utils.install_utils.platform.system', system)
+    monkeypatch.setattr('ClearMap.Utils.install_utils.platform.processor', processor)
+    patch_env(cfg_path=src, dest_path=dest, use_cuda_torch=False, pip_mode=True, use_spyder=False, tmp_dir='/tmp')
+
+
+def test_the_qt_pin_against_the_linux_font_crash_is_kept_on_linux(env_yaml_with_qt_pin, monkeypatch):
+    src, dest = env_yaml_with_qt_pin
+
+    _patch_env_on('Linux', src, dest, monkeypatch)
+
+    assert QT_PIN in _conda_dependencies(dest)
+
+
+@pytest.mark.parametrize('system_name', ['Darwin', 'Windows'])
+def test_the_qt_pin_against_the_linux_font_crash_goes_on_other_systems_but_the_package_stays(
+        env_yaml_with_qt_pin, system_name, monkeypatch):
+    src, dest = env_yaml_with_qt_pin
+
+    _patch_env_on(system_name, src, dest, monkeypatch)
+
+    dependencies = _conda_dependencies(dest)
+    assert QT_PACKAGE_NAME in dependencies  # Listed without a version: only the pin is gone
+    assert not [dep for dep in dependencies if dep.startswith(QT_PACKAGE_NAME) and dep != QT_PACKAGE_NAME]
+    assert 'pyqt6' in dependencies
