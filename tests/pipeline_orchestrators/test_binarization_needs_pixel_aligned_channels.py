@@ -51,7 +51,7 @@ def test_channels_registered_each_on_its_own_are_not_binarized(experiment, vesse
     with pytest.warns(UserWarning):
         worker = experiment.get_worker('vasculature', substep='binary')
 
-    with pytest.raises(ChannelsNotPixelAlignedError, match='exactly one channel must be the root'):
+    with pytest.raises(ChannelsNotPixelAlignedError, match='acquired together .* with the same channel'):
         worker.binarize()
 
     assert binarized == []
