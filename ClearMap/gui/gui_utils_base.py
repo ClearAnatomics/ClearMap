@@ -21,13 +21,10 @@ from typing import Optional, Callable
 
 from qtpy import QtWidgets
 from qtpy.QtCore import Signal
-from qtpy.QtWidgets import QLayout, QApplication, QWidget, \
+from qtpy.QtWidgets import QLayout, QApplication, QWidget, QDialogButtonBox, \
     QToolBox  # REFACTOR: local imports or strings for annotations?
 
 from ClearMap.Utils.exceptions import ClearMapValueError
-
-# WARNING: declared here for dependency visibility but imported locally where used
-# from ClearMap.gui.widget_monkeypatch_callbacks import recursive_patch_widgets  # WARNING: local import
 
 warnings.filterwarnings('ignore', category=RuntimeWarning, module='ClearMap.gui.gui_utils_base')  # For surface_project
 
@@ -197,18 +194,35 @@ def designer_root_class(ui_name: str):
     return root_class
 
 
+# The dynamic properties of a QDialogButtonBox in the designer files, with the standard button whose text they give
+BUTTON_TEXT_PROPERTY_TO_STANDARD_BUTTON = {'applyText': QDialogButtonBox.Apply,
+                                           'okText': QDialogButtonBox.Ok,
+                                           'openText': QDialogButtonBox.Open}
+
+
+def apply_button_box_texts(widget: QWidget) -> None:
+    """
+    Rewrite the text of the standard buttons of the QDialogButtonBoxes of widget with the dynamic properties
+    ``applyText``, ``okText`` and ``openText`` which the designer files give them
+    """
+    for button_box in widget.findChildren(QDialogButtonBox):
+        for property_name, standard_button in BUTTON_TEXT_PROPERTY_TO_STANDARD_BUTTON.items():
+            text = button_box.property(property_name)
+            if text:
+                button_box.button(standard_button).setText(text)
+
+
 def create_clearmap_widget(ui_name: str, *, window_title: Optional[str] = None) -> QWidget:
     """
-    A widget built from a Qt Designer file of ``ClearMap/gui/creator``, with the methods of its compound boxes
-    (``widget_monkeypatch_callbacks``). Its class is the root class of the file (see :func:`designer_root_class`):
+    A widget built from a Qt Designer file of ``ClearMap/gui/creator``, with the texts of its button boxes
+    (:func:`apply_button_box_texts`). Its class is the root class of the file (see :func:`designer_root_class`):
     the loader builds the file differently into a subclass (e.g. the children of a QTabWidget become its pages).
     """
     widget = designer_root_class(ui_name)()
     load_ui_into(widget, ui_name)
     if window_title is not None:
         widget.setWindowTitle(window_title)  # After the load, which sets the title of the file
-    from ClearMap.gui.widget_monkeypatch_callbacks import recursive_patch_widgets
-    recursive_patch_widgets(widget)
+    apply_button_box_texts(widget)
     return widget
 
 

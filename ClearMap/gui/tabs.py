@@ -108,7 +108,7 @@ from qtpy.QtCore import QSignalBlocker
 
 from ClearMap.Utils.tag_expression import Expression
 
-from qtpy.QtWidgets import QApplication, QButtonGroup, QWidget
+from qtpy.QtWidgets import QApplication, QButtonGroup, QDialogButtonBox, QWidget
 import pyqtgraph as pg
 from natsort import natsorted
 
@@ -1633,7 +1633,8 @@ class VasculatureTab(PostProcessingTab['BinaryVesselProcessor']):
 
         # ######################################## DISPLAY ##############################
         # slicer
-        self.ui.graphSlicerButtonBox.connectOpen(self.plot_graph_type_processing_chunk_slicer)
+        self.ui.graphSlicerButtonBox.button(QDialogButtonBox.Open).clicked.connect(
+            self.plot_graph_type_processing_chunk_slicer)
 
         self.ui.plotGraphPickRegionPushButton.clicked.connect(self.pick_region)
         self.ui.plotGraphChunkPushButton.clicked.connect(self.display_graph_chunk_from_cfg)

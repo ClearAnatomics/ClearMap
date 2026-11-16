@@ -135,9 +135,11 @@ tab_registry
     ``TabRegistry``: determines which tabs are valid given the current
     sample state and app mode.
 
-widget_monkeypatch_callbacks
-    Functions bound at runtime to compound Qt widgets (doublets, triplets,
-    etc.) to give them a uniform value-changed interface.
+compound_boxes
+    ``NumberListBox``: the singlets, doublets and triplets of the designer files (a ``QFrame`` which holds one to
+    three spin boxes and, optionally, a check box which enables them), with a uniform value interface
+    (``getValue``, ``setValue``, ``valueChangedConnect``). Promote the ``QFrame`` to it in Qt Designer (see
+    ``creator/README.rst``).
 
 event_bus integration
     The GUI communicates with backend workers through typed events

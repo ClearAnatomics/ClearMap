@@ -646,7 +646,6 @@ class WizardWidget:
         self.setup()
 
         # self.dlg.setStyleSheet(qdarkstyle.load_stylesheet())
-        self.__fix_btn_boxes_text()
         self.connect_buttons()
 
     # Abstract
@@ -657,14 +656,6 @@ class WizardWidget:
         but should be implemented in the subclass
         """
         raise NotImplementedError
-
-    def __fix_btn_boxes_text(self):
-        """
-        Patch the name of button boxes to match the text in the ui file
-        """
-        for btn_box in self.dlg.findChildren(QDialogButtonBox):
-            if btn_box.property('applyText'):
-                btn_box.button(QDialogButtonBox.Apply).setText(btn_box.property('applyText'))
 
     def connect_buttons(self):
         """

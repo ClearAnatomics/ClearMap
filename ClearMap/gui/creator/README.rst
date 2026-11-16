@@ -24,3 +24,13 @@ does not change it).
 
 Do not set a ``styleSheet`` on the root widget of a file to get a dark preview: it would apply in the GUI too
 (the loader, ``qtpy.uic.loadUi``, sets every property of the root widget).
+
+Compound boxes: singlets, doublets and triplets
+-----------------------------------------------
+
+A setting made of one to three numbers (an overlap, a range, a resolution) is a ``QFrame`` which holds the spin boxes
+and, optionally, a check box which enables them. In Designer, promote the ``QFrame`` to ``NumberListBox`` (right click,
+"Promote to...": base class ``QFrame``, class name ``NumberListBox``, header file ``ClearMap.gui.compound_boxes``), and
+name it after its number of spin boxes: ``...Singlet``, ``...Doublet`` or ``...Triplet``. The order of the values is the
+number at the end of the names of the spin boxes (``spinBox_1``, ``spinBox_2``; two spin boxes may end in ``min`` and
+``max`` instead). A frame which is not promoted has no methods and is refused when it is linked to a setting.

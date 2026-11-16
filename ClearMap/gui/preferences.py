@@ -4,6 +4,8 @@ The values are persisted in a file
 located in the home folder of the user. The preferences are used to store values related to
 ClearMap performance as well as values that affect the appearance of the software.
 """
+from qtpy.QtWidgets import QDialogButtonBox
+
 from ClearMap.gui.params import PreferencesParams
 from ClearMap.gui.tabs_interfaces import GenericDialog
 
@@ -23,9 +25,8 @@ class PreferenceUi(GenericDialog):
 
         self.setup_preferences(**kwargs)
 
-        # self.ui.buttonBox.connectApply(self.params.ui_to_cfg)
-        self.ui.buttonBox.connectOk(self.apply_prefs_and_close)
-        self.ui.buttonBox.connectCancel(self.ui.close)
+        self.ui.buttonBox.button(QDialogButtonBox.Ok).clicked.connect(self.apply_prefs_and_close)
+        self.ui.buttonBox.button(QDialogButtonBox.Cancel).clicked.connect(self.ui.close)
 
         self.params.font_size = font_size
 

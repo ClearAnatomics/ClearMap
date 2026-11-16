@@ -39,7 +39,7 @@ __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
-from ClearMap.gui.gui_utils_base import unique_connect
+from ClearMap.gui.gui_utils_base import unique_connect, apply_button_box_texts
 
 print('Starting base imports...', flush=True)
 import os
@@ -178,7 +178,6 @@ from ClearMap.config.config_handler import ConfigHandler, CLEARMAP_CFG_DIR, ALTE
 from ClearMap.gui.gui_utils_images import get_current_res, is_dark
 from ClearMap.gui.tab_registry import TabRegistry
 from ClearMap.gui.event_delivery import GuiThreadDelivery
-from ClearMap.gui.widget_monkeypatch_callbacks import recursive_patch_widgets
 from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
 from ClearMap.pipeline_orchestrators.experiment_controller import ExperimentController, AnalysisGroupController, \
     AppMode
@@ -523,7 +522,7 @@ class ClearMapAppBase(QMainWindow):
             tb.setCurrentIndex(0)
 
     def monkey_patch(self):
-        recursive_patch_widgets(self)
+        apply_button_box_texts(self)
         self.patch_tool_boxes()
         # self.fix_styles()
 

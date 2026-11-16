@@ -11,7 +11,7 @@ import pytest
 import qtpy
 
 from ClearMap.Utils.exceptions import ClearMapValueError
-from ClearMap.gui import gui_utils_base, widget_monkeypatch_callbacks
+from ClearMap.gui import gui_utils_base
 
 UI_FILE_TITLE = 'Dialog'  # The windowTitle of nested_progress_dialog.ui
 
@@ -40,7 +40,7 @@ def fake_qt(monkeypatch):
     monkeypatch.setattr(qtpy, 'uic', uic, raising=False)
     monkeypatch.setattr(qtpy.QtWidgets, 'QDialog', FakeDialog, raising=False)
     patched = []
-    monkeypatch.setattr(widget_monkeypatch_callbacks, 'recursive_patch_widgets', patched.append)
+    monkeypatch.setattr(gui_utils_base, 'apply_button_box_texts', patched.append)
     return uic, patched
 
 
@@ -74,3 +74,49 @@ def test_a_root_which_is_not_a_qt_widgets_class_is_refused(fake_qt, monkeypatch)
 
     with pytest.raises(ClearMapValueError, match='nested_progress_dialog.ui is a QDialog'):
         gui_utils_base.create_clearmap_widget('nested_progress_dialog')
+
+
+class FakeButton:
+    def __init__(self):
+        self.texts = []
+
+    def setText(self, text):
+        self.texts.append(text)
+
+
+class FakeButtonBox:
+    def __init__(self, **text_properties):
+        self._properties = text_properties
+        self.buttons = {}
+
+    def property(self, name):
+        return self._properties.get(name)
+
+    def button(self, standard_button):
+        return self.buttons.setdefault(standard_button, FakeButton())
+
+
+class FakeContainer:
+    def __init__(self, *button_boxes):
+        self._button_boxes = button_boxes
+
+    def findChildren(self, widget_class):
+        return list(self._button_boxes)
+
+
+def test_the_text_properties_of_a_button_box_give_the_text_of_its_standard_buttons():
+    box = FakeButtonBox(applyText='Validate', okText='Go', openText='Plot')
+
+    gui_utils_base.apply_button_box_texts(FakeContainer(box))
+
+    buttons = {property_name: box.buttons[standard_button].texts for property_name, standard_button
+               in gui_utils_base.BUTTON_TEXT_PROPERTY_TO_STANDARD_BUTTON.items()}
+    assert buttons == {'applyText': ['Validate'], 'okText': ['Go'], 'openText': ['Plot']}
+
+
+def test_a_button_box_without_text_properties_keeps_the_text_of_its_buttons():
+    box = FakeButtonBox()
+
+    gui_utils_base.apply_button_box_texts(FakeContainer(box))
+
+    assert box.buttons == {}
