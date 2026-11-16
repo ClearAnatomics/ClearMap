@@ -3,14 +3,11 @@
 widget_monkeypatch_callbacks
 ============================
 
-A set of functions that will be monkey patched as methods to the graphical widgets,
-allowing notably compound widgets from QtCreator without defining plugins
+A set of functions that will be monkey patched as methods to the button boxes of the designer files
 """
 import types
-from typing import Iterable
 
-from qtpy.QtWidgets import (QSpinBox, QDoubleSpinBox, QCheckBox,
-                             QDialogButtonBox, QFrame)
+from qtpy.QtWidgets import QDialogButtonBox
 
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
@@ -18,140 +15,6 @@ __license__ = 'GPLv3 - GNU General Public License v3 (see LICENSE.txt)'
 __copyright__ = 'Copyright © 2022 by Charly Rousseau'
 __webpage__ = 'https://idisco.info'
 __download__ = 'https://github.com/ClearAnatomics/ClearMap'
-
-
-def _get_list_box_value(instance):
-    """
-    Get the value(s) of the spin box(es) in the instance.
-    Individual sentinel values (-1) are left as is for the caller to interpret
-    (e.g. as meaning 'auto' or 'None' depending on the context)
-    If the control is entirely disabled (box unchecked), None is returned
-
-    Parameters
-    ----------
-    instance: QFrame
-        The instance of the compound box to get the value(s) from
-
-    Returns
-    -------
-    int, float, list or None
-        The value(s) of the spin box(es) or None if the box is disabled
-    """
-    if not instance.controlsEnabled():
-        return None
-    values = [spin.value() for spin in _get_sorted_spin_boxes(instance)]
-
-    return values[0] if len(values) == 1 else values  # return single value for singlet
-
-
-def _set_list_box_value(instance, values):
-    """
-    Set the value(s) of the spin box(es) in the instance
-    values are expected to have been set to None if the box is disabled or
-    to the sentinel value -1 if the box is disableable but not all are None
-    (i.e. at least one value is not None)
-
-    Parameters
-    ----------
-    instance: QFrame
-        The instance of the compound box to set the value(s) for
-    values: Iterable, int, float or None
-        The value(s) to set. If None, the box is disabled.
-    """
-    if values is None:
-        instance.disableControls()
-
-        # Display the text corresponding to the "special" value
-        for spin in _get_sorted_spin_boxes(instance):
-            if spin.specialValueText():
-                spin.blockSignals(True)
-                spin.setValue(spin.minimum())
-                spin.blockSignals(False)
-
-        return
-    elif isinstance(values, (list, tuple)) and len(values) != len(_get_sorted_spin_boxes(instance)):
-        raise ValueError(f'Expected {len(_get_sorted_spin_boxes(instance))} values, got {len(values)}')
-    else:
-        if not isinstance(values, Iterable) or isinstance(values, str):
-            values = [values]
-
-        instance.enableControls()
-        spins = _get_sorted_spin_boxes(instance)
-
-        for i, (val, spin_box) in enumerate(zip(values, spins)):
-            spin_box.blockSignals(i != len(values) - 1)  # block signals except for last to avoid multiple calls
-            if isinstance(spin_box, QSpinBox):
-                spin_box.setValue(int(val))
-            elif isinstance(spin_box, QDoubleSpinBox):
-                spin_box.setValue(float(val))
-            spin_box.blockSignals(False)
-
-
-def _get_sorted_spin_boxes(instance):
-    cached = getattr(instance, "_cm_sorted_spin_boxes", None)
-    if cached is not None:
-        return cached
-
-    indices = []
-    spin_boxes = instance.findChildren(QSpinBox) or instance.findChildren(QDoubleSpinBox)
-    for spin_box in spin_boxes:
-        box_name = spin_box.objectName().lower()
-        try:  # Sort by integer following the last underscore in the objectName
-            indices.append(int(box_name.split('_')[-1]))
-        except ValueError:
-            err_msg = f'Could not extract index from "{spin_box.objectName()}" in "{instance.objectName()}"'
-            if len(spin_boxes) == 2:
-                if box_name.endswith('min'):
-                    indices.append(0)
-                elif box_name.endswith('max'):
-                    indices.append(1)
-                else:
-                    raise ValueError(err_msg + '; Unknown suffix')
-            else:
-                raise ValueError(err_msg)
-    sorted_spin_boxes = [box for _, box in sorted(zip(indices, spin_boxes))]
-    instance._cm_sorted_spin_boxes = sorted_spin_boxes  # cache the result
-    return sorted_spin_boxes
-
-
-def _connect_value_changed(instance, callback):
-    spin_boxes = _get_sorted_spin_boxes(instance)
-    for bx in spin_boxes:
-        # bx.valueChanged.connect(callback)
-        bx.setKeyboardTracking(False)
-        bx.editingFinished.connect(callback)
-    chk_bx = _get_check_box(instance)
-    if chk_bx is not None:
-        chk_bx.toggled.connect(callback)
-
-
-def _controls_enabled(instance):
-    chk = _get_check_box(instance)
-    if chk is not None:
-        return chk.isChecked()
-    # No checkbox, check if the contained control(s) are enabled
-    if instance.findChildren(QSpinBox) or instance.findChildren(QDoubleSpinBox):
-        spin_boxes = _get_sorted_spin_boxes(instance)
-        return spin_boxes[0].isEnabled()
-    else:
-        raise NotImplementedError(f'Control type "{instance}" is not yet supported')
-
-
-def _get_check_box(instance):
-    check_boxes = instance.findChildren(QCheckBox)
-    return check_boxes[0] if check_boxes else None
-
-
-def _enable_controls(instance):
-    check_box = instance.getCheckBox()
-    if check_box:
-        check_box.setChecked(True)
-
-
-def _disable_controls(instance):
-    check_box = instance.getCheckBox()
-    if check_box:
-        check_box.setChecked(False)
 
 
 def _connect_apply(instance, func):
@@ -176,87 +39,6 @@ def _connect_ok(instance, func):
 
 def _connect_cancel(instance, func):
     instance.button(QDialogButtonBox.Cancel).clicked.connect(func)
-
-
-def recursive_patch_compound_boxes(parent):
-    """
-    Since it is difficult to create real custom widgets in PyQt which can be used in QtCreator,
-    we chose a different approach based on the dynamic nature of Python.
-    We define new compound types (e.g. triplets of values) based on
-    dynamic properties and the objectNames in QtCreator and then patch the behaviour of these
-    widgets in this method
-
-    Parameters
-    ----------
-    parent: QWidget
-        The main widget to start the recursive search
-    """
-    frames = parent.findChildren(QFrame)
-    for bx in frames:
-        bx_name = bx.objectName().lower()
-        if not is_compound_box(bx_name):
-            continue
-        ensure_compound_box_patched(bx)
-
-
-def ensure_compound_box_patched(bx: QFrame, bx_name: str = ''):
-    """
-    Ensure a single QFrame has compound-box methods.
-
-    .. note::
-        Idempotent
-
-    Parameters
-    ----------
-    bx: QFrame
-        The box to patch
-    bx_name: str
-        The objectName of the box, used to determine the type of compound box and thus the
-        methods to patch
-    """
-    if not bx_name:
-        bx_name = bx.objectName().lower()
-        if not is_compound_box(bx_name):
-            return
-    if hasattr(bx, 'getCheckBox'):
-        return  # already patched
-    bx.getCheckBox = types.MethodType(_get_check_box, bx)
-    bx.controlsEnabled = types.MethodType(_controls_enabled, bx)
-    bx.enableControls = types.MethodType(_enable_controls, bx)
-    bx.disableControls = types.MethodType(_disable_controls, bx)
-    if is_list_box(bx_name):
-        bx.getValue = types.MethodType(_get_list_box_value, bx)
-        bx.setValue = types.MethodType(_set_list_box_value, bx)
-        bx.valueChangedConnect = types.MethodType(_connect_value_changed, bx)
-    else:
-        print(f'Skipping box "{bx_name}", type not recognised')
-
-
-def is_list_box(bx_name):
-    """
-    Check whether the name of the box is a list box i.e. a custom widget
-    ending in singlet double triplet that can be used to store a list of numbers
-    """
-    return bx_name.startswith('triplet') or bx_name.endswith('let')
-
-
-def is_compound_box(bx_name):
-    """
-    Check whether the name of the box is a compound box i.e. a custom widget
-    that is not natively supported by Qt but is based on elements inserted in a QFrame
-    in the .ui file. The behaviour is defined by the objectName
-
-    Parameters
-    ----------
-    bx_name: str
-        The objectName of the QFrame
-
-    Returns
-    -------
-    bool
-    """
-    return (bx_name.startswith('triplet') or
-            bx_name.endswith('let'))
 
 
 def recursive_patch_button_boxes(parent):
