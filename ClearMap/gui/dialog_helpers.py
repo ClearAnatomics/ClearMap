@@ -13,12 +13,14 @@ from ClearMap.gui.gui_utils_base import create_clearmap_widget, UI_FOLDER, DIALO
 _defaults = get_defaults_provider()
 DISPLAY_CONFIG = _defaults.get('display')
 
+NO_START_FOLDER_DIRECTORY = '~'  # Where the folder dialogs open when no start folder is set (as in machine.yml)
+
 
 def get_directory_dlg(start_folder, title="Choose the source directory"):
     diag = QFileDialog()  # REFACTOR: move to gui_utils
     # Native dialogs misbehave on some desktops. The flag itself is passed: PyQt6 has no QFileDialog.Options wrapper
     opt = QFileDialog.DontUseNativeDialog
-    start_folder = clean_path(start_folder)
+    start_folder = clean_path(start_folder or NO_START_FOLDER_DIRECTORY)  # Not set: None, or '' as 3.1.x wrote it
     src_folder = diag.getExistingDirectory(parent=diag, caption=title,
                                            directory=start_folder, options=opt)
     diag.close()
