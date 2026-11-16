@@ -182,7 +182,7 @@ class GenericTab(GenericUi, BusSubscriberMixin):
         name: str
         """
         name = name or self.get_tab_name()
-        super().__init__(main_window, ui_file_name, name, 'QTabWidget')
+        super().__init__(main_window, ui_file_name, name, 'QWidget')
         # REFACTORING: avoid direct access to a private attribute
         BusSubscriberMixin.__init__(self, bus=main_window.experiment_controller._bus)
         self.tab_idx: int = tab_idx

@@ -34,8 +34,6 @@ def test_no_designer_file_sets_a_style_sheet_on_its_root_widget():
     assert not with_style_sheet, f'{with_style_sheet}: see gui/creator/README.rst for a dark preview in Designer'
 
 
-QT_CLASS_ANCESTORS = {'QWidget': {'QWidget'}, 'QDialog': {'QDialog', 'QWidget'}, 'QTabWidget': {'QTabWidget', 'QWidget'},
-                      'QMainWindow': {'QMainWindow', 'QWidget'}}
 WIZARD_DEFAULT_WIDGET_CLASS = 'QDialog'  # widget_class_name of WizardWidget
 WIZARD_WIDGET_CLASS_POSITION = 6  # Its position among the arguments of WizardWidget.__init__ (after ui_name)
 
@@ -68,12 +66,29 @@ def _widget_classes_named_for_designer_files():
     return named
 
 
-def test_the_widget_class_named_for_a_designer_file_is_its_root_class_or_a_subclass_of_it():
-    """uic.loadUi refuses a widget which is not an instance of the root class ('Wrong base class of toplevel widget')"""
+def test_the_widget_class_named_for_a_designer_file_is_its_root_class():
+    """
+    uic.loadUi refuses a widget which is not an instance of the root class ('Wrong base class of toplevel widget'),
+    and it builds the content of the file differently into a subclass: the children of a QTabWidget become its pages.
+    """
     named = _widget_classes_named_for_designer_files()
     wrong = [f'{file}:{line} {ui_name}.ui is a {root_class}, not built into a {widget_class}'
              for file, line, ui_name, widget_class, root_class in named
-             if root_class not in QT_CLASS_ANCESTORS.get(widget_class, set())]
+             if widget_class != root_class]
 
     assert len(named) >= 5, 'the calls were not found'
     assert not wrong
+
+
+def test_the_tabs_are_built_into_the_root_class_of_their_designer_files():
+    """GenericTab builds its file (e.g. sample_tab.ui) into the class it names: a QTabWidget would show the content
+    of the tab in the first page of a tab widget of its own"""
+    interfaces = ast.parse((Path(ClearMap.gui.__file__).parent / 'tabs_interfaces.py').read_text(encoding='utf-8'))
+    generic_tab = next(node for node in interfaces.body if isinstance(node, ast.ClassDef) and node.name == 'GenericTab')
+    init = next(node for node in generic_tab.body if isinstance(node, ast.FunctionDef) and node.name == '__init__')
+    widget_classes = {_constant(call.args[3]) for call in ast.walk(init)
+                      if isinstance(call, ast.Call) and ast.unparse(call.func) == 'super().__init__'}
+    tab_ui_files = sorted(CREATOR_FOLDER.glob('*_tab.ui'))
+
+    assert tab_ui_files
+    assert {_root_class(ui_file) for ui_file in tab_ui_files} == widget_classes
