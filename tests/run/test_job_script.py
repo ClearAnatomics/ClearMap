@@ -56,3 +56,11 @@ def test_clearmap_tmp_comes_before_the_tmpdir_of_the_job(stubs_folder):
 
     assert result.returncode == 0, result.stderr
     assert 'SRUN_CLEARMAP_TMP=/scratch/me' in result.stdout
+
+
+def test_the_default_conda_environment_of_the_script_is_the_one_the_environment_file_creates():
+    environment_file = Path(__file__).parents[2] / 'ClearMap3.yml'
+    environment_name = next(line.split(':', 1)[1].strip() for line in environment_file.read_text().splitlines()
+                            if line.startswith('name:'))
+
+    assert f'CLEARMAP_CONDA_ENV:-{environment_name}}}' in JOB_SCRIPT.read_text()

@@ -19,7 +19,7 @@ set -euo pipefail
 
 : "${CLEARMAP_PIPELINE:?set CLEARMAP_PIPELINE to align, tube_map or cell_map}"
 : "${CLEARMAP_EXPERIMENT:?set CLEARMAP_EXPERIMENT to the experiment folder}"
-CLEARMAP_CONDA_ENV="${CLEARMAP_CONDA_ENV:-ClearMap3.1}"
+CLEARMAP_CONDA_ENV="${CLEARMAP_CONDA_ENV:-ClearMap3.2}"
 
 # The libraries (OpenMP, BLAS) start one thread per core of the NODE unless told otherwise: tell them the cores of the JOB
 export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK}"
