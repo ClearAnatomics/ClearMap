@@ -121,6 +121,23 @@ def test_the_machine_config_validates_with_the_atlas_cache_folder_a_path_or_none
     assert (not list(Validator(schema, registry=schema_registry).iter_errors(config))) is valid
 
 
+@pytest.mark.parametrize('section, keys', [('machine', ['start_folder']),
+                                          ('batch_processing', ['paths', 'results_folder']),
+                                          ('group_analysis', ['paths', 'results_folder'])])
+@pytest.mark.parametrize('folder, valid', [(None, True), ('', True), ('/data/results', True), (12, False)])
+def test_a_folder_which_is_not_set_is_null_or_empty_as_clearmap_3_1_wrote_it(src_dir: Path, schemas_dir: Path,
+                                                                            schema_registry, section, keys, folder,
+                                                                            valid):
+    schema = _load_schema(schemas_dir / f'{section}.schema.yaml')
+    config = _load_yaml(src_dir / f'{section}.yml')
+    parent = config
+    for key in keys[:-1]:
+        parent = parent[key]
+    parent[keys[-1]] = folder
+
+    assert (not list(Validator(schema, registry=schema_registry).iter_errors(config))) is valid
+
+
 def test_the_machine_config_of_the_package_validates(src_dir: Path, schemas_dir: Path, schema_registry):
     schema = _load_schema(schemas_dir / 'machine.schema.yaml')
 

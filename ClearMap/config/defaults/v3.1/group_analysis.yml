@@ -4,6 +4,6 @@ clearmap_version: "3.1.0"
 pipeline: "CellMap"
 
 paths:
-    results_folder: ""
+    results_folder: null  # Not set: chosen in the GUI
 groups: {}
 comparisons: {}
