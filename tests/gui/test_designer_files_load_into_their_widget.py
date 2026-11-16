@@ -1,15 +1,16 @@
 """
-A designer file is built into a widget of the Qt class that its caller names (qtpy.uic.loadUi), without its resource
-includes. The title given by the caller is set after the load, which sets the title written in the file.
+A designer file is built into a widget of its root class (qtpy.uic.loadUi), without its resource includes. The title given by the caller is set after the load, which sets the title written in the file.
 
 qtpy's uic and widgets are replaced by fakes: the sandbox has no Qt. The load with a real Qt is checked by
 test_designer_files_build_with_the_qt_binding.
 """
+import types
 import xml.etree.ElementTree as ET
 
 import pytest
 import qtpy
 
+from ClearMap.Utils.exceptions import ClearMapValueError
 from ClearMap.gui import gui_utils_base, widget_monkeypatch_callbacks
 
 UI_FILE_TITLE = 'Dialog'  # The windowTitle of nested_progress_dialog.ui
@@ -43,10 +44,10 @@ def fake_qt(monkeypatch):
     return uic, patched
 
 
-def test_the_file_is_loaded_into_a_widget_of_the_class_named_by_the_caller(fake_qt):
+def test_the_file_is_loaded_into_a_widget_of_the_root_class_of_the_file(fake_qt):
     uic, patched = fake_qt
 
-    widget = gui_utils_base.create_clearmap_widget('nested_progress_dialog', widget_class_name='QDialog')
+    widget = gui_utils_base.create_clearmap_widget('nested_progress_dialog')
 
     assert isinstance(widget, FakeDialog)
     assert [loaded_widget for _, loaded_widget in uic.loaded] == [widget]
@@ -56,14 +57,20 @@ def test_the_file_is_loaded_into_a_widget_of_the_class_named_by_the_caller(fake_
 def test_the_file_is_loaded_without_its_resource_includes(fake_qt):
     uic, _ = fake_qt
 
-    gui_utils_base.create_clearmap_widget('nested_progress_dialog', widget_class_name='QDialog')
+    gui_utils_base.create_clearmap_widget('nested_progress_dialog')
 
     loaded_root = uic.loaded[0][0]
     assert loaded_root.find('widget') is not None and loaded_root.find('resources') is None
 
 
 def test_the_title_of_the_caller_replaces_the_title_of_the_file(fake_qt):
-    widget = gui_utils_base.create_clearmap_widget('nested_progress_dialog', widget_class_name='QDialog',
-                                                   window_title='Progress')
+    widget = gui_utils_base.create_clearmap_widget('nested_progress_dialog', window_title='Progress')
 
     assert widget.titles == [UI_FILE_TITLE, 'Progress']
+
+
+def test_a_root_which_is_not_a_qt_widgets_class_is_refused(fake_qt, monkeypatch):
+    monkeypatch.setattr(gui_utils_base, 'QtWidgets', types.SimpleNamespace())  # No class: what a custom root is
+
+    with pytest.raises(ClearMapValueError, match='nested_progress_dialog.ui is a QDialog'):
+        gui_utils_base.create_clearmap_widget('nested_progress_dialog')

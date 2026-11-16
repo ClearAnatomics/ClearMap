@@ -99,7 +99,7 @@ class GenericUi:
     of GenericTab and GenericDialog, themselves interfaces
     """
     # FIXME: seems to be called several times
-    def __init__(self, main_window: QMainWindow, ui_file_name: str, name: str, widget_class_name: str):
+    def __init__(self, main_window: QMainWindow, ui_file_name: str, name: str):
         """
 
         Parameters
@@ -107,17 +107,15 @@ class GenericUi:
         main_window: ClearMapGui
         name: str
         ui_file_name: str
-        widget_class_name: str
         """
         self.main_window: QMainWindow = main_window
         self.name: str = name
         self.ui_file_name: str = ui_file_name
-        self.widget_class_name: str = widget_class_name
         self.ui: QWidget | None = None
         self.params: UiParameter | UiParameterCollection | None = None
 
     def _load_dot_ui(self) -> QWidget:
-        return create_clearmap_widget(self.ui_file_name, widget_class_name=self.widget_class_name)
+        return create_clearmap_widget(self.ui_file_name)
 
     def _init_ui(self) -> None:
         self.ui = self._load_dot_ui()
@@ -140,7 +138,7 @@ class GenericDialog(GenericUi):
     Interface to any dialog associated with parameters
     """
     def __init__(self, main_window, name: str, file_name: str):
-        super().__init__(main_window, file_name, name, 'QDialog')
+        super().__init__(main_window, file_name, name)
 
     def _init_ui(self) -> None:
         super()._init_ui()
@@ -182,7 +180,7 @@ class GenericTab(GenericUi, BusSubscriberMixin):
         name: str
         """
         name = name or self.get_tab_name()
-        super().__init__(main_window, ui_file_name, name, 'QWidget')
+        super().__init__(main_window, ui_file_name, name)
         # REFACTORING: avoid direct access to a private attribute
         BusSubscriberMixin.__init__(self, bus=main_window.experiment_controller._bus)
         self.tab_idx: int = tab_idx
@@ -413,7 +411,7 @@ class GenericTab(GenericUi, BusSubscriberMixin):
         page = tab_widget.get_channel_widget(channel)
         creating = not page
         if creating:
-            page = create_clearmap_widget(self.channels_ui_name, widget_class_name='QWidget')
+            page = create_clearmap_widget(self.channels_ui_name)
             channel = tab_widget.add_channel_widget(page, name=channel)
         self._assign_channel_page_id(page, channel)
         return channel, page, creating

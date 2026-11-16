@@ -24,6 +24,8 @@ from qtpy.QtCore import Signal
 from qtpy.QtWidgets import QLayout, QApplication, QWidget, \
     QToolBox  # REFACTOR: local imports or strings for annotations?
 
+from ClearMap.Utils.exceptions import ClearMapValueError
+
 # WARNING: declared here for dependency visibility but imported locally where used
 # from ClearMap.gui.widget_monkeypatch_callbacks import recursive_patch_widgets  # WARNING: local import
 
@@ -169,12 +171,39 @@ def load_ui_into(widget: QWidget, ui_name: str) -> None:
     uic.loadUi(ui_without_resource_includes(os.path.join(UI_FOLDER, 'creator', ui_name)), widget)
 
 
-def create_clearmap_widget(ui_name: str, widget_class_name: str, window_title: Optional[str] = None) -> QWidget:
+def designer_root_class(ui_name: str):
     """
-    A widget of the Qt class ``widget_class_name`` (e.g. 'QDialog') built from a Qt Designer file of
-    ``ClearMap/gui/creator``, with the methods of its compound boxes (``widget_monkeypatch_callbacks``).
+    The Qt class of the root widget of a Qt Designer file of ``ClearMap/gui/creator`` (e.g. QDialog).
+
+    Parameters
+    ----------
+    ui_name : str
+        The name of the file, with or without ``.ui``.
+
+    Raises
+    ------
+    ClearMapValueError
+        If the root widget of the file is not a class of ``qtpy.QtWidgets``.
     """
-    widget = getattr(QtWidgets, widget_class_name)()
+    if not ui_name.endswith('.ui'):
+        ui_name += '.ui'
+    ui_file = os.path.join(UI_FOLDER, 'creator', ui_name)
+    class_name = ET.parse(ui_file).getroot().find('widget').get('class')
+    root_class = getattr(QtWidgets, class_name, None)
+    if root_class is None:
+        raise ClearMapValueError(f'The root widget of {ui_file} is a {class_name}, which is not a class of '
+                                 f'QtWidgets (promoted or custom widgets cannot be the root of a designer file).',
+                                 value=class_name, expected='a class of QtWidgets')
+    return root_class
+
+
+def create_clearmap_widget(ui_name: str, *, window_title: Optional[str] = None) -> QWidget:
+    """
+    A widget built from a Qt Designer file of ``ClearMap/gui/creator``, with the methods of its compound boxes
+    (``widget_monkeypatch_callbacks``). Its class is the root class of the file (see :func:`designer_root_class`):
+    the loader builds the file differently into a subclass (e.g. the children of a QTabWidget become its pages).
+    """
+    widget = designer_root_class(ui_name)()
     load_ui_into(widget, ui_name)
     if window_title is not None:
         widget.setWindowTitle(window_title)  # After the load, which sets the title of the file
