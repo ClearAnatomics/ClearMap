@@ -724,7 +724,7 @@ class ManageAssetsWidget(WizardWidget):
                                                output_title='Selected assets:')
 
         super().__init__('assets_manipulation', 'Assets management wizard',
-                         src_folder, params, app, [600, 1200], 'QWidget')
+                         src_folder, params, app, [600, 1200])
 
         # self.dlg.setModal(False)
         # self.dlg.show()
