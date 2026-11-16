@@ -724,7 +724,8 @@ class ManageAssetsWidget(WizardWidget):
                                                output_title='Selected assets:')
 
         super().__init__('assets_manipulation', 'Assets management wizard',
-                         src_folder, params, app, [600, 1200])
+                         src_folder, params, app, [600, 1200],
+                         'QWidget')  # Shown in a dock: a QDialog would hide on Escape
 
         # self.dlg.setModal(False)
         # self.dlg.show()

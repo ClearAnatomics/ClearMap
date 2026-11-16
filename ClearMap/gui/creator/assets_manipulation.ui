@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>mainDialog</class>
- <widget class="QDialog" name="mainDialog">
+ <class>AssetsManipulation</class>
+ <widget class="QWidget" name="AssetsManipulation">
   <property name="geometry">
    <rect>
     <x>0</x>

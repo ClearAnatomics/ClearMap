@@ -92,3 +92,8 @@ def test_the_tabs_are_built_into_the_root_class_of_their_designer_files():
 
     assert tab_ui_files
     assert {_root_class(ui_file) for ui_file in tab_ui_files} == widget_classes
+
+
+def test_the_assets_manager_is_a_plain_widget_as_it_is_shown_in_a_dock():
+    """A QDialog in the dock of the main window hides on Escape (reject) and presses its default button on Enter"""
+    assert _root_class(CREATOR_FOLDER / 'assets_manipulation.ui') == 'QWidget'
