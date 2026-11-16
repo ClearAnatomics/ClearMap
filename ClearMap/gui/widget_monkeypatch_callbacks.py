@@ -10,7 +10,7 @@ import types
 from typing import Iterable
 
 from qtpy.QtWidgets import (QSpinBox, QDoubleSpinBox, QCheckBox,
-                             QDialogButtonBox, QDockWidget, QFrame)
+                             QDialogButtonBox, QFrame)
 
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
@@ -176,11 +176,6 @@ def _connect_ok(instance, func):
 
 def _connect_cancel(instance, func):
     instance.button(QDialogButtonBox.Cancel).clicked.connect(func)
-
-
-def dock_resize_event(instance, event):
-    super(QDockWidget, instance).__init__()
-    instance.resized.emit()
 
 
 def recursive_patch_compound_boxes(parent):
