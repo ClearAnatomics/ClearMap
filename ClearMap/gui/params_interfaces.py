@@ -273,13 +273,10 @@ def param_handler(func):
 def frame_getter(widget: QFrame):
     """
     For compound objects wrapped in a frame like
-    singlets, doublets and triplets, with or without a checkbox
-    or for text edits with an enable checkbox
+    singlets, doublets and triplets (NumberListBox), with or without a checkbox
     """
     if hasattr(widget, 'getValue'):   # singlets, doublets and triplets
         return widget.getValue()
-    elif hasattr(widget, 'text') and callable(widget.text): # TextEdit with checkbox
-        return widget.text()
     else:
         raise ValueError(f'Unrecognised frame with name "{widget.objectName()}"')
 
@@ -287,13 +284,10 @@ def frame_getter(widget: QFrame):
 def frame_setter(widget: QFrame, value):
     """
     For compound objects wrapped in a frame like
-    singlets, doublets and triplets, with or without a checkbox
-    or for text edits with an enable checkbox
+    singlets, doublets and triplets (NumberListBox), with or without a checkbox
     """
     if hasattr(widget, 'setValue'):  # singlets, doublets and triplets
         widget.setValue(value)
-    elif hasattr(widget, 'setText') and callable(widget.setText):  # TextEdit with checkbox
-        widget.setText(value)
     else:
         raise ValueError(f'Unrecognised frame with name "{widget.objectName()}"')
 
@@ -302,8 +296,6 @@ def connect_frame(widget, callback):
     name = widget.objectName()
     if hasattr(widget, 'valueChangedConnect'):  # singlets, doublets and triplets
         widget.valueChangedConnect(lambda *_: callback())
-    elif hasattr(widget, 'textChangedConnect'):  # WARNING: plainTextEdit.textChanged is argument less
-        widget.textChangedConnect(lambda *_: callback())
     else:
         raise ValueError(f'Unrecognised frame with "{name=}"')
 
@@ -546,45 +538,6 @@ class VectorLink(ParamLink):
             else:
                 out.append(self.dtype(x))
         return out[0] if (self.n_numbers == 1 and self.collapse_singular) else out
-
-
-def optional_text_link(keys: Sequence[str], widget: QFrame,
-                       disabled_value: Optional[Union[str, None]] = None) -> ParamLink:
-    """
-    Create a ParamLink for an optional text field.
-    This is a QFrame widgets that contain a text editable (QLineEdit or QPlainTextEdit)
-    and an enable/disable checkbox.
-
-    Parameters
-    ----------
-    keys: List[str]
-        The keys for the config
-    widget: QFrame
-        The QFrame widget containing the text edit and checkbox
-    disabled_value: Optional[Union[str, None]]
-        The value to be used when the widget is disabled.
-        If None, the config value will be None when disabled.
-        If "auto", the config value will be "auto" when disabled.
-        Default is None.
-
-    Returns
-    -------
-    ParamLink
-        The ParamLink object to be used in the params_dict
-    """
-    def cast_to_ui(cfg_val: Any):
-        if (disabled_value is None and cfg_val is None) or (disabled_value == "auto" and cfg_val == "auto"):
-            return None
-        return "" if cfg_val is None else str(cfg_val)
-
-    def cast_from_ui(ui_val: Any):
-        if ui_val is None:
-            return disabled_value
-        return None if ui_val == "" else str(ui_val)
-
-    return ParamLink(keys=list(keys), widget=widget, cast_to_ui=cast_to_ui, cast_from_ui=cast_from_ui,
-                     connect=lambda w, cb: w.textChangedConnect(cb))
-
 
 
 def combobox_getter(widget: QComboBox):

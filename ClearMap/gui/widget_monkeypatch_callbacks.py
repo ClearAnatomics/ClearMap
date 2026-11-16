@@ -9,8 +9,8 @@ allowing notably compound widgets from QtCreator without defining plugins
 import types
 from typing import Iterable
 
-from qtpy.QtWidgets import (QSpinBox, QDoubleSpinBox, QCheckBox, QLineEdit,
-                             QDialogButtonBox, QDockWidget, QPlainTextEdit, QTextEdit, QFrame)
+from qtpy.QtWidgets import (QSpinBox, QDoubleSpinBox, QCheckBox,
+                             QDialogButtonBox, QDockWidget, QFrame)
 
 
 __author__ = 'Charly Rousseau <charly.rousseau@icm-institute.org>'
@@ -125,13 +125,6 @@ def _connect_value_changed(instance, callback):
         chk_bx.toggled.connect(callback)
 
 
-def _connect_text_changed(instance, callback):
-    _get_text_edit(instance).textChanged.connect(callback)
-    chk = _get_check_box(instance)
-    if chk is not None:
-        chk.toggled.connect(callback)
-
-
 def _controls_enabled(instance):
     chk = _get_check_box(instance)
     if chk is not None:
@@ -140,10 +133,6 @@ def _controls_enabled(instance):
     if instance.findChildren(QSpinBox) or instance.findChildren(QDoubleSpinBox):
         spin_boxes = _get_sorted_spin_boxes(instance)
         return spin_boxes[0].isEnabled()
-    elif instance.findChildren(QLineEdit):
-        return instance.findChildren(QLineEdit)[0].isEnabled()
-    elif instance.findChildren(QPlainTextEdit):
-        return instance.findChildren(QPlainTextEdit)[0].isEnabled()
     else:
         raise NotImplementedError(f'Control type "{instance}" is not yet supported')
 
@@ -163,40 +152,6 @@ def _disable_controls(instance):
     check_box = instance.getCheckBox()
     if check_box:
         check_box.setChecked(False)
-
-
-def _get_text_edit(instance):
-    for cls in (QLineEdit, QPlainTextEdit, QTextEdit):
-        children = instance.findChildren(cls)
-        if children:
-            return children[0]
-
-
-def _set_text(instance, txt):
-    if txt is None or txt == 'auto' or txt == '':
-        instance.disableControls()
-    else:
-        instance.enableControls()
-        text_edit = _get_text_edit(instance)
-        if isinstance(text_edit, QLineEdit):
-            text_edit.setText(txt)
-        elif isinstance(text_edit, QPlainTextEdit):
-            text_edit.setPlainText(txt)
-        else:
-            raise ValueError(f'Expected QLineEdit or QPlainTextEdit, got "{type(text_edit)}"')
-
-
-def _get_text(instance):
-    if instance.controlsEnabled():
-        text_edit = _get_text_edit(instance)
-        if isinstance(text_edit, QLineEdit):
-            return text_edit.text()
-        elif isinstance(text_edit, QPlainTextEdit):
-            return text_edit.toPlainText()
-        else:
-            raise ValueError(f'Expected QLineEdit or QPlainTextEdit, got "{type(text_edit)}"')
-    else:  # Disabled, return disabled value
-        return None
 
 
 def _connect_apply(instance, func):
@@ -232,7 +187,7 @@ def recursive_patch_compound_boxes(parent):
     """
     Since it is difficult to create real custom widgets in PyQt which can be used in QtCreator,
     we chose a different approach based on the dynamic nature of Python.
-    We define new compound types (e.g. checkable text edit or triplets of values) based on
+    We define new compound types (e.g. triplets of values) based on
     dynamic properties and the objectNames in QtCreator and then patch the behaviour of these
     widgets in this method
 
@@ -278,10 +233,6 @@ def ensure_compound_box_patched(bx: QFrame, bx_name: str = ''):
         bx.getValue = types.MethodType(_get_list_box_value, bx)
         bx.setValue = types.MethodType(_set_list_box_value, bx)
         bx.valueChangedConnect = types.MethodType(_connect_value_changed, bx)
-    elif is_optional_box(bx_name):
-        bx.setText = types.MethodType(_set_text, bx)
-        bx.text = types.MethodType(_get_text, bx)
-        bx.textChangedConnect = types.MethodType(_connect_text_changed, bx)
     else:
         print(f'Skipping box "{bx_name}", type not recognised')
 
@@ -292,10 +243,6 @@ def is_list_box(bx_name):
     ending in singlet double triplet that can be used to store a list of numbers
     """
     return bx_name.startswith('triplet') or bx_name.endswith('let')
-
-
-def is_optional_box(box_name):
-    return box_name.endswith('optionallineedit') or box_name.endswith('optionalplaintextedit')
 
 
 def is_compound_box(bx_name):
@@ -314,9 +261,7 @@ def is_compound_box(bx_name):
     bool
     """
     return (bx_name.startswith('triplet') or
-            bx_name.endswith('let') or
-            bx_name.endswith('optionallineedit') or
-            bx_name.endswith('optionalplaintextedit'))
+            bx_name.endswith('let'))
 
 
 def recursive_patch_button_boxes(parent):
