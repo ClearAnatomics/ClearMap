@@ -13,7 +13,7 @@ import numpy as np
 
 from qtpy.QtCore import Qt, QTimer, QSignalBlocker
 from qtpy.QtWidgets import (QToolBox, QCheckBox, QLabel, QHBoxLayout, QVBoxLayout,
-                             QSpinBox, QLineEdit, QDoubleSpinBox, QRadioButton, QFrame, QButtonGroup,
+                             QSpinBox, QLineEdit, QDoubleSpinBox, QRadioButton, QButtonGroup,
                              QMessageBox)
 
 from ClearMap.Analysis.graphs.graph_filters import GraphFilter, combined_filters_name
@@ -47,7 +47,7 @@ from .gui_utils_base import replace_widget, DIALOG_ACCEPTED
 from .params_mixins import OrthoviewerSlicingMixin
 from .pipeline_model import BINARIZATION_STEPS, PipelineStep, LinearPipeline
 from .pipeline_widgets import LinearPipelineWidget
-from .widget_monkeypatch_callbacks import recursive_patch_compound_boxes
+from .compound_boxes import NumberListBox
 from .params_interfaces import (ParamLink, UiParameter, ChannelUiParameter, UiParameterCollection,
                                 ChannelsUiParameterCollection, VectorLink, invert, param_setter, param_handler,
                                 list_widget_setter, list_widget_getter, _linear_pipeline_connector)
@@ -2133,7 +2133,7 @@ class GraphFilterParams(UiParameter):  # FIXME: do we really pass the graph as a
             range_min, range_max = -range_abs, range_abs - 1
         else:
             range_min, range_max = 0, range_abs - 1
-        widget = QFrame(self.tab)
+        widget = NumberListBox(self.tab)
         widget.setObjectName('graphFilterPropertyValueDoublet')
         frame_layout = QHBoxLayout(widget)
         min_ctrl = widget_class(self.tab)
@@ -2149,7 +2149,6 @@ class GraphFilterParams(UiParameter):  # FIXME: do we really pass the graph as a
         max_ctrl.setObjectName(f'graphFilterPropertyValueSpinBox_2')  # For doublet ctrl behaviour (needs sorting)
         max_ctrl.setRange(range_min, range_max)
         frame_layout.addWidget(max_ctrl)
-        recursive_patch_compound_boxes(self.tab)
         return widget
 
 

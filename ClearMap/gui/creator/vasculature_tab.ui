@@ -868,7 +868,7 @@
                      </widget>
                     </item>
                     <item row="0" column="1" colspan="2">
-                     <widget class="QFrame" name="veinIntensityRangeOnArteriesChannelDoublet">
+                     <widget class="NumberListBox" name="veinIntensityRangeOnArteriesChannelDoublet">
                       <property name="frameShape">
                        <enum>QFrame::StyledPanel</enum>
                       </property>
@@ -1121,7 +1121,7 @@ p, li { white-space: pre-wrap; }
                      </widget>
                     </item>
                     <item row="1" column="1">
-                     <widget class="QFrame" name="graphConstructionSlicerXRangeDoublet">
+                     <widget class="NumberListBox" name="graphConstructionSlicerXRangeDoublet">
                       <property name="frameShape">
                        <enum>QFrame::StyledPanel</enum>
                       </property>
@@ -1177,7 +1177,7 @@ p, li { white-space: pre-wrap; }
                      </widget>
                     </item>
                     <item row="2" column="1">
-                     <widget class="QFrame" name="graphConstructionSlicerYRangeDoublet">
+                     <widget class="NumberListBox" name="graphConstructionSlicerYRangeDoublet">
                       <property name="frameShape">
                        <enum>QFrame::StyledPanel</enum>
                       </property>
@@ -1240,7 +1240,7 @@ p, li { white-space: pre-wrap; }
                      </widget>
                     </item>
                     <item row="3" column="1">
-                     <widget class="QFrame" name="graphConstructionSlicerZRangeDoublet">
+                     <widget class="NumberListBox" name="graphConstructionSlicerZRangeDoublet">
                       <property name="frameShape">
                        <enum>QFrame::StyledPanel</enum>
                       </property>
@@ -1351,7 +1351,7 @@ p, li { white-space: pre-wrap; }
                   </widget>
                  </item>
                  <item row="3" column="1" colspan="2">
-                  <widget class="QFrame" name="vasculatureVoxelizationRadiusTriplet">
+                  <widget class="NumberListBox" name="vasculatureVoxelizationRadiusTriplet">
                    <property name="frameShape">
                     <enum>QFrame::StyledPanel</enum>
                    </property>
@@ -1560,6 +1560,14 @@ p, li { white-space: pre-wrap; }
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>NumberListBox</class>
+   <extends>QFrame</extends>
+   <header>ClearMap.gui.compound_boxes</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources>
   <include location="icons.qrc"/>
  </resources>

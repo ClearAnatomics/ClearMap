@@ -75,7 +75,7 @@
        </widget>
       </item>
       <item row="0" column="2">
-       <widget class="QFrame" name="xOverlapSinglet">
+       <widget class="NumberListBox" name="xOverlapSinglet">
         <property name="frameShape">
          <enum>QFrame::StyledPanel</enum>
         </property>
@@ -120,7 +120,7 @@
        </widget>
       </item>
       <item row="1" column="2">
-       <widget class="QFrame" name="yOverlapSinglet">
+       <widget class="NumberListBox" name="yOverlapSinglet">
         <property name="frameShape">
          <enum>QFrame::StyledPanel</enum>
         </property>
@@ -186,7 +186,7 @@
        </widget>
       </item>
       <item row="3" column="2">
-       <widget class="QFrame" name="projectionThicknessDoublet">
+       <widget class="NumberListBox" name="projectionThicknessDoublet">
         <property name="frameShape">
          <enum>QFrame::StyledPanel</enum>
         </property>
@@ -250,7 +250,7 @@
        </widget>
       </item>
       <item row="4" column="2">
-       <widget class="QFrame" name="rigidMaxShiftsXDoublet">
+       <widget class="NumberListBox" name="rigidMaxShiftsXDoublet">
         <property name="frameShape">
          <enum>QFrame::StyledPanel</enum>
         </property>
@@ -298,7 +298,7 @@
        </widget>
       </item>
       <item row="5" column="2">
-       <widget class="QFrame" name="rigidMaxShiftsYDoublet">
+       <widget class="NumberListBox" name="rigidMaxShiftsYDoublet">
         <property name="frameShape">
          <enum>QFrame::StyledPanel</enum>
         </property>
@@ -346,7 +346,7 @@
        </widget>
       </item>
       <item row="6" column="2">
-       <widget class="QFrame" name="rigidMaxShiftsZDoublet">
+       <widget class="NumberListBox" name="rigidMaxShiftsZDoublet">
         <property name="frameShape">
          <enum>QFrame::StyledPanel</enum>
         </property>
@@ -472,7 +472,7 @@
        <number>2</number>
       </property>
       <item row="1" column="1">
-       <widget class="QFrame" name="wobblyMaxShiftsYDoublet">
+       <widget class="NumberListBox" name="wobblyMaxShiftsYDoublet">
         <property name="frameShape">
          <enum>QFrame::StyledPanel</enum>
         </property>
@@ -517,7 +517,7 @@
        </widget>
       </item>
       <item row="3" column="1">
-       <widget class="QFrame" name="wobblyStackValidRangeDoublet">
+       <widget class="NumberListBox" name="wobblyStackValidRangeDoublet">
         <property name="frameShape">
          <enum>QFrame::StyledPanel</enum>
         </property>
@@ -555,7 +555,7 @@
        </widget>
       </item>
       <item row="5" column="1">
-       <widget class="QFrame" name="wobblySliceRangeDoublet">
+       <widget class="NumberListBox" name="wobblySliceRangeDoublet">
         <property name="frameShape">
          <enum>QFrame::StyledPanel</enum>
         </property>
@@ -610,7 +610,7 @@
        </widget>
       </item>
       <item row="0" column="1">
-       <widget class="QFrame" name="wobblyMaxShiftsXDoublet">
+       <widget class="NumberListBox" name="wobblyMaxShiftsXDoublet">
         <property name="frameShape">
          <enum>QFrame::StyledPanel</enum>
         </property>
@@ -665,7 +665,7 @@
        </widget>
       </item>
       <item row="2" column="1">
-       <widget class="QFrame" name="wobblyMaxShiftsZDoublet">
+       <widget class="NumberListBox" name="wobblyMaxShiftsZDoublet">
         <property name="frameShape">
          <enum>QFrame::StyledPanel</enum>
         </property>
@@ -703,7 +703,7 @@
        </widget>
       </item>
       <item row="4" column="1">
-       <widget class="QFrame" name="wobblyStackPixelSizeSinglet">
+       <widget class="NumberListBox" name="wobblyStackPixelSizeSinglet">
         <property name="frameShape">
          <enum>QFrame::StyledPanel</enum>
         </property>
@@ -742,7 +742,7 @@
        </widget>
       </item>
       <item row="6" column="1">
-       <widget class="QFrame" name="wobblySlicePixelSizeSinglet">
+       <widget class="NumberListBox" name="wobblySlicePixelSizeSinglet">
         <property name="frameShape">
          <enum>QFrame::StyledPanel</enum>
         </property>
@@ -795,6 +795,14 @@
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>NumberListBox</class>
+   <extends>QFrame</extends>
+   <header>ClearMap.gui.compound_boxes</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources>
   <include location="icons.qrc"/>
  </resources>

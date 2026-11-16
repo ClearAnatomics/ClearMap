@@ -148,7 +148,7 @@
                </widget>
               </item>
               <item row="1" column="1">
-               <widget class="QFrame" name="hMaxSinglet">
+               <widget class="NumberListBox" name="hMaxSinglet">
                 <property name="frameShape">
                  <enum>QFrame::StyledPanel</enum>
                 </property>
@@ -252,7 +252,7 @@
                </widget>
               </item>
               <item row="0" column="1">
-               <widget class="QFrame" name="detectionSubsetXRangeDoublet">
+               <widget class="NumberListBox" name="detectionSubsetXRangeDoublet">
                 <property name="frameShape">
                  <enum>QFrame::StyledPanel</enum>
                 </property>
@@ -323,7 +323,7 @@
                </widget>
               </item>
               <item row="1" column="1">
-               <widget class="QFrame" name="detectionSubsetYRangeDoublet">
+               <widget class="NumberListBox" name="detectionSubsetYRangeDoublet">
                 <property name="frameShape">
                  <enum>QFrame::StyledPanel</enum>
                 </property>
@@ -394,7 +394,7 @@
                </widget>
               </item>
               <item row="2" column="1">
-               <widget class="QFrame" name="detectionSubsetZRangeDoublet">
+               <widget class="NumberListBox" name="detectionSubsetZRangeDoublet">
                 <property name="frameShape">
                  <enum>QFrame::StyledPanel</enum>
                 </property>
@@ -538,7 +538,7 @@
            <number>0</number>
           </property>
           <item row="1" column="1">
-           <widget class="QFrame" name="cellFilterThresholdIntensityDoublet">
+           <widget class="NumberListBox" name="cellFilterThresholdIntensityDoublet">
             <property name="frameShape">
              <enum>QFrame::StyledPanel</enum>
             </property>
@@ -623,7 +623,7 @@
            </widget>
           </item>
           <item row="0" column="1">
-           <widget class="QFrame" name="cellFilterThresholdSizeDoublet">
+           <widget class="NumberListBox" name="cellFilterThresholdSizeDoublet">
             <property name="frameShape">
              <enum>QFrame::StyledPanel</enum>
             </property>
@@ -746,7 +746,7 @@
         </widget>
        </item>
        <item row="0" column="1">
-        <widget class="QFrame" name="voxelizationRadiusTriplet">
+        <widget class="NumberListBox" name="voxelizationRadiusTriplet">
          <property name="frameShape">
           <enum>QFrame::StyledPanel</enum>
          </property>
@@ -1028,6 +1028,14 @@
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>NumberListBox</class>
+   <extends>QFrame</extends>
+   <header>ClearMap.gui.compound_boxes</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources>
   <include location="icons.qrc"/>
  </resources>

@@ -52,7 +52,7 @@
         </widget>
        </item>
        <item row="2" column="1" colspan="2">
-        <widget class="QFrame" name="clippingPixelsPercentDoublet">
+        <widget class="NumberListBox" name="clippingPixelsPercentDoublet">
          <property name="frameShape">
           <enum>QFrame::StyledPanel</enum>
          </property>
@@ -121,7 +121,7 @@
         </widget>
        </item>
        <item row="6" column="1" colspan="2">
-        <widget class="QFrame" name="clipRangeDoublet">
+        <widget class="NumberListBox" name="clipRangeDoublet">
          <property name="frameShape">
           <enum>QFrame::StyledPanel</enum>
          </property>
@@ -227,7 +227,7 @@
            </widget>
           </item>
           <item row="0" column="1">
-           <widget class="QFrame" name="detectionSubsetXRangeDoublet">
+           <widget class="NumberListBox" name="detectionSubsetXRangeDoublet">
             <property name="frameShape">
              <enum>QFrame::StyledPanel</enum>
             </property>
@@ -283,7 +283,7 @@
            </widget>
           </item>
           <item row="1" column="1">
-           <widget class="QFrame" name="detectionSubsetYRangeDoublet">
+           <widget class="NumberListBox" name="detectionSubsetYRangeDoublet">
             <property name="frameShape">
              <enum>QFrame::StyledPanel</enum>
             </property>
@@ -339,7 +339,7 @@
            </widget>
           </item>
           <item row="2" column="1">
-           <widget class="QFrame" name="detectionSubsetZRangeDoublet">
+           <widget class="NumberListBox" name="detectionSubsetZRangeDoublet">
             <property name="frameShape">
              <enum>QFrame::StyledPanel</enum>
             </property>
@@ -454,7 +454,7 @@
         </widget>
        </item>
        <item row="0" column="1">
-        <widget class="QFrame" name="voxelizationRadiusTriplet">
+        <widget class="NumberListBox" name="voxelizationRadiusTriplet">
          <property name="frameShape">
           <enum>QFrame::StyledPanel</enum>
          </property>
@@ -707,4 +707,12 @@
  </widget>
  <resources/>
  <connections/>
+ <customwidgets>
+  <customwidget>
+   <class>NumberListBox</class>
+   <extends>QFrame</extends>
+   <header>ClearMap.gui.compound_boxes</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
 </ui>

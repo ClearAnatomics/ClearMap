@@ -369,6 +369,5 @@ def recursive_patch_widgets(parent):
     parent: QWidget
         The main widget to start the recursive search
     """
-    recursive_patch_compound_boxes(parent)
     recursive_patch_button_boxes(parent)
     fix_btn_boxes_text(parent)

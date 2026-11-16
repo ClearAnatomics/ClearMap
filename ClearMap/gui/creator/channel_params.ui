@@ -152,7 +152,7 @@
         </widget>
        </item>
        <item row="7" column="1" colspan="2">
-        <widget class="QFrame" name="sliceYDoublet">
+        <widget class="NumberListBox" name="sliceYDoublet">
          <property name="frameShape">
           <enum>QFrame::StyledPanel</enum>
          </property>
@@ -238,7 +238,7 @@
         </widget>
        </item>
        <item row="2" column="1" colspan="2">
-        <widget class="QFrame" name="resolutionTriplet">
+        <widget class="NumberListBox" name="resolutionTriplet">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
            <horstretch>0</horstretch>
@@ -428,7 +428,7 @@
         </widget>
        </item>
        <item row="8" column="1" colspan="2">
-        <widget class="QFrame" name="sliceZDoublet">
+        <widget class="NumberListBox" name="sliceZDoublet">
          <property name="frameShape">
           <enum>QFrame::StyledPanel</enum>
          </property>
@@ -500,7 +500,7 @@
         </widget>
        </item>
        <item row="6" column="1" colspan="2">
-        <widget class="QFrame" name="sliceXDoublet">
+        <widget class="NumberListBox" name="sliceXDoublet">
          <property name="frameShape">
           <enum>QFrame::StyledPanel</enum>
          </property>
@@ -610,6 +610,14 @@
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>NumberListBox</class>
+   <extends>QFrame</extends>
+   <header>ClearMap.gui.compound_boxes</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources>
   <include location="icons.qrc"/>
  </resources>

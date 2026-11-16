@@ -70,7 +70,7 @@
     </spacer>
    </item>
    <item row="1" column="2">
-    <widget class="QFrame" name="resampleResolutionTriplet">
+    <widget class="NumberListBox" name="resampleResolutionTriplet">
      <property name="frameShape">
       <enum>QFrame::StyledPanel</enum>
      </property>
@@ -337,6 +337,14 @@
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>NumberListBox</class>
+   <extends>QFrame</extends>
+   <header>ClearMap.gui.compound_boxes</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources>
   <include location="icons.qrc"/>
  </resources>

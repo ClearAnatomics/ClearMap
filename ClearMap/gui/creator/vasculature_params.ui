@@ -49,7 +49,7 @@
        </widget>
       </item>
       <item row="0" column="1" colspan="2">
-       <widget class="QFrame" name="binarizationClipRangeDoublet">
+       <widget class="NumberListBox" name="binarizationClipRangeDoublet">
         <property name="frameShape">
          <enum>QFrame::StyledPanel</enum>
         </property>
@@ -144,4 +144,12 @@
  </widget>
  <resources/>
  <connections/>
+ <customwidgets>
+  <customwidget>
+   <class>NumberListBox</class>
+   <extends>QFrame</extends>
+   <header>ClearMap.gui.compound_boxes</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
 </ui>

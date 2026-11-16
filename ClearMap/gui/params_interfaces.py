@@ -25,7 +25,6 @@ from ClearMap.gui.exception_handler import handle_exception
 from ClearMap.gui.gui_utils_base import disconnect_widget_signal
 from ClearMap.gui.pipeline_model import LinearPipeline, PipelineStep, BINARIZATION_STEPS
 from ClearMap.gui.pipeline_widgets import LinearPipelineWidget
-from ClearMap.gui.widget_monkeypatch_callbacks import _get_sorted_spin_boxes, ensure_compound_box_patched
 from ClearMap.gui.widgets import (ExtendableTabWidget, FileDropListWidget, channel_page_id_of, LandmarksWeightsPanel, GroupsWidgetAdapter,
                                   NProcessesWidget)
 
@@ -116,8 +115,6 @@ class ParamLink:
                  present_if: Optional[Callable[[dict], bool]] = None,
                  disabled_value: Any =None, ui_sentinel: Any =None, enforce_sentinel_min=False,
                  section_level: bool = False):
-        if isinstance(widget, QFrame):
-            ensure_compound_box_patched(widget)
         if keys is None:
             connect = False
         self.keys: List[str] = keys
@@ -412,7 +409,11 @@ class VectorLink(ParamLink):
         ui_sentinel: Union[int, float]
             The sentinel value to use for None or 'auto'.
         """
-        ensure_compound_box_patched(widget)
+        if not hasattr(widget, 'spinBoxes'):  # Not a NumberListBox (e.g. a QFrame which was not promoted)
+            raise ClearMapValueError(f'{widget.objectName()} must be a NumberListBox (a QFrame promoted to '
+                                     f'ClearMap.gui.compound_boxes.NumberListBox in the designer file), '
+                                     f'got {type(widget).__name__}', value=type(widget).__name__,
+                                     expected='NumberListBox')
         self.keys = list(keys)
         self.widget = widget
         if disabled_value not in (None, "auto"):
@@ -480,7 +481,7 @@ class VectorLink(ParamLink):
         if not checked:
             return
         # Only populate defaults if all spinboxes are still at sentinel
-        spins = _get_sorted_spin_boxes(self.widget)  # WARNING: private dependency on monkeypatch
+        spins = self.widget.spinBoxes()
         if not all(s.value() == s.minimum() for s in spins):
             return  # user had real values, preserve them
 

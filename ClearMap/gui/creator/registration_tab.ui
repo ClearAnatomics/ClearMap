@@ -79,7 +79,7 @@
         </widget>
        </item>
        <item row="1" column="1">
-        <widget class="QFrame" name="atlasResolutionTriplet">
+        <widget class="NumberListBox" name="atlasResolutionTriplet">
          <property name="frameShape">
           <enum>QFrame::StyledPanel</enum>
          </property>
@@ -333,6 +333,14 @@ __UNDECIDED__: to choose. None: no channel is aligned with the atlas.</string>
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>NumberListBox</class>
+   <extends>QFrame</extends>
+   <header>ClearMap.gui.compound_boxes</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources>
   <include location="icons.qrc"/>
  </resources>
