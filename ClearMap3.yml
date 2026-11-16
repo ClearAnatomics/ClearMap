@@ -15,8 +15,7 @@ channels:
   - conda-forge
 
 dependencies:
-  - python=3.12  # Constrained to speed up resolution. Not 3.11: conda-forge builds NumPy >= 2.5 and the current
-  #                tifffile for 3.12 and later only, and with Qt 6.11.3 a 3.11 environment falls back to NumPy 1
+  - python=3.14  # Constrained to speed up resolution.
   - cython>=3  # The Cython headers of NumPy 2 refuse an older Cython
   - ipython
   - jupyter
