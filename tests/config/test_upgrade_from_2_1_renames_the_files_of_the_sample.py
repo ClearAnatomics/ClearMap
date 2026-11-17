@@ -55,3 +55,15 @@ def test_the_elastix_folders_are_named_by_their_channels_whatever_the_sample_id_
     # Never prefixed by the sample id: see the asset 'aligned'
     assert sorted(path.name for path in upgrader.root.iterdir() if path.is_dir()) == ['atlas_to_autofluorescence',
                                                                                      'autofluorescence_to_nuclei']
+
+
+@pytest.mark.parametrize('with_sample_id_prefix', [False, True])
+def test_the_files_are_renamed_by_channel_and_keep_one_sample_id_prefix(tmp_path, with_sample_id_prefix):
+    upgrader = upgrader_of_a_2_1_experiment(tmp_path / 'experiment', with_sample_id_prefix=with_sample_id_prefix,
+                                            aligned=True)
+    prefix = f'{SAMPLE_ID}_' if with_sample_id_prefix else ''
+
+    upgrader._rename_assets()
+
+    assert sorted(path.name for path in upgrader.root.iterdir() if path.is_file()) == [
+        f'{prefix}autofluorescence_resampled.tif', f'{prefix}nuclei_resampled.tif', f'{prefix}nuclei_stitched.npy']
