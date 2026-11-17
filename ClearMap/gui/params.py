@@ -2278,6 +2278,7 @@ class BatchParameters(UiParameter):
     def build_params_dict(self) -> dict:
         return {
             'results_folder': ParamLink(['paths', 'results_folder'], self.tab.resultsFolderLineEdit,
+                                        cast_to_ui=self.sanitize_path_read, cast_from_ui=self.sanitize_path_write,
                                         notify_apply=lambda: self.publish(UiBatchResultsFolderChanged(self.results_folder))),
             'groups': ParamLink(['groups'], self.groups_adapter,
                                 connect=False)#notify_apply=lambda: self.publish(UiBatchGroupsChanged(self.groups)))
