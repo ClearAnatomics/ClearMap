@@ -47,6 +47,7 @@ from typing import Callable, Dict, Iterable, Mapping, Optional, Tuple, Any, Unio
 from ClearMap.IO.channel_file_renaming import ChannelRenamePlan, plan_channel_file_renames
 from ClearMap.Utils.event_bus import EventBus, BusSubscriberMixin
 from ClearMap.Utils.events import WorkspaceChanged, UiChannelRenamed, UiChannelsChanged, CfgChanged
+from ClearMap.Utils.versions import VersionLike
 from ClearMap.config.config_adjusters.type_hints import AdjusterScope
 from ClearMap.config.config_coordinator import ConfigCoordinator
 from ClearMap.config.config_handler import ConfigHandler
@@ -325,7 +326,7 @@ class ExperimentController(BusSubscriberMixin):
         sample_id = self._get_sample_cfg().get('sample_id')
         return sample_id or None  # leave creation to UI prompt (app will call set_sample_id)
 
-    def upgrade_configs(self, from_version: str, to_version: str) -> None:
+    def upgrade_configs(self, from_version: VersionLike, to_version: VersionLike) -> None:
         """
         Convert the config to the current ClearMap version in
         the current exp_dir.
@@ -333,9 +334,9 @@ class ExperimentController(BusSubscriberMixin):
 
         Parameters
         ----------
-        from_version: str
+        from_version: str | tuple | Version
             The version the config is currently in.
-        to_version: str
+        to_version: str | tuple | Version
             The version to convert the config to.
         """
         from ClearMap.config.convert_config_versions import convert_versions

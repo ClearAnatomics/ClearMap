@@ -14,7 +14,7 @@ from pathlib import Path
 
 from packaging.version import Version
 
-from ClearMap.config.config_handler import ConfigHandler, clearmap_version, ALTERNATIVES_REG, LEGACY_SECTIONS
+from ClearMap.config.config_handler import ConfigHandler, ALTERNATIVES_REG, LEGACY_SECTIONS
 
 CFG_DIR = Path(inspect.getfile(inspect.currentframe())).resolve().parent
 CLEARMAP_DIR = str(CFG_DIR.parent.parent)  # used by shell script

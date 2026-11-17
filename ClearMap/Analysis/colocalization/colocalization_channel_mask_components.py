@@ -834,7 +834,11 @@ class ColocalizationChannelMaskComponents:
 def _random_shape(radius):
     dice = np.random.randint(3)
     if dice == 0:
-        shape = skimage.morphology.cube(2 * int(radius / 1.8) + 1)
+        width = 2 * int(radius / 1.8) + 1
+        try:  # scikit-image >= 0.25
+            shape = skimage.morphology.footprint_rectangle((width,) * 3)
+        except AttributeError:  # cube is removed in scikit-image 0.27
+            shape = skimage.morphology.cube(width)
     elif dice == 1:
         shape = skimage.morphology.octahedron(radius)
     elif dice == 2:

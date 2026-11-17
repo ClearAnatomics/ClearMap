@@ -1169,7 +1169,7 @@ def rand_cmap(n_labels, map_type='bright', first_color_black=True, last_color_bl
     elif map_type == 'bright' and cmap_name not in bright_cmap_names:
         cmap_name = 'Accent'
 
-    cmap_colors = np.array(mpl.cm.get_cmap(cmap_name).colors)
+    cmap_colors = np.array(plt.get_cmap(cmap_name).colors)  # matplotlib.cm.get_cmap is removed since matplotlib 3.9
     n_repeats = n_labels // cmap_colors.shape[0] + 1  # Overshoot
     colors = np.tile(cmap_colors, (n_repeats, 1))[:n_labels, :]  # Trim
     if first_color_black:

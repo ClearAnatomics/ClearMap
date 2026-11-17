@@ -11,7 +11,8 @@ properties:
     type: object
     additionalProperties: true
     properties:
-      results_folder: { type: "string" }
+      # null: not set. An empty string, as ClearMap 3.1.x wrote it, also means not set
+      results_folder: { type: ["string", "null"] }
 
   groups:
     type: object

@@ -20,7 +20,8 @@ properties:
   detection_chunk_size_max: { $ref: "./typedefs.schema.yaml#/$defs/positiveInteger" }
   detection_chunk_overlap:  { $ref: "./typedefs.schema.yaml#/$defs/nonNegativeInteger" }
 
-  start_folder:       { type: string }
+  # null: not set. An empty string, as ClearMap 3.1.x wrote it, also means not set
+  start_folder:       { type: ["string", "null"] }
   temp_folder:        { type: ["string", "null"] }
   atlas_cache_folder: { type: ["string", "null"] }
   start_full_screen:  { type: boolean }

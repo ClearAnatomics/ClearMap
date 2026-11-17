@@ -1,4 +1,3 @@
-import ast
 import functools
 import traceback
 import warnings
@@ -604,16 +603,12 @@ def combobox_setter(widget: QComboBox, value):
 
 
 def line_edit_getter(widget: QLineEdit):
-    txt = widget.text()
-    if txt in ('None', ''):
-        return None
-    count = sum([txt.count(symbol) for symbol in '[]{}'])
-    if count:  # List or dict
-        if count % 2 == 0:  # (not perfect but should work for most cases)
-            txt = ast.literal_eval(txt)
-        else:
-            warnings.warn(f'Unbalanced brackets in {txt}')
-    return txt
+    """
+    The text of a line edit, as typed: an empty field is the empty string, a value of the text fields of the config.
+    A field which holds something else reads its text with the casts of its ParamLink: a folder which is not set
+    (sanitize_path_write), a list (e.g. tile_extensions_from_text)
+    """
+    return widget.text()
 
 
 def list_widget_getter(widget: QListWidget):
@@ -827,7 +822,7 @@ class WidgetOps:
 
         self.register(QLineEdit,
             getter=line_edit_getter,
-            setter=lambda w, v: w.setText(str(v)),
+            setter=lambda w, v: w.setText("" if v is None else str(v)),
             connector=editing_finished_connector,
         )
 

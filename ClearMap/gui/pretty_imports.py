@@ -148,13 +148,18 @@ class _ImportGraph:
         self._deps_cache: Dict[str, List[str]] = {}
 
     @staticmethod
-    def _resolve_relative(from_module: str, level: int, mod: str | None) -> str | None:
+    def _resolve_relative(from_module: str, level: int, mod: str | None, *, is_package: bool) -> str | None:
+        """The absolute name of a relative import; ``from_module`` is the module (or package) that holds it.
+
+        One dot is the package of the module, which for the ``__init__.py`` of a package is the package itself.
+        """
         parts = from_module.split('.')
         if level <= 0:
             return mod
-        if level >= len(parts):
+        levels_to_drop = level - 1 if is_package else level
+        if levels_to_drop >= len(parts):
             return None
-        base = parts[:-level]
+        base = parts[:len(parts) - levels_to_drop]
         if mod:
             base += mod.split('.')
         return '.'.join(base)
@@ -193,7 +198,7 @@ class _ImportGraph:
 
             elif isinstance(node, ast.ImportFrom):
                 level = int(getattr(node, 'level', 0) or 0)
-                parent = self._resolve_relative(module, level, node.module)
+                parent = self._resolve_relative(module, level, node.module, is_package=py_file.name == '__init__.py')
 
                 if not parent or not parent.startswith(CLEARMAP_PREFIX):
                     continue

@@ -3,13 +3,14 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Dict, Any, Optional, Iterable
 
-from .config_handler import ConfigHandler, INSTALL_CFG_DIR, ALTERNATIVES_REG
+from .config_handler import ConfigHandler, INSTALL_CFG_DIR, ALTERNATIVES_REG, config_version_label
+from ClearMap._version import CURRENT_CONFIG_VERSION
 from .validators.json_schema_utils import build_schema_registry_from_dir, load_yaml_schema, compile_validator
 from ..Utils.exceptions import ClearMapValueError
 
 JsonDict = Dict[str, Any]
 
-VERSION = 'v3.1'  # REFACTOR: use CLEARMAP_VERSION instead or straight ConfigHAndler for default dirs
+VERSION = config_version_label(CURRENT_CONFIG_VERSION, separator='.')  # REFACTOR: or straight ConfigHandler for default dirs
 SCHEMAS_DIR = INSTALL_CFG_DIR / 'schemas' / VERSION
 
 DEFAULTS_PROVIDER = None
