@@ -67,3 +67,20 @@ def test_the_files_are_renamed_by_channel_and_keep_one_sample_id_prefix(tmp_path
 
     assert sorted(path.name for path in upgrader.root.iterdir() if path.is_file()) == [
         f'{prefix}autofluorescence_resampled.tif', f'{prefix}nuclei_resampled.tif', f'{prefix}nuclei_stitched.npy']
+
+
+@pytest.mark.parametrize('old_name, new_name', [
+    ('resampled_autofluorescence.tif', 'autofluorescence_resampled.tif'),
+    ('resampled_autofluorescence_debug.tif', 'autofluorescence_resampled_debug.tif'),  # Was resampled__debug
+    ('autofluorescence_resampled.tif', 'autofluorescence_resampled.tif'),  # Was autofluorescence__resampled
+    ('autofluorescence.tif', 'autofluorescence.tif'),
+    ('stitched_arteries.npy', 'arteries_stitched.npy'),
+    ('stitched_arteries_debug.npy', 'arteries_stitched_debug.npy'),
+    ('stitched.npy', 'nuclei_stitched.npy')])
+def test_the_channel_word_of_an_old_file_name_is_replaced_by_the_channel_without_a_doubled_underscore(
+        tmp_path, old_name, new_name):
+    upgrader = ExperimentUpgrade_2_1_to_3_0(tmp_path, app=None)
+    upgrader.new_channels = {'raw': ('nuclei', 'nuclei'), 'arteries': ('arteries', 'arteries'),
+                             'autofluorescence': ('autofluorescence', 'autofluorescence')}
+
+    assert upgrader._compute_new_file_names({old_name: old_name}) == {old_name: new_name}
