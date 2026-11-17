@@ -348,8 +348,8 @@ case "$answer" in  # FIXME:
 menu_entry="[Desktop Entry]
 Version=1.1
 Type=Application
-Name=ClearMap2
-Comment=The ClearMap2 Pipeline GUI
+Name=ClearMap
+Comment=The ClearMap Pipeline GUI
 Icon=$clearmap_install_path/ClearMap/gui/icons/logo_cyber.png
 Exec=$clearmap_install_path/start_gui.sh $clearmap_install_path
 Actions=

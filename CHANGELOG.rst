@@ -42,13 +42,26 @@ Upgrading experiments
 Bug fixes
 ~~~~~~~~~
 
+- Cluster: the job script activates ``ClearMap3.2`` by default.
+- The bug fixes of 3.1.4 (registration of channels aligned through a third channel, the upgrade of a 2.1 experiment,
+  the paths to the external programs, empty fields and folder dialogs) are in 3.2.0 too.
+
+3.1.4
+-----
+
+Bug fixes only; the configuration files and the results of 3.1.3 are unchanged.
+
 - Registration: two channels which are both acquired with a third channel are pixel aligned.
 - Upgrade of a 2.1 experiment: the files of a sample which was not aligned are renamed (the missing elastix folders
   made the renaming fail); with ``use_id_as_prefix``, the elastix folders are renamed and the sample id is not
-  repeated in the names of the ``arteries`` and ``autofluorescence`` files.
-- Installer: the paths to the external programs are read from, and written to, the machine configuration of this
-  version.
-- Cluster: the job script activates ``ClearMap3.2`` by default.
+  repeated in the names of the ``arteries`` and ``autofluorescence`` files; no doubled underscore is left where the
+  channel word was removed from a file name.
+- Installer and settings: the paths to the external programs (elastix) are read from, and written to, the machine
+  configuration of this version (``machine.yml``), not ``machine_params_v3_0.cfg``.
+- GUI: a text field is read as its text (the tile extensions are parsed explicitly, not evaluated), and an empty field
+  is the empty string.
+- GUI: a results folder which is not set is ``null`` in the config (an empty string is still read as not set), and the
+  folder dialogs open in the home folder when no start folder is set, not in a folder named ``None``.
 
 3.1.3
 -----
