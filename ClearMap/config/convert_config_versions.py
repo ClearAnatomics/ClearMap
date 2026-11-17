@@ -567,7 +567,7 @@ class ExperimentUpgrade_2_1_to_3_0(ExperimentConfigConverter):
 
             if 'arteries' in old_name:
                 new_channel = self.new_channels['arteries'][0]
-                new_name = old_name.replace("arteries", "")
+                new_name = new_name.replace("arteries", "")
             elif 'autofluorescence' in old_name:
                 new_channel = next(
                     (name for name, data in self.new_channels.items() if data[1] == 'autofluorescence'),
@@ -575,7 +575,7 @@ class ExperimentUpgrade_2_1_to_3_0(ExperimentConfigConverter):
                 )
                 if new_channel:
                     # FIXME: may be surrounding underscores
-                    new_name = old_name.replace("autofluorescence", "")
+                    new_name = new_name.replace("autofluorescence", "")
             else:  # The old (<v3) 'raw' channel (meaning first non autofluo channel)
                 new_channel = self.new_channels['raw'][0]
 

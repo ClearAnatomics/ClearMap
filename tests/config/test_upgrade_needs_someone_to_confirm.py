@@ -105,6 +105,19 @@ def test_a_sample_which_was_not_aligned_has_no_elastix_folder_to_rename(tmp_path
 
 
 @pytest.mark.parametrize('with_sample_id_prefix', [False, True])
+def test_the_files_of_a_2_1_experiment_are_renamed_by_channel_and_keep_the_sample_id_prefix(tmp_path,
+                                                                                            with_sample_id_prefix):
+    experiment = make_a_2_1_experiment(tmp_path / 'experiment', with_sample_id_prefix=with_sample_id_prefix)
+    prefix = f'{SAMPLE_ID}_' if with_sample_id_prefix else ''
+
+    qt_modules = qt_modules_imported_by(run_the_upgrade(experiment, ACCEPT_ALL))
+
+    assert qt_modules == []  # The suggestions were taken, in a terminal, without Qt
+    assert sorted(path.name for path in experiment.iterdir() if path.suffix in ('.tif', '.npy')) == [
+        f'{prefix}autofluorescence_resampled.tif', f'{prefix}nuclei_resampled.tif', f'{prefix}nuclei_stitched.npy']
+
+
+@pytest.mark.parametrize('with_sample_id_prefix', [False, True])
 def test_the_elastix_folders_of_a_2_1_experiment_are_named_by_their_channels_whatever_the_sample_id_prefix(
         tmp_path, with_sample_id_prefix):
     experiment = make_a_2_1_experiment(tmp_path / 'experiment', with_sample_id_prefix=with_sample_id_prefix,
