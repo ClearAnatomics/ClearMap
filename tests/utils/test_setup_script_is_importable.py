@@ -11,6 +11,8 @@ import types
 
 import pytest
 
+from ClearMap._version import __version__
+
 from conftest import SETUP_SCRIPT  # pytest puts this directory on the path
 
 REPOSITORY_ROOT = SETUP_SCRIPT.parent
@@ -64,6 +66,7 @@ def setup_calls(monkeypatch):
     cython = types.ModuleType('Cython')
     cython_build = types.ModuleType('Cython.Build')
     cython_build.cythonize = cythonize_nothing
+    cython.__version__ = '3.1.0'  # The build signature reads it
     cython.Build = cython_build
     monkeypatch.setitem(sys.modules, 'Cython', cython)
     monkeypatch.setitem(sys.modules, 'Cython.Build', cython_build)
@@ -80,7 +83,7 @@ def test_running_the_setup_script_calls_setup_once_with_the_extensions_and_the_v
     assert keywords['name'] == 'ClearMap'
     assert keywords['ext_modules'], 'No extension to build'
     assert all(extension.sources[0].endswith('.pyx') for extension in keywords['ext_modules'])
-    assert keywords['version'].count('.') == 2
+    assert keywords['version'] == __version__  # Dev releases (3.2.0.dev0) too, not only X.Y.Z
 
 
 @pytest.mark.parametrize('system, cpp_version_line, expected', [

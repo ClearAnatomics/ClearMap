@@ -14,14 +14,14 @@ from packaging.version import Version
 import qdarkstyle
 from PyQt5.QtWidgets import QApplication, QDialog
 
-from ClearMap import __version__
 from ClearMap.IO.assets_constants import CHANNELS_ASSETS_TYPES_CONFIG
 from ClearMap.IO.FileUtils import Rename, apply_renames
 from ClearMap.Utils.tag_expression import Expression
+from ClearMap.Utils.versions import as_version
 from ClearMap.config.config_adjusters.dict_ops import (try_get_item_recursive, set_item_recursive, has_item_recursive,
                                                        del_item_recursive)
 from ClearMap.config.config_adjusters.patch_ops import deep_merge
-from ClearMap.config.config_handler import ConfigHandler, ALTERNATIVES_REG
+from ClearMap.config.config_handler import ConfigHandler, ALTERNATIVES_REG, VERSION_SUFFIX
 from ClearMap.config.registration_channels import MOVING_OTHER
 
 from ClearMap.gui.dialogs import RenameChannelsDialog, VerifyRenamingDialog
@@ -29,15 +29,8 @@ from ClearMap.gui.dialog_helpers import get_directory_dlg
 from ClearMap.gui.gui_utils_base import ensure_qapp
 
 
-clearmap_version = __version__
-VERSION_SUFFIX = f'v{Version(clearmap_version).major}_{Version(clearmap_version).minor}'
-
-
 SUPPORTED_VERSIONS = [Version(v) for v in ('2.1', '3.0', '3.1')]
 
-
-def _norm_ver(v) -> Version:
-    return v if isinstance(v, Version) else Version(str(v))
 
 def read_cfg(path: Path | str, must_exist: bool = True):
     path = Path(path).expanduser().resolve()
@@ -78,8 +71,8 @@ def cfg_converter(from_v: str, to_v: str, config_type: str):
         def convert_sample_3_0_to_3_1(cfg_path: Path) -> Path:
         ...
     """
-    from_v = _norm_ver(from_v)
-    to_v = _norm_ver(to_v)
+    from_v = as_version(from_v)
+    to_v = as_version(to_v)
     def decorator(func: Callable) -> Callable:
         key = (from_v, to_v)
         if key not in FILE_CONVERTERS:
@@ -97,8 +90,8 @@ def version_guard(from_v, to_v, key: str = 'clearmap_version'):
     - Raises if version != from_v
     - Warns & returns filename if version == to_v
     """
-    from_v = _norm_ver(from_v)
-    to_v = _norm_ver(to_v)
+    from_v = as_version(from_v)
+    to_v = as_version(to_v)
 
     def decorator(func: Callable) -> Callable:
         @wraps(func)
@@ -116,8 +109,8 @@ def version_guard(from_v, to_v, key: str = 'clearmap_version'):
 
 
 def global_cfg_converter(from_v, to_v, config_type: str):
-    from_v = _norm_ver(from_v)
-    to_v = _norm_ver(to_v)
+    from_v = as_version(from_v)
+    to_v = as_version(to_v)
     def decorator(func: Callable) -> Callable:
         GLOBAL_FILE_CONVERTERS.setdefault((from_v, to_v), {})[config_type] = func
         return func
@@ -138,8 +131,8 @@ def project_converter(from_v: str, to_v: str):
         def convert_project_3_0_to_3_1(exp_dir: Path) -> None:
             ...
     """
-    from_v = _norm_ver(from_v)
-    to_v = _norm_ver(to_v)
+    from_v = as_version(from_v)
+    to_v = as_version(to_v)
 
     def decorator(func: Callable) -> Callable:
         PROJECT_CONVERTERS[(from_v, to_v)] = func
@@ -346,8 +339,8 @@ def convert(cfg_path, *, prev_v: str | Version = '2.1', new_v: str | Version = '
     cfg_path = Path(cfg_path).expanduser().resolve()
     cfg_type, scope = detect_config_type(cfg_path)
 
-    prev_v = _norm_ver(prev_v)
-    new_v = _norm_ver(new_v)
+    prev_v = as_version(prev_v)
+    new_v = as_version(new_v)
 
     steps = get_conversion_steps(prev_v, new_v)
     if not steps:
@@ -506,6 +499,18 @@ class ExperimentUpgrade_2_1_to_3_0(ExperimentConfigConverter):
             return f_path.stem[:-1] + f_path.suffix
         return name
 
+    @staticmethod
+    def remove_channel_word(name: str, channel_word: str) -> str:
+        """
+        Remove the channel word and one underscore next to it, so that no doubled underscore is left
+        ('resampled_autofluorescence_x.tif' gives 'resampled_x.tif'). The underscore before the extension of a name
+        which was only the word ('autofluorescence.tif' gives '.tif') is left to :meth:`fix_stray_underscore`.
+        """
+        for pattern in (f'_{channel_word}', f'{channel_word}_', channel_word):
+            if pattern in name:
+                return name.replace(pattern, '')
+        return name
+
     def _rename_assets(self):
         files_to_rename, folders_to_rename, main_folder = self.__get_files_and_folders_to_rename()
         files_to_rename = self._compute_new_file_names(files_to_rename)
@@ -539,15 +544,16 @@ class ExperimentUpgrade_2_1_to_3_0(ExperimentConfigConverter):
             """Use clearmap expression to build new folder name based on asset constants"""
             return expr.string(values={'moving_channel': moving_channel, 'fixed_channel': fixed_channel})
 
-        elastix_folders = [d for d in folders_to_rename if d.startswith('elastix_')]
         out: dict[str, str] = deepcopy(files_to_rename)
-        for folder in elastix_folders:
+        for folder in folders_to_rename:
             if not alignment_reference_channel:
                 warnings.warn(f'No reference channel found in the sample config file, Skipping {folder} renaming.')
                 continue
-            if folder == 'elastix_auto_to_reference':
+            # The folders of 2.1 start with the sample id if use_id_as_prefix, the new ones never do (see 'aligned')
+            old_name = self._strip_sample_id(folder)
+            if old_name == 'elastix_auto_to_reference':
                 out[folder] = channels_to_elx_folder(moving_channel='atlas', fixed_channel=alignment_reference_channel)
-            elif folder == 'elastix_resampled_to_auto':
+            elif old_name == 'elastix_resampled_to_auto':
                 out[folder] = channels_to_elx_folder(moving_channel=alignment_reference_channel, fixed_channel=regular_channel)
 
         return out
@@ -573,15 +579,14 @@ class ExperimentUpgrade_2_1_to_3_0(ExperimentConfigConverter):
 
             if 'arteries' in old_name:
                 new_channel = self.new_channels['arteries'][0]
-                new_name = old_name.replace("arteries", "")
+                new_name = self.remove_channel_word(new_name, 'arteries')
             elif 'autofluorescence' in old_name:
                 new_channel = next(
                     (name for name, data in self.new_channels.items() if data[1] == 'autofluorescence'),
                     None,
                 )
                 if new_channel:
-                    # FIXME: may be surrounding underscores
-                    new_name = old_name.replace("autofluorescence", "")
+                    new_name = self.remove_channel_word(new_name, 'autofluorescence')
             else:  # The old (<v3) 'raw' channel (meaning first non autofluo channel)
                 new_channel = self.new_channels['raw'][0]
 
@@ -610,6 +615,7 @@ class ExperimentUpgrade_2_1_to_3_0(ExperimentConfigConverter):
         folders_to_rename = ['elastix_auto_to_reference', 'elastix_resampled_to_auto']
         if self.use_id_as_prefix:
             folders_to_rename = [f'{self.sample_id}_{f}' for f in folders_to_rename]
+        folders_to_rename = [f for f in folders_to_rename if (main_folder / f).is_dir()]  # Not aligned yet: none
         files_to_rename = {str(f.name): str(f.name) for f in assets if (main_folder / f).is_file()}
         return files_to_rename, folders_to_rename, main_folder
 
@@ -876,8 +882,8 @@ def convert_3_0_to_3_1(main_folder: str | Path = '', create_app: bool = True):
 def convert_versions(previous_version: str, new_version: str, *,
                      exp_dir: str | Path = '', create_app: bool = True):
     exp_dir = str(Path(exp_dir).expanduser().resolve())
-    previous_version = _norm_ver(previous_version)
-    new_version = _norm_ver(new_version)
+    previous_version = as_version(previous_version)
+    new_version = as_version(new_version)
 
     if previous_version == new_version:
         warnings.warn(f'No conversion needed: already at version {new_version}')

@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import sys
@@ -41,6 +42,9 @@ LARGE_SOURCE_FILES_OPTION = '-flarge-source-files'
 HELP_ARGUMENT = '--help=common'  # GCC: lists the options of the compiler. Other compilers may not know it
 PROBE_TIMEOUT_SECONDS = 30
 
+# What the extensions were last built with: a build made for another Python, NumPy or Cython is not reused
+BUILD_SIGNATURE_PATH = Path(__file__).resolve().parent / 'build' / 'clearmap_build_signature.json'
+
 requirements = [  # pip
     'lxml'
 ]
@@ -61,9 +65,29 @@ data_dirs = [
 ###############################################################################
 
 class parallel_build_ext(_build_ext):
+    """
+    build_ext in parallel, which rebuilds every extension when they were last built for another environment.
+
+    setuptools skips an extension whose compiled file is newer than its source, so a module compiled against NumPy 1
+    (another environment, the same checkout) was kept for NumPy 2 and failed at import ("numpy.core.multiarray failed
+    to import"). :func:`main` sets :attr:`force_rebuild` and :attr:`build_signature` before ``setup()`` runs.
+    """
+    force_rebuild = False
+    build_signature = None
+
     def initialize_options(self):
         super().initialize_options()
         self.parallel = N_PROCS
+
+    def finalize_options(self):
+        super().finalize_options()
+        if self.force_rebuild:
+            self.force = True
+
+    def run(self):
+        super().run()
+        if self.build_signature is not None:
+            record_build_signature(BUILD_SIGNATURE_PATH, self.build_signature)
 
 
 ###############################################################################
@@ -260,6 +284,31 @@ def make_extensions(extra_compile_args, extra_link_args, libraries):
     return extensions
 
 
+def current_build_signature():
+    """The versions the compiled extensions depend on: Python, NumPy (its C API) and Cython (the generated C)"""
+    import numpy as np
+    import Cython
+
+    def major_minor(version):
+        return '.'.join(str(version).split('.')[:2])
+
+    return {'python': major_minor(platform.python_version()), 'numpy': major_minor(np.__version__),
+            'cython': major_minor(Cython.__version__)}
+
+
+def recorded_build_signature(path):
+    """The signature of the last build, or None when there is none (never built here, ``build`` removed)"""
+    try:
+        return json.loads(path.read_text(encoding='utf-8'))
+    except (FileNotFoundError, json.JSONDecodeError):  # No record, or a damaged one: it says nothing, so rebuild
+        return None
+
+
+def record_build_signature(path, signature):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(signature, indent=2, sort_keys=True), encoding='utf-8')
+
+
 def read_clearmap_version():
     """The version written in ClearMap/_version.py (read, not imported: ClearMap is not built yet)"""
     namespace = {}
@@ -276,15 +325,24 @@ def main():
     extra_compile_args, extra_link_args = compile_and_link_arguments(use_openmp)
     extensions = make_extensions(extra_compile_args, extra_link_args, libraries)
 
+    build_signature = current_build_signature()
+    previous_signature = recorded_build_signature(BUILD_SIGNATURE_PATH)
+    force = FORCE or previous_signature != build_signature
+    if force and not FORCE:
+        print(f'Rebuilding every extension: last built with {previous_signature}, this environment has '
+              f'{build_signature}')
+    parallel_build_ext.force_rebuild = force
+    parallel_build_ext.build_signature = build_signature
+
     print(f'Building {len(extensions)} extensions with {N_PROCS} processes, '
           f'using OpenMP: {use_openmp}, '
           f'libraries: {libraries}, ',
           f'compile args: {extra_compile_args},'
           f'link args: {extra_link_args}')
     if os_name.startswith('darwin') or os_name.startswith('windows'):
-        ext_modules = cythonize(extensions, quiet=True, force=FORCE)
+        ext_modules = cythonize(extensions, quiet=True, force=force)
     else:
-        ext_modules = cythonize(extensions, nthreads=N_PROCS, quiet=True, force=FORCE)
+        ext_modules = cythonize(extensions, nthreads=N_PROCS, quiet=True, force=force)
 
     packages = find_packages(exclude=('doc', 'tests*', 'pickle_python_2', 'deprecated',
                                       'ClearMap.External.elastix'))
