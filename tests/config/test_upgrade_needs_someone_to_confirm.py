@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from ClearMap.Utils.exceptions import ClearMapValueError
+from ClearMap.config.convert_config_versions import ExperimentUpgrade_2_1_to_3_0
 from ClearMap.config.upgrade_prompts import (ChannelAnswer, ConsolePrompter, check_channel_answers,
                                              suggested_channel_answers)
 from tests.qt_imports import QT_MODULES
@@ -208,3 +209,24 @@ def test_the_terminal_takes_the_suggestions_on_enter():
     prompter = ConsolePrompter(ask=lambda question: '', say=lambda line: None)
 
     assert prompter.choose_channels(suggested_channel_answers(['raw'])) == {'raw': ChannelAnswer('nuclei', 'nuclei')}
+
+
+@pytest.mark.parametrize('old_name, new_name', [
+    ('resampled_autofluorescence.tif', 'autofluorescence_resampled.tif'),
+    ('resampled_autofluorescence_debug.tif', 'autofluorescence_resampled_debug.tif'),  # Was resampled__debug
+    ('autofluorescence_resampled.tif', 'autofluorescence_resampled.tif'),  # Was autofluorescence__resampled
+    ('autofluorescence.tif', 'autofluorescence.tif'),
+    ('stitched_arteries.npy', 'arteries_stitched.npy'),
+    ('stitched_arteries_debug.npy', 'arteries_stitched_debug.npy'),
+    ('stitched.npy', 'nuclei_stitched.npy')])
+def test_the_channel_word_of_an_old_file_name_is_replaced_by_the_channel_without_a_doubled_underscore(
+        tmp_path, old_name, new_name):
+    upgrader = ExperimentUpgrade_2_1_to_3_0(tmp_path, prompter=ConsolePrompter(ask=input_not_expected))
+    upgrader.new_channels = {'raw': ('nuclei', 'nuclei'), 'arteries': ('arteries', 'arteries'),
+                             'autofluorescence': ('autofluorescence', 'autofluorescence')}
+
+    assert upgrader._compute_new_file_names({old_name: old_name}) == {old_name: new_name}
+
+
+def input_not_expected(question):
+    raise AssertionError(f'Nobody should be asked {question!r}')

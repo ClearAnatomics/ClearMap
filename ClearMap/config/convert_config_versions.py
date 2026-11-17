@@ -501,6 +501,18 @@ class ExperimentUpgrade_2_1_to_3_0(ExperimentConfigConverter):
             return f_path.stem[:-1] + f_path.suffix
         return name
 
+    @staticmethod
+    def remove_channel_word(name: str, channel_word: str) -> str:
+        """
+        Remove the channel word and one underscore next to it, so that no doubled underscore is left
+        ('resampled_autofluorescence_x.tif' gives 'resampled_x.tif'). The underscore before the extension of a name
+        which was only the word ('autofluorescence.tif' gives '.tif') is left to :meth:`fix_stray_underscore`.
+        """
+        for pattern in (f'_{channel_word}', f'{channel_word}_', channel_word):
+            if pattern in name:
+                return name.replace(pattern, '')
+        return name
+
     def _rename_assets(self):
         files_to_rename, folders_to_rename, main_folder = self.__get_files_and_folders_to_rename()
         files_to_rename = self._compute_new_file_names(files_to_rename)
@@ -567,15 +579,14 @@ class ExperimentUpgrade_2_1_to_3_0(ExperimentConfigConverter):
 
             if 'arteries' in old_name:
                 new_channel = self.new_channels['arteries'][0]
-                new_name = new_name.replace("arteries", "")
+                new_name = self.remove_channel_word(new_name, 'arteries')
             elif 'autofluorescence' in old_name:
                 new_channel = next(
                     (name for name, data in self.new_channels.items() if data[1] == 'autofluorescence'),
                     None,
                 )
                 if new_channel:
-                    # FIXME: may be surrounding underscores
-                    new_name = new_name.replace("autofluorescence", "")
+                    new_name = self.remove_channel_word(new_name, 'autofluorescence')
             else:  # The old (<v3) 'raw' channel (meaning first non autofluo channel)
                 new_channel = self.new_channels['raw'][0]
 
