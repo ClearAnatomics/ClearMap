@@ -104,6 +104,19 @@ def test_a_sample_which_was_not_aligned_has_no_elastix_folder_to_rename(tmp_path
     assert (experiment / 'nuclei_stitched.npy').exists()
 
 
+@pytest.mark.parametrize('with_sample_id_prefix', [False, True])
+def test_the_elastix_folders_of_a_2_1_experiment_are_named_by_their_channels_whatever_the_sample_id_prefix(
+        tmp_path, with_sample_id_prefix):
+    experiment = make_a_2_1_experiment(tmp_path / 'experiment', with_sample_id_prefix=with_sample_id_prefix,
+                                       aligned=True)
+
+    qt_modules_imported_by(run_the_upgrade(experiment, ACCEPT_ALL))
+
+    # Never prefixed by the sample id: see the asset 'aligned'
+    assert sorted(path.name for path in experiment.iterdir() if path.is_dir()) == ['atlas_to_autofluorescence',
+                                                                                  'autofluorescence_to_nuclei']
+
+
 def test_the_names_typed_in_the_terminal_are_used_and_a_wrong_one_is_asked_again(tmp_path):
     experiment = make_a_2_1_experiment(tmp_path / 'experiment')
     answers = ['y',
