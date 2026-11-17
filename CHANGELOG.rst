@@ -2,6 +2,69 @@
 Changelog
 =========
 
+3.2.0
+-----
+
+The libraries release: ClearMap moves to Qt 6, NumPy 2 and Python 3.14. The configuration files and the results of 3.1
+are unchanged, so an experiment of 3.1 opens as it is. This is the first release of the smaller steps announced for
+3.1: the next one is the modular release (3.3), then Windows compatibility.
+
+Libraries
+~~~~~~~~~
+
+- **Qt 6.** ClearMap imports Qt through ``qtpy``. PyQt6 is installed by the 3.2 environment and used when it is
+  installed. PyQt5 is kept for 3.2: set ``QT_API=pyqt5`` to use it (the environment file keeps PyQt5 selectable).
+  One module chooses the binding before anything imports Qt, and pyqtgraph follows it.
+- **NumPy 2** and pandas 2.2.2 or later; Cython 3; graph-tool is no longer pinned.
+- **Python 3.11 or later**; the environment is Python 3.14. Every worker pool is created with an explicit start method.
+- QtWebEngine and mpld3 are no longer dependencies: the group plots are matplotlib canvases with their toolbar.
+- The environment is named ``ClearMap3.2``.
+
+GUI
+~~~
+
+- A third theme, ``qdarkstyle-light``. The theme is chosen in the preferences (``system`` keeps the desktop style) and
+  applied at the next start. The colours of the messages and tooltips follow the theme.
+- The Qt resources are compiled at run time with the ``rcc`` of the loaded Qt: no generated resource module remains.
+- The list boxes of the designer files are one class, ``NumberListBox``. Fields which are empty are read as the empty
+  string, and a results folder which is not set is ``null`` in the config (an empty string is still read as not set).
+  Folder dialogs open in the home folder when no start folder is set.
+
+Upgrading experiments
+~~~~~~~~~~~~~~~~~~~~~
+
+- An upgrade of an experiment (config files converted, files renamed) is always confirmed. The GUI asks as before. From
+  a shell, ``python -m ClearMap.config.convert_config_versions <folder>`` upgrades a 2.1 experiment in the terminal,
+  with the suggested channel names (``raw`` becomes ``nuclei``, or ``vessels`` with an ``arteries`` channel) to accept
+  or change. A batch job (slurm) has no one to confirm and refuses: its experiment must be valid, so upgrade it
+  beforehand.
+
+Bug fixes
+~~~~~~~~~
+
+- Registration: two channels which are both acquired with a third channel are pixel aligned.
+- Upgrade of a 2.1 experiment: the files of a sample which was not aligned are renamed (the missing elastix folders
+  made the renaming fail); with ``use_id_as_prefix``, the elastix folders are renamed and the sample id is not
+  repeated in the names of the ``arteries`` and ``autofluorescence`` files.
+- Installer: the paths to the external programs are read from, and written to, the machine configuration of this
+  version.
+- Cluster: the job script activates ``ClearMap3.2`` by default.
+
+3.1.3
+-----
+
+Bug fixes and updates for newer libraries; the configuration files and the results of 3.1.2 are unchanged.
+
+- GUI: a warning at start when the NVIDIA driver does not answer, with a diagnosis of a driver and kernel module out of
+  sync (#191).
+- Setup: the extensions are rebuilt when Python, NumPy or Cython changed since their last build.
+- GUI: the staged imports resolve a relative import of a package to the package itself.
+- Group analysis: the volcano and histogram plots are made in any Qt application, not only one named ``ClearMap``.
+- Visualization: the random label colormaps read their colours with ``pyplot.get_cmap`` (``cm.get_cmap`` is gone).
+- Colocalization: ``footprint_rectangle`` replaces ``cube``, removed in scikit-image 0.27.
+- Scripts: ``bin_props`` histograms each region with the bins of all the regions; a line of ``TubeMap.py`` and an
+  import of ``StatisticsPointList.py`` are fixed.
+
 3.1.2
 -----
 
