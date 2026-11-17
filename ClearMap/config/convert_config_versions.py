@@ -603,6 +603,7 @@ class ExperimentUpgrade_2_1_to_3_0(ExperimentConfigConverter):
         folders_to_rename = ['elastix_auto_to_reference', 'elastix_resampled_to_auto']
         if self.use_id_as_prefix:
             folders_to_rename = [f'{self.sample_id}_{f}' for f in folders_to_rename]
+        folders_to_rename = [f for f in folders_to_rename if (main_folder / f).is_dir()]  # Not aligned yet: none
         files_to_rename = {str(f.name): str(f.name) for f in assets if (main_folder / f).is_file()}
         return files_to_rename, folders_to_rename, main_folder
 

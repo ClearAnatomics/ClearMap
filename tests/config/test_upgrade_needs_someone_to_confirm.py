@@ -96,6 +96,14 @@ def test_a_2_1_experiment_is_upgraded_with_the_suggestions_in_a_terminal_without
     assert (experiment / 'autofluorescence_resampled.tif').exists()
 
 
+def test_a_sample_which_was_not_aligned_has_no_elastix_folder_to_rename(tmp_path):
+    experiment = make_a_2_1_experiment(tmp_path / 'experiment', aligned=False)
+
+    qt_modules_imported_by(run_the_upgrade(experiment, ACCEPT_ALL))
+
+    assert (experiment / 'nuclei_stitched.npy').exists()
+
+
 def test_the_names_typed_in_the_terminal_are_used_and_a_wrong_one_is_asked_again(tmp_path):
     experiment = make_a_2_1_experiment(tmp_path / 'experiment')
     answers = ['y',
