@@ -1,4 +1,3 @@
-import ast
 import functools
 import traceback
 import warnings
@@ -604,15 +603,13 @@ def combobox_setter(widget: QComboBox, value):
 
 
 def line_edit_getter(widget: QLineEdit):
+    """
+    The text of a line edit, as typed: a field which holds a list or a number reads its text with the casts of its
+    ParamLink (e.g. tile_extensions_from_text), not here
+    """
     txt = widget.text()
     if txt in ('None', ''):
         return None
-    count = sum([txt.count(symbol) for symbol in '[]{}'])
-    if count:  # List or dict
-        if count % 2 == 0:  # (not perfect but should work for most cases)
-            txt = ast.literal_eval(txt)
-        else:
-            warnings.warn(f'Unbalanced brackets in {txt}')
     return txt
 
 

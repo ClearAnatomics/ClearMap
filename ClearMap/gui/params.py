@@ -61,6 +61,7 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 NO_PARTNER_TEXT = 'None'  # The item of the align_with combo box for a channel which is not registered (config: None)
 UNDEFINED_LAYOUT_CHANNEL_TEXT = 'undefined'  # The item of the layout channel combo box when none is chosen (config: None)
+TILE_EXTENSIONS_SEPARATOR = ','  # Between the tile extensions in their line edit: .ome.tif, .ome.npy
 
 
 def align_with_choices(other_channels: Iterable[str]) -> list[str]:
@@ -97,6 +98,22 @@ def layout_channel_to_ui(layout_channel: str | None) -> str:
 def layout_channel_from_ui(text: str | None) -> str | None:
     """The layout channel of the config for the text of the layout channel combo box: None if none is chosen"""
     return None if text == UNDEFINED_LAYOUT_CHANNEL_TEXT else text
+
+
+def tile_extensions_to_text(tile_extensions: Iterable[str]) -> str:
+    """The text of the tile extensions line edit for the list of the config, e.g. '.ome.tif, .ome.npy'"""
+    return f'{TILE_EXTENSIONS_SEPARATOR} '.join(tile_extensions)
+
+
+def tile_extensions_from_text(text: str | None) -> list[str]:
+    """
+    The list of the config for the text of the tile extensions line edit: split at the separators, without the spaces
+    around them nor empty items. Each extension is checked by the schema (extensionString), not here.
+    """
+    if not text:
+        return []
+    extensions = (extension.strip() for extension in text.split(TILE_EXTENSIONS_SEPARATOR))
+    return [extension for extension in extensions if extension]
 
 
 class NProcessesParams(UiParameter):
@@ -598,13 +615,13 @@ class SharedSampleParams(UiParameter):
         The ID of the sample. This must be unique
     use_id_as_prefix : bool
         Whether to use the sample ID as a prefix for the output files
-    default_tile_extension : str
-        The extension of the tile files
+    default_tile_extension : list[str]
+        The extensions of the tile files, shown separated by commas
     """
     src_folder: str
     sample_id: str
     use_id_as_prefix: bool
-    default_tile_extension: str
+    default_tile_extension: list[str]
 
     cfg_subtree = ['sample']
 
@@ -612,7 +629,9 @@ class SharedSampleParams(UiParameter):
         return {
             'sample_id': ParamLink(['sample_id'], self.tab.sampleIdTxt),
             'use_id_as_prefix': ParamLink(['use_id_as_prefix'], self.tab.useIdAsPrefixCheckBox),
-            'default_tile_extension': ParamLink(['default_tile_extension'], self.tab.defaultTileExtensionLineEdit),
+            'default_tile_extension': ParamLink(['default_tile_extension'], self.tab.defaultTileExtensionLineEdit,
+                                                cast_to_ui=tile_extensions_to_text,
+                                                cast_from_ui=tile_extensions_from_text),
             'src_folder': ParamLink(keys=None, widget=self.tab.srcFolderTxt, default=''),
         }
 
