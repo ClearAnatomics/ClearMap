@@ -1,15 +1,15 @@
-# ClearMap.yml 
+# ClearMap3.yml
 #
-# ClearMap2.0 Toolbox
+# ClearMap Toolbox
 # © Christoph Kirst, Charly Rousseau
-# https://github.com/ChristophKirst/ClearMap2
+# https://github.com/ClearAnatomics/ClearMap
 #
 # Licensed under GNU General Public License v3.0
 #
 # ClearMap anaconda environment
 #
-# install: conda env create -f ClearMap.yml 
-# update:  conda env update -f ClearMap.yml 
+# install: conda env create -f ClearMap3.yml
+# update:  conda env update -f ClearMap3.yml
 name: ClearMap3.2
 channels:
   - conda-forge
