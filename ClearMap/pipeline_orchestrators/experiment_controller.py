@@ -53,6 +53,7 @@ from ClearMap.config.config_coordinator import ConfigCoordinator
 from ClearMap.config.config_handler import ConfigHandler
 from ClearMap.config.defaults_provider import DefaultsProvider
 from ClearMap.config.registration_channels import registration_pairs
+from ClearMap.config.upgrade_prompts import UpgradePrompter
 from ClearMap.pipeline_orchestrators.group_orchestrators import DensityGroupAnalysisOrchestrator
 from ClearMap.pipeline_orchestrators.processor_launcher import ProcessorLauncher
 
@@ -326,7 +327,8 @@ class ExperimentController(BusSubscriberMixin):
         sample_id = self._get_sample_cfg().get('sample_id')
         return sample_id or None  # leave creation to UI prompt (app will call set_sample_id)
 
-    def upgrade_configs(self, from_version: VersionLike, to_version: VersionLike) -> None:
+    def upgrade_configs(self, from_version: VersionLike, to_version: VersionLike, *,
+                        prompter: UpgradePrompter) -> None:
         """
         Convert the config to the current ClearMap version in
         the current exp_dir.
@@ -338,9 +340,11 @@ class ExperimentController(BusSubscriberMixin):
             The version the config is currently in.
         to_version: str | tuple | Version
             The version to convert the config to.
+        prompter: UpgradePrompter
+            Who confirms the upgrade and answers its questions (the GUI passes its dialogs).
         """
         from ClearMap.config.convert_config_versions import convert_versions
-        convert_versions(from_version, to_version, exp_dir=self._exp_dir)
+        convert_versions(from_version, to_version, exp_dir=self._exp_dir, prompter=prompter)
         self.cfg_coordinator.load_all()
 
     # ---- boot / workspace ----------------------------------------------------

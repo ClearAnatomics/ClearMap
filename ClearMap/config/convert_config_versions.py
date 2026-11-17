@@ -21,6 +21,7 @@ from ClearMap.config.config_adjusters.patch_ops import deep_merge
 from ClearMap.config.config_handler import ConfigHandler, ALTERNATIVES_REG, VERSION_SUFFIX
 from ClearMap.config.early_boot import MachineConfig
 from ClearMap.config.registration_channels import MOVING_OTHER
+from ClearMap.config.upgrade_prompts import UpgradePrompter, suggested_channel_answers
 
 
 
@@ -151,6 +152,12 @@ def get_configs(v1_path, v2_path=''):
         v2_path = v1_path.with_name(f'{v1_path.stem}_{VERSION_SUFFIX}.cfg')  # can't use with_suffix without a dot
     v2_path = v2_path.expanduser()
     return read_cfg(v1_path), read_cfg(v2_path, must_exist=False)
+
+
+def channel_names_with_a_path_2_1(config_v1) -> list[str]:
+    """The channels of a 2.1 sample config which have data, in the order of the config"""
+    return [name for name, resolution in config_v1['resolutions'].items()
+            if resolution and config_v1['src_paths'].get(name)]
 
 
 @cfg_converter('2.1', '3.0', 'sample')
@@ -427,8 +434,9 @@ class ExperimentUpgrade_2_1_to_3_0(ExperimentConfigConverter):
     Handles upgrade of a full experiment folder from 2.1 → 3.0.
     """
 
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, *, prompter: UpgradePrompter):
         super().__init__(root)
+        self.prompter = prompter
         self.sample_cfg_path: Path | None = None
         self.alignment_cfg_path: Path | None = None
         self.cell_map_cfg_path: Path | None = None
@@ -444,6 +452,11 @@ class ExperimentUpgrade_2_1_to_3_0(ExperimentConfigConverter):
             self.cfg_loader.get_cfg_path(name) for name in ('sample', 'alignment', 'cell_map')
         ]
 
+        # Everything is asked before any file is converted: stopping leaves the experiment as it was
+        self._ask_the_channels()
+        if self._aborted:
+            return
+
         # Convert sample config
         v3_sample_cfg_path = convert(self.sample_cfg_path, prev_v='2.1', new_v='3.0',
                                      backup=True, overwrite=True)
@@ -453,25 +466,18 @@ class ExperimentUpgrade_2_1_to_3_0(ExperimentConfigConverter):
         self.use_id_as_prefix = self.sample_cfg['use_id_as_prefix']
         self.sample_id = self.sample_cfg['sample_id']
 
+    def _ask_the_channels(self):
+        """Set ``new_channels`` ({old name: (new name, content type)}) from the prompter, else abort"""
+        old_names = channel_names_with_a_path_2_1(read_cfg(self.sample_cfg_path))
+        answers = self.prompter.choose_channels(suggested_channel_answers(old_names))
+        if not answers:
+            self._aborted = True
+            return
+        self.new_channels = {old_name: (answer.name, answer.data_type) for old_name, answer in answers.items()}
+
     def _rename_channels(self):
-        # Extract channels with paths
-        channels = {name: data for name, data in self.sample_cfg['channels'].items() if data['path']}
-
-        # Pop up dialog to rename channels and define data_type
-        from ClearMap.gui.dialogs import RenameChannelsDialog  # Local: see _prepare_the_dialogs
-        from ClearMap.gui.gui_utils_base import DIALOG_ACCEPTED
-        dialog = RenameChannelsDialog(channels)
-        if dialog.exec() == DIALOG_ACCEPTED:
-            self.new_channels = dialog.get_new_channels()
-        else:
-            self.new_channels = {}
-            self._aborted = True
+        if self._aborted:
             return
-
-        if not self.new_channels:
-            self._aborted = True
-            return
-
         # Rename channels in the v3 sample config file
         for old_name, (new_name, data_type) in self.new_channels.items():
             self.sample_cfg['channels'][new_name] = self.sample_cfg['channels'].pop(old_name)
@@ -509,15 +515,11 @@ class ExperimentUpgrade_2_1_to_3_0(ExperimentConfigConverter):
             apply_renames(renames)
 
     def verify_renaming(self, renames: list[Rename]) -> list[Rename]:
-        from ClearMap.gui.dialogs import VerifyRenamingDialog  # Local: see _prepare_the_dialogs
-        from ClearMap.gui.gui_utils_base import DIALOG_ACCEPTED
-        dialog = VerifyRenamingDialog(renames, title='Verify renaming',
-                                      message='The files of the sample are renamed to the names of ClearMap 3. '
-                                              'Untick a file to leave it as it is.')
-        if dialog.exec() == DIALOG_ACCEPTED:
-            return dialog.selected_renames
-        self._aborted = True
-        return []
+        selected = self.prompter.choose_renames(renames)
+        if selected is None:
+            self._aborted = True
+            return []
+        return selected
 
     def _compute_elastix_folders_new_names(self, files_to_rename: dict[str, str], folders_to_rename: list[str]):
         """Handle the elastix folders renaming using channel info"""
@@ -625,14 +627,18 @@ def _experiment_folder_from_a_dialog() -> str:
 
 
 @project_converter('2.1', '3.0')
-def convert_2_1_to_3_0(main_folder='', create_app=True):
-    _prepare_the_dialogs()  # This upgrade always asks: the names and types of the channels, the renaming
+def convert_2_1_to_3_0(main_folder='', create_app=True, *, prompter: UpgradePrompter):
+    """
+    Upgrade an experiment folder. This upgrade asks the names and types of the channels and the renaming:
+    ``prompter`` answers.
+    """
     if not main_folder:
+        _prepare_the_dialogs()  # No folder given: only the GUI does that, the dialog needs the application
         main_folder = _experiment_folder_from_a_dialog()
     if not main_folder:
         return
 
-    upgrader = ExperimentUpgrade_2_1_to_3_0(main_folder)
+    upgrader = ExperimentUpgrade_2_1_to_3_0(main_folder, prompter=prompter)
     upgrader.run()
 
 
@@ -868,7 +874,7 @@ class ExperimentUpgrade_3_0_to_3_1(ExperimentConfigConverter):
                 func(cfg_path)
 
 @project_converter('3.0', '3.1')
-def convert_3_0_to_3_1(main_folder: str | Path = '', create_app: bool = True):
+def convert_3_0_to_3_1(main_folder: str | Path = '', create_app: bool = True, *, prompter: UpgradePrompter):
     if not main_folder:  # This upgrade asks nothing else: with the folder given, no Qt
         _prepare_the_dialogs()
         main_folder = _experiment_folder_from_a_dialog()
@@ -879,8 +885,14 @@ def convert_3_0_to_3_1(main_folder: str | Path = '', create_app: bool = True):
     upgrader.run()
 
 
-def convert_versions(previous_version: str, new_version: str, *,
+def convert_versions(previous_version: str, new_version: str, *, prompter: UpgradePrompter,
                      exp_dir: str | Path = '', create_app: bool = True):
+    """
+    Upgrade the configs and files of an experiment from ``previous_version`` to ``new_version``.
+
+    The upgrade converts the config files and may rename files, so ``prompter`` must confirm it:
+    there is no way to upgrade without someone answering (see :mod:`ClearMap.config.upgrade_prompts`).
+    """
     exp_dir = str(Path(exp_dir).expanduser().resolve())
     previous_version = as_version(previous_version)
     new_version = as_version(new_version)
@@ -891,6 +903,11 @@ def convert_versions(previous_version: str, new_version: str, *,
 
     steps = get_conversion_steps(previous_version, new_version)
 
+    if not prompter.confirm(f'Upgrade the experiment {exp_dir} from {previous_version} to {new_version}? '
+                            f'The config files are converted and some files may be renamed.'):
+        print('Upgrade cancelled, the experiment is unchanged')
+        return
+
     for from_v, to_v in steps:
         converter = PROJECT_CONVERTERS.get((from_v, to_v))
         if not converter:
@@ -898,7 +915,7 @@ def convert_versions(previous_version: str, new_version: str, *,
                 f'No project converter registered for {from_v} → {to_v}. '
                 f'Supported steps: {SUPPORTED_VERSIONS}')
         print(f'Converting {from_v} → {to_v}...')
-        converter(exp_dir, create_app=create_app)
+        converter(exp_dir, create_app=create_app, prompter=prompter)
         print(f'✓ {from_v} → {to_v} complete')
 
     print(f'\n✓ Upgrade complete: {previous_version} → {new_version}\n')
@@ -913,6 +930,17 @@ def test():
                                            '/tmp/test_cell_map_v3.cfg')
 
 
+def _parse_command_line(arguments: list[str] | None = None):
+    import argparse
+    parser = argparse.ArgumentParser(
+        description='Upgrade an experiment folder from ClearMap 2.1 to 3.0, asking for the channel names and the '
+                    'renaming in the terminal. Needs a terminal: a batch job cannot upgrade an experiment.')
+    parser.add_argument('experiment_folder')
+    return parser.parse_args(arguments)
+
+
 if __name__ == '__main__':
     # test()
-    convert_2_1_to_3_0()
+    from ClearMap.config.upgrade_prompts import ConsolePrompter
+    command_line = _parse_command_line()
+    convert_versions('2.1', '3.0', exp_dir=command_line.experiment_folder, prompter=ConsolePrompter())

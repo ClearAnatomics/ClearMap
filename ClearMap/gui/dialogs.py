@@ -14,7 +14,7 @@ __download__ = 'https://github.com/ClearAnatomics/ClearMap'
 
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING, Mapping, Sequence
 
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (QLabel, QDialogButtonBox, QDialog, QHBoxLayout, QVBoxLayout, QFormLayout,
@@ -23,10 +23,14 @@ from qtpy.QtWidgets import (QLabel, QDialogButtonBox, QDialog, QHBoxLayout, QVBo
 
 from ClearMap.IO.FileUtils import FileRenameError, Rename, check_renames
 from ClearMap.IO.assets_constants import DATA_CONTENT_TYPES
+from ClearMap.config.upgrade_prompts import ChannelAnswer, UpgradePrompter
+from ClearMap.gui.gui_utils_base import DIALOG_ACCEPTED
 
 if TYPE_CHECKING:
     from ClearMap.IO.channel_file_renaming import NotRenamed
 
+VERIFY_RENAMING_MESSAGE = ('The files of the sample are renamed to the names of ClearMap 3. '
+                           'Untick a file to leave it as it is.')
 RENAMES_TABLE_HEADERS = ['Rename', 'Folder', 'Current name', 'New name']
 FOLDER_SEPARATORS = ('/', '\\')  # Of every platform: a new name typed on one does not hold a folder on another
 SELECTED_COLUMN, FOLDER_COLUMN, CURRENT_NAME_COLUMN, NEW_NAME_COLUMN = range(len(RENAMES_TABLE_HEADERS))
@@ -48,8 +52,14 @@ class AboutDialog(QDialog):
 
 
 class RenameChannelsDialog(QDialog):
-    def __init__(self, channels, parent=None):
+    """
+    Ask the new name and the content type of each channel.
+
+    ``suggested`` maps a channel to the (name, content type) the fields start with.
+    """
+    def __init__(self, channels, parent=None, *, suggested: Mapping[str, tuple[str, str]] | None = None):
         super().__init__(parent)
+        suggested = suggested or {}
         self.setWindowTitle("Redefine channels")
         self.channels = channels
         self.new_channels = {}
@@ -69,6 +79,10 @@ class RenameChannelsDialog(QDialog):
             data_type_label = QLabel("Data type:")
             data_type_input = QComboBox()
             data_type_input.addItems(DATA_CONTENT_TYPES)
+            if channel in suggested:
+                suggested_name, suggested_data_type = suggested[channel]
+                name_input.setText(suggested_name)
+                data_type_input.setCurrentText(suggested_data_type)
             form_layout.addRow(data_type_label, data_type_input)
 
             self.channel_inputs[channel] = (name_input, data_type_input)
@@ -302,3 +316,27 @@ class ResourceTypeToFolderDialog(QDialog):
         """
         return self.result_mapping(), self.migrate_checkbox.isChecked()
 
+
+class DialogUpgradePrompter(UpgradePrompter):
+    """
+    Ask the user in dialogs, which start with the suggestions. Cancel stops the upgrade.
+
+    The GUI asks whether to upgrade before it starts one ("Upgrade to ..." or "Upgrade now?"), so confirm is yes.
+    """
+
+    def confirm(self, message: str) -> bool:
+        return True
+
+    def choose_channels(self, suggested: Mapping[str, ChannelAnswer]) -> dict[str, ChannelAnswer] | None:
+        dialog = RenameChannelsDialog(list(suggested),
+                                      suggested={old: (answer.name, answer.data_type)
+                                                 for old, answer in suggested.items()})
+        if dialog.exec() != DIALOG_ACCEPTED:
+            return None
+        return {old: ChannelAnswer(name, data_type) for old, (name, data_type) in dialog.get_new_channels().items()}
+
+    def choose_renames(self, renames: Sequence[Rename]) -> list[Rename] | None:
+        dialog = VerifyRenamingDialog(list(renames), title='Verify renaming', message=VERIFY_RENAMING_MESSAGE)
+        if dialog.exec() != DIALOG_ACCEPTED:
+            return None
+        return dialog.selected_renames

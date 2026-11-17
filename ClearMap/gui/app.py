@@ -11,6 +11,7 @@ from ClearMap.config.convert_config_versions import convert_versions
 from ClearMap._version import CURRENT_CONFIG_VERSION
 from ClearMap.Utils.versions import as_version
 from ClearMap.gui.exception_handler import install_global_handler
+from ClearMap.gui.dialogs import DialogUpgradePrompter
 
 """
 app
@@ -849,7 +850,8 @@ class ClearMapApp(ClearMapAppBase):
 
             for root, v in outdated:
                 prev = str(v) if v else '2.1'  # fallback to first numbered version
-                convert_versions(prev, CURRENT_CONFIG_VERSION, exp_dir=root, create_app=False)
+                convert_versions(prev, CURRENT_CONFIG_VERSION, exp_dir=root, create_app=False,
+                                 prompter=DialogUpgradePrompter())
 
         # 1) init group controller before tabs
         self.gui_controller.group_controller.set_group_base_dir(group_dir)
@@ -1226,7 +1228,8 @@ class ClearMapApp(ClearMapAppBase):
                                                                 f'An old version of ClearMap was detected, do you want to: ',
                                                                 [f'Upgrade to {current_version}', 'Abort']):
                     case 0:  # Upgrade
-                        self.experiment_controller.upgrade_configs(sample_version, CURRENT_CONFIG_VERSION)
+                        self.experiment_controller.upgrade_configs(sample_version, CURRENT_CONFIG_VERSION,
+                                                                   prompter=DialogUpgradePrompter())
                     case 1:  # Abort
                         self.src_folder = ''  # reset
                         return

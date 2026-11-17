@@ -14,6 +14,7 @@ from ClearMap.Utils.exceptions import ClearMapConfigError
 from ClearMap.config import config_handler
 from ClearMap.config.config_handler import ConfigHandler, config_needs_upgrade
 from ClearMap.config.convert_config_versions import convert_versions
+from ClearMap.config.upgrade_prompts import ConsolePrompter
 
 SECTIONS_WITH_A_VERSION = ('sample', 'stitching', 'registration', 'cell_map', 'vasculature', 'machine')
 
@@ -53,11 +54,15 @@ def test_the_configs_of_a_newer_version_are_refused_with_the_version_they_carry(
         config_needs_upgrade(newer)
 
 
+def refuse_to_be_asked(question):
+    raise AssertionError(f'Nothing to upgrade: nobody should be asked {question!r}')
+
+
 def test_upgrading_the_configs_of_the_defaults_to_the_current_format_converts_nothing(tmp_path):
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter('always')
         convert_versions(_version_written_by_the_defaults('sample'), CURRENT_CONFIG_VERSION, exp_dir=tmp_path,
-                         create_app=False)
+                         create_app=False, prompter=ConsolePrompter(ask=refuse_to_be_asked))
 
     assert any('No conversion needed' in str(warning.message) for warning in caught)
 

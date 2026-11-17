@@ -18,6 +18,7 @@ EXPERIMENT_FILES = ('sample_params.cfg', 'stitching_params.cfg')  # The 3.0 name
 UPGRADE_A_3_0_EXPERIMENT = f'''
 import json, sys
 import ClearMap.config.convert_config_versions as conversions
+from ClearMap.config.upgrade_prompts import ConsolePrompter
 
 converted = []
 
@@ -30,7 +31,8 @@ for config_name in ('sample', 'stitching', 'registration', 'cell_map', 'tract_ma
                     'batch', 'group_analysis'):
     setattr(conversions, f'convert_{{config_name}}_3_0_to_3_1', record_conversion.__get__(config_name))
 
-conversions.convert_versions('3.0', '3.1', exp_dir=sys.argv[1])
+conversions.convert_versions('3.0', '3.1', exp_dir=sys.argv[1],
+                             prompter=ConsolePrompter(ask=lambda question: 'y', say=lambda line: None))
 print({RESULT_MARKER!r} + json.dumps({{'converted': converted,
                                        'qt': [name for name in {QT_MODULES!r} if name in sys.modules]}}))
 '''
