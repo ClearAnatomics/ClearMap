@@ -2,6 +2,38 @@
 Changelog
 =========
 
+3.1.4
+-----
+
+Bug fixes only; the configuration files and the results of 3.1.3 are unchanged.
+
+- Registration: two channels which are both acquired with a third channel are pixel aligned.
+- Upgrade of a 2.1 experiment: the files of a sample which was not aligned are renamed (the missing elastix folders
+  made the renaming fail); with ``use_id_as_prefix``, the elastix folders are renamed and the sample id is not
+  repeated in the names of the ``arteries`` and ``autofluorescence`` files; no doubled underscore is left where the
+  channel word was removed from a file name.
+- Installer and settings: the paths to the external programs (elastix) are read from, and written to, the machine
+  configuration of this version (``machine.yml``), not ``machine_params_v3_0.cfg``.
+- GUI: a text field is read as its text (the tile extensions are parsed explicitly, not evaluated), and an empty field
+  is the empty string.
+- GUI: a results folder which is not set is ``null`` in the config (an empty string is still read as not set), and the
+  folder dialogs open in the home folder when no start folder is set, not in a folder named ``None``.
+
+3.1.3
+-----
+
+Bug fixes and updates for newer libraries; the configuration files and the results of 3.1.2 are unchanged.
+
+- GUI: a warning at start when the NVIDIA driver does not answer, with a diagnosis of a driver and kernel module out of
+  sync (#191).
+- Setup: the extensions are rebuilt when Python, NumPy or Cython changed since their last build.
+- GUI: the staged imports resolve a relative import of a package to the package itself.
+- Group analysis: the volcano and histogram plots are made in any Qt application, not only one named ``ClearMap``.
+- Visualization: the random label colormaps read their colours with ``pyplot.get_cmap`` (``cm.get_cmap`` is gone).
+- Colocalization: ``footprint_rectangle`` replaces ``cube``, removed in scikit-image 0.27.
+- Scripts: ``bin_props`` histograms each region with the bins of all the regions; a line of ``TubeMap.py`` and an
+  import of ``StatisticsPointList.py`` are fixed.
+
 3.1.2
 -----
 
