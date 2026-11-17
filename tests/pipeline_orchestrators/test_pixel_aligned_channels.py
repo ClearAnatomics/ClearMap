@@ -68,7 +68,7 @@ def test_channels_of_other_stitched_shapes_are_not(experiment, imaged_together):
 def test_channels_registered_each_on_its_own_are_not(experiment, imaged_together):
     _patch_channel(experiment, 'registration', 'arteries', {'moving_channel': 'other'})
 
-    with pytest.raises(ChannelsNotPixelAlignedError, match='exactly one channel must be the root'):
+    with pytest.raises(ChannelsNotPixelAlignedError, match='acquired together .* with the same channel'):
         imaged_together.check_pixel_aligned('arteries', 'vessels')
 
 

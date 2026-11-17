@@ -5,7 +5,7 @@ pair): acquired together (registration) and stitched together (stitching).
 import pytest
 
 from ClearMap.Utils.exceptions import ChannelsNotPixelAlignedError, ClearMapConfigError
-from ClearMap.config.registration_channels import check_intrinsically_aligned
+from ClearMap.config.registration_channels import acquisition_root, check_intrinsically_aligned
 from ClearMap.config.stitching_channels import check_stitched_together, layout_root
 
 
@@ -30,17 +30,54 @@ def test_channels_acquired_together_with_one_of_them_are_intrinsically_aligned(r
     check_intrinsically_aligned(registration_config, list(registration_config['channels']))
 
 
+@pytest.mark.parametrize('channels_acquired_with_auto', [
+    ['Podo_CD31', 'SM22'],
+    ['SM22', 'Podo_CD31'],
+])
+def test_channels_both_acquired_with_a_channel_which_is_not_among_them_are_aligned_with_each_other(
+        channels_acquired_with_auto):
+    registration_config = registration(auto=('atlas', 'other'), Podo_CD31=('auto', 'intrinsically_aligned'),
+                                       SM22=('auto', 'intrinsically_aligned'))
+
+    check_intrinsically_aligned(registration_config, channels_acquired_with_auto)
+
+
+def test_channels_acquired_with_each_other_through_a_chain_ending_outside_of_them_are_aligned_with_each_other():
+    registration_config = registration(auto=('atlas', 'other'), Podo_CD31=('auto', 'intrinsically_aligned'),
+                                       SM22=('Podo_CD31', 'intrinsically_aligned'))
+
+    check_intrinsically_aligned(registration_config, ['SM22', 'auto'])  # The root is among them
+    check_intrinsically_aligned(registration_config, ['SM22', 'Podo_CD31'])  # The root is not
+
+
+def test_the_root_of_a_channel_is_the_channel_registered_on_its_own_at_the_end_of_its_chain():
+    registration_config = registration(auto=('atlas', 'other'), Podo_CD31=('auto', 'intrinsically_aligned'),
+                                       SM22=('Podo_CD31', 'intrinsically_aligned'))
+
+    assert [acquisition_root(registration_config, channel) for channel in ('auto', 'Podo_CD31', 'SM22')] == ['auto'] * 3
+
+
 def test_channels_registered_each_on_its_own_are_not():
     # Their results end at the same place, but not pixel for pixel
-    with pytest.raises(ChannelsNotPixelAlignedError, match=r"got root_channels=\['vessels', 'arteries'\]"):
+    with pytest.raises(ChannelsNotPixelAlignedError, match='with the same channel, got vessels: vessels, '
+                                                           'arteries: arteries'):
         check_intrinsically_aligned(registration(vessels=('auto', 'other'), arteries=('auto', 'other')),
                                     ['vessels', 'arteries'])
 
 
-def test_a_channel_acquired_together_with_another_channel_than_them_is_not():
-    with pytest.raises(ChannelsNotPixelAlignedError, match="arteries is acquired together with 'auto'"):
-        check_intrinsically_aligned(registration(vessels=('auto', 'other'), arteries=('auto', 'intrinsically_aligned')),
-                                    ['vessels', 'arteries'])
+def test_channels_acquired_with_different_channels_are_not():
+    registration_config = registration(auto=('atlas', 'other'), dapi=('atlas', 'other'),
+                                       vessels=('auto', 'intrinsically_aligned'),
+                                       arteries=('dapi', 'intrinsically_aligned'))
+    with pytest.raises(ChannelsNotPixelAlignedError, match='with the same channel, got vessels: auto, arteries: dapi'):
+        check_intrinsically_aligned(registration_config, ['vessels', 'arteries'])
+
+
+@pytest.mark.parametrize('partner', ['atlas', None, '__UNDECIDED__', 'not_a_channel'])
+def test_a_channel_acquired_with_what_is_not_a_channel_of_the_sample_is_not_aligned(partner):
+    registration_config = registration(vessels=('auto', 'other'), arteries=(partner, 'intrinsically_aligned'))
+    with pytest.raises(ChannelsNotPixelAlignedError, match='which is not a channel of the sample'):
+        check_intrinsically_aligned(registration_config, ['vessels', 'arteries'])
 
 
 def test_channels_acquired_together_with_each_other_but_not_with_the_one_registered_are_not():
@@ -51,12 +88,12 @@ def test_channels_acquired_together_with_each_other_but_not_with_the_one_registe
 
 
 def test_all_the_requirements_which_are_not_met_are_named():
-    registration_config = registration(vessels=('auto', 'intrinsically_aligned'),
-                                       arteries=('auto', 'intrinsically_aligned'))
+    registration_config = registration(vessels=('atlas', 'intrinsically_aligned'),
+                                       arteries=(None, 'intrinsically_aligned'))
     with pytest.raises(ChannelsNotPixelAlignedError) as error:
         check_intrinsically_aligned(registration_config, ['vessels', 'arteries'])
 
-    assert len(error.value.unmet_requirements) == 3 and error.value.channels == ('vessels', 'arteries')
+    assert len(error.value.unmet_requirements) == 2 and error.value.channels == ('vessels', 'arteries')
 
 
 # ------------------------------------------------------------------------------------------------- stitched together

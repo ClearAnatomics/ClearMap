@@ -198,11 +198,37 @@ def reversed_registrations(registration_config: Mapping, channels: Iterable[str]
     return [channel for channel in channels if registration_direction(channel, channels_config[channel]) == MOVING_SELF]
 
 
+def acquisition_root(registration_config: Mapping, channel: str) -> str:
+    """
+    The channel which channel was acquired with and which is registered on its own: channel itself, or its
+    align_with followed while each is intrinsically aligned (moving_channel: intrinsically_aligned).
+    The root may be any channel of the sample, e.g. the autofluorescence channel the others are acquired with.
+
+    Raises
+    ------
+    ClearMapConfigError
+        If an intrinsically aligned channel along the way is not aligned with a channel of the sample (e.g. the atlas,
+        nothing, or a partner which is not chosen yet), or the chain makes a loop.
+    """
+    channels_config = registration_config.get('channels', {})
+    followed = [channel]
+    while is_intrinsically_aligned(channels_config.get(followed[-1], {})):
+        align_with = channels_config[followed[-1]].get('align_with')
+        if align_with not in channels_config:
+            raise ClearMapConfigError(f'{followed[-1]} is acquired together with {align_with!r}, which is not a '
+                                      f'channel of the sample.')
+        if align_with in followed:
+            raise ClearMapConfigError(f'the channels they are acquired together with make a loop: '
+                                      f'{" -> ".join(followed + [align_with])}')
+        followed.append(align_with)
+    return followed[-1]
+
+
 def check_intrinsically_aligned(registration_config: Mapping, channels: Iterable[str]) -> None:
     """
-    Check that the channels are aligned by construction (acquired together): exactly one of them is the root (it is
-    registered on its own), every other one is intrinsically aligned with one of them, and following their align_with
-    leads to the root.
+    Check that the channels are aligned by construction (acquired together): following their align_with through the
+    intrinsically aligned channels leads each of them to the same root (the channel registered on its own), which may
+    be one of them or not (e.g. two channels acquired with the autofluorescence channel are aligned with each other).
     Registering them each on its own is not enough: their results would end at the same place, but not pixel for
     pixel (e.g. with a non rigid registration).
 
@@ -212,29 +238,17 @@ def check_intrinsically_aligned(registration_config: Mapping, channels: Iterable
         Naming each requirement which is not met.
     """
     channels = tuple(channels)
-    channels_config = registration_config.get('channels', {})
-    root_channels = [channel for channel in channels
-                     if not is_intrinsically_aligned(channels_config.get(channel, {}))]
+    roots = {}
     unmet_requirements = []
-    if len(root_channels) != 1:
-        unmet_requirements.append(f'exactly one channel must be the root (registered on its own), the others being '
-                                  f'acquired together (moving_channel: {INTRINSICALLY_ALIGNED}), got {root_channels=}')
     for channel in channels:
-        if channel in root_channels:
-            continue
-        align_with = channels_config[channel].get('align_with')
-        if align_with not in channels:
-            unmet_requirements.append(f'{channel} is acquired together with {align_with!r}, which is not one of them')
-    if not unmet_requirements:  # Each one is aligned with one of them: they must all lead to the root
-        for channel in channels:
-            followed = [channel]
-            for _ in channels:  # A root is reached within as many steps as there are channels, or it is a loop
-                if followed[-1] in root_channels:
-                    break
-                followed.append(channels_config[followed[-1]]['align_with'])
-            else:
-                unmet_requirements.append(f'the channels they are acquired together with make a loop: {" -> ".join(followed)}')
-                break
+        try:
+            roots[channel] = acquisition_root(registration_config, channel)
+        except ClearMapConfigError as err:
+            unmet_requirements.append(str(err))
+    if len(set(roots.values())) > 1:
+        unmet_requirements.append(f'they must be acquired together (moving_channel: {INTRINSICALLY_ALIGNED}) with the '
+                                  f'same channel, got '
+                                  f'{", ".join(f"{channel}: {root}" for channel, root in roots.items())}')
     if unmet_requirements:
         raise ChannelsNotPixelAlignedError(channels, unmet_requirements)
 
