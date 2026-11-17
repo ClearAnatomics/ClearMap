@@ -1,4 +1,4 @@
-ClearMap 3.1
+ClearMap 3.2
 ============
 
 [![DOI](https://zenodo.org/badge/256322811.svg)](https://zenodo.org/badge/latestdoi/256322811)
@@ -22,15 +22,27 @@ ClearMap 3.1
 *ClearMap* is a toolbox for the analysis and registration of volumetric
 data from cleared tissues.
 
-> **New in 3.1**: Redesigned pipeline orchestrators, YAML-based configuration,
-> channel-centred workspace, colocalization analysis, and improved GUI.
+> **New in 3.2**: a maintenance release, mostly for developers and installers. The libraries ClearMap is built on are
+> updated (Qt 6, NumPy 2, Python 3.14). The pipelines and their results do not change, and your 3.1 experiments and
+> configuration files open as they are. For users, this should mainly improve compatibility with recent systems and
+> software, and keeps ClearMap installable as the older libraries are retired.
 > Install by running `./install_gui.sh` and launch with `clearmap-ui`.
+> PyQt6 is the default Qt binding; PyQt5 is kept for 3.2 (set the `QT_API=pyqt5` environment variable to use it).
 
 > [!IMPORTANT]
-> **Smaller, more frequent releases.** 3.1 comes after a long wait. From here on, ClearMap is released in smaller
+> **Smaller, more frequent releases.** 3.1 came after a long wait. From here on, ClearMap is released in smaller
 > steps (3.2, 3.3, ...), each adding one theme (see [CHANGELOG.rst](CHANGELOG.rst)), so new releases will come
-> more often and fixes will not wait for a big one.
+> more often and fixes will not wait for a big one. After 3.2 (libraries) come 3.3 (modular), then Windows support.
 
+
+## 3.2 — What's new
+
+Mostly under the hood (the libraries); nothing changes in the pipelines. What you may notice is marked *(users)*.
+
+  * [x] Qt 6 through `qtpy` (PyQt6 by default, PyQt5 kept for 3.2 with `QT_API=pyqt5`)
+  * [x] NumPy 2 and Python 3.14 environment
+  * [x] *(users)* A third theme, `qdarkstyle-light`, chosen in the preferences
+  * [x] *(users)* Upgrade of 2.1 experiments from a terminal, always confirmed
 
 ## 3.1 — What's new
 
@@ -222,6 +234,10 @@ Copyright © 2020-2024 by Christoph Kirst and the ClearMap team.
 
 
 ## Version history
+
+### VERSION 3.2
+  * Libraries: Qt 6 (PyQt6, PyQt5 kept), NumPy 2, Python 3.14
+  * Third GUI theme, upgrade of 2.1 experiments from a terminal
 
 ### VERSION 3.1
   * Pipeline orchestrators replacing the old `processors` package
