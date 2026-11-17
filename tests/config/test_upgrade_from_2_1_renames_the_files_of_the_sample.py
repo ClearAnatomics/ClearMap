@@ -42,3 +42,16 @@ def test_the_files_of_a_sample_which_was_not_aligned_are_renamed(tmp_path):
 
     assert sorted(path.name for path in upgrader.root.iterdir()) == ['autofluorescence_resampled.tif',
                                                                      'nuclei_resampled.tif', 'nuclei_stitched.npy']
+
+
+@pytest.mark.parametrize('with_sample_id_prefix', [False, True])
+def test_the_elastix_folders_are_named_by_their_channels_whatever_the_sample_id_prefix(tmp_path,
+                                                                                         with_sample_id_prefix):
+    upgrader = upgrader_of_a_2_1_experiment(tmp_path / 'experiment', with_sample_id_prefix=with_sample_id_prefix,
+                                            aligned=True)
+
+    upgrader._rename_assets()
+
+    # Never prefixed by the sample id: see the asset 'aligned'
+    assert sorted(path.name for path in upgrader.root.iterdir() if path.is_dir()) == ['atlas_to_autofluorescence',
+                                                                                     'autofluorescence_to_nuclei']

@@ -532,15 +532,16 @@ class ExperimentUpgrade_2_1_to_3_0(ExperimentConfigConverter):
             """Use clearmap expression to build new folder name based on asset constants"""
             return expr.string(values={'moving_channel': moving_channel, 'fixed_channel': fixed_channel})
 
-        elastix_folders = [d for d in folders_to_rename if d.startswith('elastix_')]
         out: dict[str, str] = deepcopy(files_to_rename)
-        for folder in elastix_folders:
+        for folder in folders_to_rename:
             if not alignment_reference_channel:
                 warnings.warn(f'No reference channel found in the sample config file, Skipping {folder} renaming.')
                 continue
-            if folder == 'elastix_auto_to_reference':
+            # The folders of 2.1 start with the sample id if use_id_as_prefix, the new ones never do (see 'aligned')
+            old_name = self._strip_sample_id(folder)
+            if old_name == 'elastix_auto_to_reference':
                 out[folder] = channels_to_elx_folder(moving_channel='atlas', fixed_channel=alignment_reference_channel)
-            elif folder == 'elastix_resampled_to_auto':
+            elif old_name == 'elastix_resampled_to_auto':
                 out[folder] = channels_to_elx_folder(moving_channel=alignment_reference_channel, fixed_channel=regular_channel)
 
         return out
