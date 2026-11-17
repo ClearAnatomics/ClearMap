@@ -1,6 +1,6 @@
 """
-A line edit is read as the text typed in it. A field which holds something else (the list of the tile extensions)
-reads its text with the casts of its ParamLink.
+A line edit is read as the text typed in it, an empty field as the empty string. A field which holds something else
+(the list of the tile extensions) reads its text with the casts of its ParamLink.
 """
 from types import SimpleNamespace
 
@@ -76,6 +76,23 @@ def test_a_text_with_brackets_is_written_as_it_was_typed(sample_params, text):
     params.handle_widget_changed(attr_name='sample_id')  # Was a ValueError or SyntaxError of ast.literal_eval
 
     assert patches == [{'sample': {'sample_id': text}}]
+
+
+def test_an_empty_field_is_written_as_the_empty_string(sample_params):
+    tab, params, patches = sample_params
+    tab.sampleIdTxt.setText('')
+
+    params.handle_widget_changed(attr_name='sample_id')
+
+    assert patches == [{'sample': {'sample_id': ''}}]  # Was None, which the schema of sample_id (a string) refuses
+
+
+def test_none_is_shown_as_an_empty_field(sample_params):
+    tab, params, _ = sample_params
+
+    params.sample_id = None
+
+    assert tab.sampleIdTxt.text() == ''  # Was the text "None"
 
 
 def test_the_tile_extensions_are_shown_separated_by_commas(sample_params):
