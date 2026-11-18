@@ -6,10 +6,10 @@ import pytest
 from ClearMap.gui import params, params_interfaces
 from ClearMap.gui.params import BatchProcessingParams
 from ClearMap.gui.widgets import GroupsWidgetAdapter
-from tests.gui.test_line_edits_are_read_as_text import FakeCheckBox, FakeLineEdit
+from tests.gui.test_line_edits_are_read_as_text import FakeCheckBox, FakeLineEdit, FakeQtWidget
 
 
-class FakeGroupsAdapter(GroupsWidgetAdapter):
+class FakeGroupsAdapter(FakeQtWidget, GroupsWidgetAdapter):
     """The groups of the tab, without their Qt pages (the registry knows it as a GroupsWidgetAdapter)"""
     def __init__(self, **_):
         self.groups = {}

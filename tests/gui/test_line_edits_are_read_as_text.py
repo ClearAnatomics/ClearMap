@@ -11,9 +11,42 @@ from ClearMap.gui.params import SharedSampleParams
 from ClearMap.gui.params_interfaces import QCheckBox, QLabel, QLineEdit
 
 
-class FakeTextWidget:
+class FakeSignal:
+    """A signal which keeps its slots: these widgets are never built by Qt (no QApplication), so the signals of the Qt
+    class they stand for cannot be used"""
+    def __init__(self):
+        self.slots = []
+
+    def connect(self, slot):
+        self.slots.append(slot)
+
+    def disconnect(self, slot=None):
+        self.slots = [] if slot is None else [kept for kept in self.slots if kept != slot]
+
+
+def fake_signal(name):
+    """A property which gives each widget its own signal. It comes before the signal of the Qt class in the MRO, which
+    raises 'super-class __init__() was never called' with a real Qt"""
+    def get_signal(widget):
+        return widget.__dict__.setdefault(f'_signal_{name}', FakeSignal())
+    return property(get_signal)
+
+
+class FakeQtWidget:
+    """What the parameter code asks any widget: the real Qt methods raise on a widget which Qt did not build"""
+    def objectName(self):
+        return ''
+
+    def parentWidget(self):
+        return None
+
+
+class FakeTextWidget(FakeQtWidget):
     """The text of a line edit or a label of the sandbox (no Qt): the real getters and setters of the widget registry
     apply to it"""
+    editingFinished = fake_signal('editingFinished')
+    textChanged = fake_signal('textChanged')
+
     def __init__(self, text=''):
         self._text = text
 
@@ -22,12 +55,6 @@ class FakeTextWidget:
 
     def setText(self, text):
         self._text = text
-
-    def objectName(self):
-        return ''
-
-    def parentWidget(self):
-        return None
 
 
 class FakeLineEdit(FakeTextWidget, QLineEdit):
@@ -38,7 +65,9 @@ class FakeLabel(FakeTextWidget, QLabel):
     pass
 
 
-class FakeCheckBox(QCheckBox):
+class FakeCheckBox(FakeQtWidget, QCheckBox):
+    stateChanged = fake_signal('stateChanged')
+
     def __init__(self):
         self._checked = False
 
@@ -47,12 +76,6 @@ class FakeCheckBox(QCheckBox):
 
     def setChecked(self, checked):
         self._checked = checked
-
-    def objectName(self):
-        return ''
-
-    def parentWidget(self):
-        return None
 
 
 @pytest.fixture
