@@ -324,7 +324,12 @@ def load_git_info_module(source_root):
     spec = importlib.util.spec_from_file_location('clearmap_git_info', git_info_path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module  # dataclasses look their module up there
-    spec.loader.exec_module(module)
+    bytecode_was_written = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True  # No __pycache__ in the source tree: the installation leaves it as it found it
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.dont_write_bytecode = bytecode_was_written
     return module
 
 
