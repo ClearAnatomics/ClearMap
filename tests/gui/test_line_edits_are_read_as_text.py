@@ -40,6 +40,12 @@ class FakeQtWidget:
     def parentWidget(self):
         return None
 
+    def blockSignals(self, blocked):
+        """Return whether the signals were blocked before, like QObject.blockSignals"""
+        previously_blocked = self.__dict__.get('_signals_blocked', False)
+        self.__dict__['_signals_blocked'] = blocked
+        return previously_blocked
+
 
 class FakeTextWidget(FakeQtWidget):
     """The text of a line edit or a label of the sandbox (no Qt): the real getters and setters of the widget registry
