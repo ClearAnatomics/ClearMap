@@ -503,11 +503,28 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
     base_slicing = sink.valid.base_slicing
     valid_slicing = source.valid.slicing
 
-    # initialize binary status for inspection
+    # initialize binary status for inspection, memory-mapped. The steps read the whole block (overlap included), as
+    # they read the sink, and write only its valid part.
     binary_status = parameter.get('binary_status')
     if binary_status:
-        binary_status = io_ops.open_ro(binary_status)
-        binary_status = binary_status[base_slicing]
+        binary_status = io_ops.edit(binary_status)[sink.base_slicing]
+        valid_binary_status = binary_status[valid_slicing]  # A view: writing to it writes the file
+
+    def add_to_binary_status(step_name, step_mask):
+        """
+        Add the bit of a binarization step to the voxels it flagged, in the valid part of the block only.
+
+        Used only when a binary status is asked for.
+
+        Parameters
+        ----------
+        step_name : str
+            The step, one of BINARY_NAMES (its bit is BINARY_STATUS[step_name]).
+        step_mask : np.ndarray of bool
+            The voxels flagged by the step, over the whole block (overlap included).
+        """
+        flagged_in_valid_part = step_mask[valid_slicing]  # The same shape as valid_binary_status
+        valid_binary_status[flagged_in_valid_part] += BINARY_STATUS[step_name]
 
     default_step_params = {'parameter': parameter, 'steps_to_measure': {}, 'prefix': prefix,
                            'base_slicing': base_slicing, 'valid_slicing': valid_slicing}
@@ -528,7 +545,7 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
             save[base_slicing] = clipped[valid_slicing]
 
         if binary_status is not None:
-            binary_status[high[valid_slicing]] += BINARY_STATUS['High']
+            add_to_binary_status('High', high)
         else:
             sink[valid_slicing] = high[valid_slicing]
 
@@ -578,7 +595,7 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
             binary_deconvolved = deconvolved > threshold
 
             if binary_status is not None:
-                binary_status[binary_deconvolved[valid_slicing]] += BINARY_STATUS['Deconvolved']
+                add_to_binary_status('Deconvolved', binary_deconvolved)
             else:
                 sink[valid_slicing] += binary_deconvolved[valid_slicing]
 
@@ -599,7 +616,7 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
         binary_adaptive = deconvolved > adaptive
 
         if binary_status is not None:
-            binary_status[binary_adaptive[valid_slicing]] += BINARY_STATUS['Adaptive']
+            add_to_binary_status('Adaptive', binary_adaptive)
         else:
             sink[valid_slicing] += binary_adaptive[valid_slicing]
 
@@ -632,7 +649,7 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
             binary_equalized = equalized > threshold
 
             if binary_status is not None:
-                binary_status[binary_equalized[valid_slicing]] += BINARY_STATUS['Equalized']
+                add_to_binary_status('Equalized', binary_equalized)
             else:
                 sink[valid_slicing] += binary_equalized[valid_slicing]
 
@@ -690,7 +707,7 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
             binary_vesselized = tubeness > threshold
 
             if binary_status is not None:
-                binary_status[binary_vesselized[valid_slicing]] += BINARY_STATUS['Tube']
+                add_to_binary_status('Tube', binary_vesselized)
             else:
                 sink[valid_slicing] += binary_vesselized[valid_slicing]
 
@@ -712,8 +729,9 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
         if binary_status is not None:
             foreground = binary_status > 0
             filled = ndi.morphology.binary_fill_holes(foreground)
-            binary_status[np.logical_and(filled, np.logical_not(foreground))] += BINARY_STATUS['Fill']
-            del foreground, filled
+            filled_holes = np.logical_and(filled, np.logical_not(foreground))
+            add_to_binary_status('Fill', filled_holes)
+            del foreground, filled, filled_holes
         else:
             filled = ndi.morphology.binary_fill_holes(sink[:])
             sink[valid_slicing] += filled[valid_slicing]
@@ -723,7 +741,7 @@ def binarize_block(source, sink, parameter=default_binarization_parameter):
             timer.print_elapsed_time('Filling')
 
     if binary_status is not None:
-        sink[valid_slicing] = binary_status[valid_slicing] > 0
+        sink[valid_slicing] = valid_binary_status > 0
 
     # smooth binary
     if parameter.get('smooth'):  # WARNING: otherwise removes sink if no smoothing
