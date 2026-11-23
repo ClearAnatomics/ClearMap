@@ -597,6 +597,11 @@ class SampleManager(OrchestratorBase):
         return [self.data_type(ch) for ch in self.channels]
 
     @property
+    def data_types_by_channel(self) -> dict[str, str]:
+        """The data type of each channel (see data_type)"""
+        return {channel: self.data_type(channel) for channel in self.channels}
+
+    @property
     @adjuster_safe
     def channels_to_detect(self) -> list[str]:
         return self.get_channels_by_pipeline('CellMap', as_list=True)
@@ -797,8 +802,8 @@ class SampleManager(OrchestratorBase):
         The reference channel of the registration config: a channel, REFERENCE_UNDECIDED or NO_REFERENCE
         (see reference_channel_setting). The default of the data types while the config does not say.
         """
-        data_types = {channel: self.data_type(channel) for channel in self.channels}
-        return reference_channel_setting(self.cfg_coordinator.get_config_view('registration'), data_types)
+        return reference_channel_setting(self.cfg_coordinator.get_config_view('registration'),
+                                         self.data_types_by_channel)
 
     @property
     @adjuster_safe
