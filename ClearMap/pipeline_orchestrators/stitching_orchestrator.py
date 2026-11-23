@@ -18,7 +18,7 @@ from ClearMap.IO.FileUtils import link_or_copy
 from ClearMap.IO.source.backends.tif_backend import parse_ome_info
 
 from ClearMap.Utils.exceptions import (AssetNotFoundError, MissingRequirementException, ClearMapRuntimeError,
-                                       MetadataError, NotAnOmeFile)
+                                       MetadataError, NotAnOmeFile, WorkerProcessDiedError)
 from ClearMap.Utils.tag_expression import Expression
 from ClearMap.Utils.utilities import check_stopped, sanitize_n_processes
 
@@ -103,9 +103,34 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
             if not file_list or Path(file_list[0]).suffix == '.tif':
                 try:
                     asset.convert('.npy', processes=n_procs, workspace=self.workspace, verbose=self.verbose)
-                except BrokenProcessPool:
-                    print(f'File conversion of {channel} to numpy canceled')
+                except BrokenProcessPool as error:
+                    self._stop_after_broken_pool(f'conversion of the tiles of channel "{channel}"', error)
                     return
+
+    def _stop_after_broken_pool(self, step, error):
+        """
+        Tell a canceled step from a crashed one, once its process pool broke. The Abort button (stop_process) sets
+        stopped and shuts the pool down: a cancel. Otherwise a worker died (e.g. killed for lack of memory), and the
+        steps after it must not run on its incomplete result (#P0016: the wobbly placement ran on a layout which was
+        not aligned, and failed with "could not broadcast").
+
+        Arguments
+        ---------
+        step : str
+            The step whose pool broke, as the message names it (e.g. 'wobbly alignment').
+        error : BrokenProcessPool
+            The error of the pool.
+
+        Raises
+        ------
+        WorkerProcessDiedError
+            If the step was not canceled.
+        """
+        if not self.stopped:
+            raise WorkerProcessDiedError(f'The {step} stopped: one of its worker processes died, often for lack of '
+                                         f'memory. Lower the number of processes in the performance settings and '
+                                         f'run it again.') from error
+        print(f'{step[0].upper()}{step[1:]} canceled')
 
     def get_stitching_order(self, strict=False):
         """
@@ -481,10 +506,9 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
             stitching_rigid.align_layout_rigid_mip(layout, depth=projection_thickness, max_shifts=max_shifts,
                                                    ranges=[None, None, None], background=background_params,
                                                    clip=25000, processes=n_procs, workspace=self.workspace, verbose=True)
-        except BrokenProcessPool:
-            print('Stitching canceled')
-            self.stopped = True  # FIXME: see if appropriate solution
-            return  # WARNING: do not run stitching_wobbly if rigid failed
+        except BrokenProcessPool as error:
+            self._stop_after_broken_pool('rigid alignment', error)
+            return  # Canceled: stopped is set, the wobbly steps do not run
         layout.place(method='optimization', min_quality=-np.inf, lower_to_origin=True, verbose=True)
         self.update_watcher_main_progress()
 
@@ -543,8 +567,8 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
                                           prepare_slice=None,
                                           find_shifts=dict(method='tracing', cutoff=3 * np.sqrt(2)),
                                           processes=n_processes, workspace=self.workspace, verbose=True)
-        except BrokenProcessPool:
-            print('Wobbly stitching canceled')
+        except BrokenProcessPool as error:
+            self._stop_after_broken_pool('wobbly alignment', error)
             return
         self.update_watcher_main_progress()
 
@@ -564,8 +588,8 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
                                                                 window_length=20, binary=10),
                                           fix_isolated=False, lower_to_origin=True,
                                           processes=n_processes, workspace=self.workspace, verbose=True)
-        except BrokenProcessPool:
-            print('Wobbly stitching canceled')
+        except BrokenProcessPool as error:
+            self._stop_after_broken_pool('wobbly placement', error)
             return
         self.update_watcher_main_progress()
 
@@ -589,8 +613,8 @@ class StitchingProcessor(IndependentChannelsPipelineOrchestrator):
                                            sink=str(self.get_path('stitched', channel=channel)),
                                            method='interpolation',
                                            processes=n_processes, workspace=self.workspace, verbose=True)
-        except BrokenProcessPool:
-            print('Wobbly stitching canceled')
+        except BrokenProcessPool as error:
+            self._stop_after_broken_pool('stitching', error)
             return
 
         self.update_watcher_main_progress()

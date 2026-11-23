@@ -313,6 +313,12 @@ class ClearMapNotImplementedError(ClearMapException, NotImplementedError):
 # I/O
 # ---------------------------------------------------------------------------
 
+class WorkerProcessDiedError(ClearMapRuntimeError):
+    """A worker process of a parallel step died (e.g. killed for lack of memory): the step did not finish."""
+    user_title = 'Worker Process Died'
+    user_hint = 'Lower the number of processes of the step in the performance settings, then run it again.'
+
+
 class ClearMapIoException(ClearMapException, IOError):
     """Base exception for failures within the ClearMap.IO dispatcher when reading, writing,
     or initializing ``Source`` objects.
