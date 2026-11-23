@@ -11,10 +11,12 @@ The results of a registration are in the folder ``<moving>_to_<fixed>``.
 """
 from __future__ import annotations
 
+import warnings
 from typing import Iterable, Mapping, NamedTuple
 
 from ClearMap.IO.assets_constants import COMPOUND_REPRESENTATIVE_DATA_TYPES, CONTENT_TYPE_TO_PIPELINE
-from ClearMap.Utils.exceptions import ChannelsNotPixelAlignedError, ClearMapConfigError, MissingRequirementException
+from ClearMap.Utils.exceptions import (ChannelsNotPixelAlignedError, ClearMapConfigError, MissingRequirementException,
+                                       ReferenceNotAutofluorescenceWarning)
 
 ATLAS = 'atlas'  # align_with / moving_channel of the atlas: a partner which is not a channel of the sample
 ALIGN_WITH_NOTHING = None  # align_with of a channel which is explicitly not registered
@@ -343,6 +345,32 @@ def check_reference_selected_as_aligned_with_the_atlas(registration_config: Mapp
                                       f'(reference_channel: {reference_channel!r}, '
                                       f'{reference_channel}.align_with: {align_with!r}). '
                                       f'{suggested_action}, in the registration settings.')
+
+
+def warn_if_the_reference_is_not_the_autofluorescence_channel(reference_channel: str | None,
+                                                            data_types: Mapping[str, str | None]) -> None:
+    """
+    Warn when the reference channel is a channel, the sample has an autofluorescence channel, and the reference is not
+    it (e.g. reference 'fos' of data type nuclei, 'auto' of data type autofluorescence, #P0017). Allowed, so a warning:
+    another channel may be aligned with the atlas on purpose (e.g. dapi), see default_reference_channel.
+
+    Parameters
+    ----------
+    reference_channel : str or None
+        The reference channel setting (see reference_channel_setting).
+    data_types : Mapping[str, str | None]
+        The data type of each channel of the sample.
+    """
+    if reference_channel in (REFERENCE_UNDECIDED, NO_REFERENCE):
+        return
+    autofluorescence_channels = [channel for channel, data_type in data_types.items()
+                                 if data_type == REFERENCE_DATA_TYPE]
+    if autofluorescence_channels and reference_channel not in autofluorescence_channels:
+        warnings.warn(ReferenceNotAutofluorescenceWarning(
+            f'The reference channel {reference_channel!r} (data type {data_types.get(reference_channel)!r}) is aligned '
+            f'with the atlas, while {", ".join(map(repr, autofluorescence_channels))} is of data type '
+            f'{REFERENCE_DATA_TYPE}. If this is not intended, choose {autofluorescence_channels[0]!r} as the reference '
+            f'channel in the registration settings.'))
 
 
 def default_registration_partners_and_directions(

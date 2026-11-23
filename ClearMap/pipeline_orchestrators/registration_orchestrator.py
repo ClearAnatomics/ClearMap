@@ -34,7 +34,8 @@ from ClearMap.config.registration_channels import (ATLAS, check_partners_chosen,
                                                    checked_reference_channel,
                                                    fixed_moving_channels, is_intrinsically_aligned,
                                                    is_selected_for_registration, may_be_registered, needs_registration,
-                                                   registration_sequence, reversed_registrations)
+                                                   registration_sequence, reversed_registrations,
+                                                   warn_if_the_reference_is_not_the_autofluorescence_channel)
 
 from ClearMap.pipeline_orchestrators.generic_orchestrators import IndependentChannelsPipelineOrchestrator, CanceledProcessing
 from ClearMap.pipeline_orchestrators.sample_info_management import SampleManager
@@ -485,6 +486,8 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
         check_partners_chosen(self.config, self.channels_to_register)  # Before any is aligned, not halfway
         # Before any is aligned, rather than once registered: the steps that use the atlas refuse it (#P0017)
         check_reference_selected_as_aligned_with_the_atlas(self.config, self.sample_manager.reference_channel_setting)
+        warn_if_the_reference_is_not_the_autofluorescence_channel(self.sample_manager.reference_channel_setting,
+                                                                  self.sample_manager.data_types_by_channel)
         try:
             for channel in self.channels_to_register:
                 self.align_channel(channel)

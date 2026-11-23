@@ -38,7 +38,8 @@ ClearMapException
 
 ClearMapWarning  (also RuntimeWarning; issued with ``warnings.warn``, not raised)
 ├── SubscriberFailedWarning
-└── ReversedRegistrationWarning
+├── ReversedRegistrationWarning
+└── ReferenceNotAutofluorescenceWarning
 """
 from __future__ import annotations
 
@@ -220,6 +221,16 @@ class ReversedRegistrationWarning(ClearMapWarning):
     user_title = 'Registration Computed the Other Way Round'
     user_hint = ('Register the channel with its partner moving onto it (moving_channel: other) to transform its points, '
                  'or invert the transform yourself.')
+
+
+class ReferenceNotAutofluorescenceWarning(ClearMapWarning):
+    """
+    The reference channel, aligned with the atlas, is not the autofluorescence channel of the sample. Allowed (e.g. a
+    dapi channel), but usually a mistake: the atlas registration is set up for the autofluorescence channel.
+    """
+    user_title = 'Reference Channel Is Not the Autofluorescence Channel'
+    user_hint = ('Choose the autofluorescence channel as the reference channel in the registration settings, '
+                 'unless intended.')
 
 
 # ---------------------------------------------------------------------------

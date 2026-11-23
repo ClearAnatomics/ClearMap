@@ -18,6 +18,7 @@ CHANNELS_OF_P0018 = {'auto': {'align_with': 'atlas', 'moving_channel': 'atlas'},
 class FakeSampleManager:
     def __init__(self, reference_channel):
         self.reference_channel_setting = reference_channel
+        self.data_types_by_channel = {'auto': 'autofluorescence', 'fos': 'nuclei'}
 
 
 class FakeRegistrationProcessor:

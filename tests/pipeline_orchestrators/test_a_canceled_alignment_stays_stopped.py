@@ -9,6 +9,7 @@ from ClearMap.pipeline_orchestrators.registration_orchestrator import Registrati
 
 class FakeSampleManager:
     reference_channel_setting = 'autofluorescence'
+    data_types_by_channel = {'autofluorescence': 'autofluorescence', 'cfos': 'nuclei'}
 
 
 class AbortedRegistrationProcessor:
