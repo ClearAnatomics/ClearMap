@@ -35,6 +35,7 @@ import ClearMap.Utils.Timer as tmr
 import ClearMap.Utils.tag_expression as te
 
 from ClearMap.Utils.utilities import CancelableProcessPoolExecutor, sanitize_n_processes
+from ClearMap.Utils.exceptions import ClearMapValueError
 
 
 from ClearMap.Alignment.Stitching.layout_graph_utils import cluster_components
@@ -1426,6 +1427,35 @@ def inspect_align_layout(alignment, verbose):
 ###############################################################################
 
 
+def check_displacements_fit_their_overlaps(layout):
+    """
+    Check that the wobbly displacements of each pair of tiles cover their overlap along the wobble axis, within the
+    layout: one per slice. They do once the layout is aligned (align_layout); a layout whose wobbly alignment did not
+    run or did not finish still has the displacements of the overlaps before the rigid alignment moved the tiles.
+
+    Arguments
+    ---------
+    layout : WobblyLayout
+        The layout to place.
+
+    Raises
+    ------
+    ClearMapValueError
+        If the displacements of a pair do not fit. The message names the two tiles and both lengths.
+    """
+    axis = layout.axis
+    n_slices = layout.extent[axis]
+    for alignment in layout.alignments:
+        lower, upper = alignment.lower_coordinate, alignment.upper_coordinate
+        n_displacements = len(alignment.displacements)
+        if n_displacements != upper - lower or lower < 0 or upper > n_slices:
+            raise ClearMapValueError(f'The wobbly displacements of the tiles {alignment.pre.tile_position} and '
+                                     f'{alignment.post.tile_position} do not fit their overlap along axis {axis}: '
+                                     f'{n_displacements} displacements for the slices {lower} to {upper} of a '
+                                     f'layout of {n_slices} slices. The wobbly alignment of this layout did not run '
+                                     f'or did not finish: align it (align_layout) before placing it.')
+
+
 def place_layout(layout, min_quality = None, method = 'optimization',
                  smooth = None, smooth_optimized = None, fix_isolated = True,
                  lower_to_origin = True, processes = None, verbose = False, workspace=None):
@@ -1455,6 +1485,8 @@ def place_layout(layout, min_quality = None, method = 'optimization',
     alignment_pairs = np.array([(source_to_index[a.pre], source_to_index[a.post]) for a in alignments])
     n_alignments = len(alignment_pairs)
     ndim = len(positions[0])
+
+    check_displacements_fit_their_overlaps(layout)
 
     # displacements and qualities
     displacements = np.full((n_slices, n_alignments, ndim), np.nan)
