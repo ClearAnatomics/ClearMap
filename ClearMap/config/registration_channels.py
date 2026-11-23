@@ -310,11 +310,39 @@ def checked_reference_channel(registration_config: Mapping, reference_channel: s
     if reference_channel is NO_REFERENCE:
         raise MissingRequirementException(f'There is no reference channel (reference_channel: None): no channel '
                                           f'is aligned with the atlas. Choose one to use the atlas.')
-    align_with = registration_config['channels'].get(reference_channel, {}).get('align_with')
-    if align_with != ATLAS:
-        raise MissingRequirementException(f'The reference channel {reference_channel!r} must be aligned with the atlas '
-                                          f'(its align_with is {align_with!r}).')
+    check_reference_selected_as_aligned_with_the_atlas(registration_config, reference_channel)
     return reference_channel
+
+
+def check_reference_selected_as_aligned_with_the_atlas(registration_config: Mapping, reference_channel: str | None) -> None:
+    """
+    Check that the reference channel, when it is a channel, is aligned with the atlas: the reference channel and
+    the align_with of the channels are two settings, and they can disagree (e.g. a reference channel chosen, then the
+    partners set by hand). An undecided or no reference passes (see checked_reference_channel for the atlas side).
+
+    Raises
+    ------
+    MissingRequirementException
+        If the reference channel is aligned with something else. The message names both settings.
+    """
+    if reference_channel in (REFERENCE_UNDECIDED, NO_REFERENCE):
+        return
+    channels = registration_config['channels']
+    align_with = channels.get(reference_channel, {}).get('align_with')
+    if align_with == ATLAS:
+        return
+    aligned_with_the_atlas = [channel for channel, channel_config in channels.items()
+                              if (channel_config or {}).get('align_with') == ATLAS]
+    if aligned_with_the_atlas:
+        suggested_action = (f'The channel aligned with the atlas is {", ".join(map(repr, aligned_with_the_atlas))}: '
+                            f'choose it as the reference channel, or align {reference_channel!r} with the atlas')
+    else:
+        suggested_action = f'No channel is aligned with the atlas: align {reference_channel!r} with it'
+    raise MissingRequirementException(f'The reference channel {reference_channel!r} must be aligned with the atlas, '
+                                      f'but its align_with is {align_with!r} '
+                                      f'(reference_channel: {reference_channel!r}, '
+                                      f'{reference_channel}.align_with: {align_with!r}). '
+                                      f'{suggested_action}, in the registration settings.')
 
 
 def default_registration_partners_and_directions(

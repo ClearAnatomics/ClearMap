@@ -7,10 +7,15 @@ from ClearMap.pipeline_orchestrators.generic_orchestrators import CanceledProces
 from ClearMap.pipeline_orchestrators.registration_orchestrator import RegistrationProcessor
 
 
+class FakeSampleManager:
+    reference_channel_setting = 'autofluorescence'
+
+
 class AbortedRegistrationProcessor:
     """The alignment of the first channel is canceled by the Abort button (stop_process terminates elastix)"""
     align = RegistrationProcessor.align
-    config = {}
+    config = {'channels': {'autofluorescence': {'align_with': 'atlas'}, 'cfos': {'align_with': 'autofluorescence'}}}
+    sample_manager = FakeSampleManager()
     channels_to_register = ['autofluorescence', 'cfos']
 
     def __init__(self):

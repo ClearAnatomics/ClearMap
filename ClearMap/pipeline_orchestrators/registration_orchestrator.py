@@ -30,7 +30,8 @@ from ClearMap.config.orientation import DEFAULT_ORIENTATION, validate_orientatio
 
 from ClearMap.config.atlas import ATLAS_NAMES_MAP, get_atlas_cache_dir
 from ClearMap.config.config_coordinator import ConfigCoordinator
-from ClearMap.config.registration_channels import (ATLAS, check_partners_chosen, checked_reference_channel,
+from ClearMap.config.registration_channels import (ATLAS, check_partners_chosen, check_reference_selected_as_aligned_with_the_atlas,
+                                                   checked_reference_channel,
                                                    fixed_moving_channels, is_intrinsically_aligned,
                                                    is_selected_for_registration, may_be_registered, needs_registration,
                                                    registration_sequence, reversed_registrations)
@@ -482,6 +483,8 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
     @check_stopped
     def align(self, _force=False):
         check_partners_chosen(self.config, self.channels_to_register)  # Before any is aligned, not halfway
+        # Before any is aligned, rather than once registered: the steps that use the atlas refuse it (#P0017)
+        check_reference_selected_as_aligned_with_the_atlas(self.config, self.sample_manager.reference_channel_setting)
         try:
             for channel in self.channels_to_register:
                 self.align_channel(channel)
