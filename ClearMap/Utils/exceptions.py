@@ -273,6 +273,11 @@ class ClearMapRuntimeError(ClearMapException, RuntimeError):
         return '\n'.join(parts)
 
 
+class ElastixFailedError(ClearMapRuntimeError):
+    """An elastix registration failed: it exited with an error, reported one in its log or left out its results."""
+    user_title = 'Registration Failed'
+    user_hint = 'Read the elastix log named in the message: its last lines say why the registration stopped.'
+
 
 class ClearMapTypeError(ClearMapException, TypeError):
     """An argument or value is of a type ClearMap does not accept here (raised by ClearMap, not by the language)."""

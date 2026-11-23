@@ -80,7 +80,7 @@ from ClearMap.Utils.utilities import sanitize_n_processes
 from ClearMap.IO import conversion, io_ops
 from ClearMap.IO.FileUtils import atomic_write
 from ClearMap.IO.source.backends.tif_backend import TifSource
-from ClearMap.Utils.exceptions import ClearMapIoException, ClearMapValueError, ClearMapRuntimeError
+from ClearMap.Utils.exceptions import ClearMapIoException, ClearMapValueError, ClearMapRuntimeError, ElastixFailedError
 
 from ClearMap.IO.elastix_config import ElastixParser
 
@@ -109,6 +109,19 @@ patched elastix build shipped with ClearMap."""
 
 BIN_POINT_FILE_HEADER_LENGTH = 2
 """The number of integers (index flag, number of points) that start a ``.bin`` point file."""
+
+ELASTIX_LOG_FILE_NAME = 'elastix.log'
+"""The log elastix writes in its result directory."""
+
+ELASTIX_LOG_ERROR_MARKERS = ('Errors occurred', 'fail')
+"""Text that elastix writes in its log when a registration fails. ``Errors occurred!`` ends the log of a run stopped
+by an exception (e.g. "Too many samples map outside moving image buffer")."""
+
+ELASTIX_TRANSFORM_PARAMETERS_FILE_NAME_TEMPLATE = 'TransformParameters.{step}.txt'
+"""The transform that elastix writes for each parameter file (step) of a registration, needed to apply it later."""
+
+ELASTIX_RESULT_IMAGE_FILE_NAME_TEMPLATE = 'result.{step}.mhd'
+"""The registered image that elastix writes for each step; the last one is the ``aligned`` asset of the workspace."""
 
 ELASTIX_EXECUTABLE_FOLDERS = ('bin', '')
 """The folders of an elastix installation that hold the executables, relative to its root: ``bin`` in the Linux
@@ -206,12 +219,41 @@ def print_settings():
         print("Elastix not initialized")
 
 
-def check_success(result_directory):
+def check_success(result_directory, *, return_code, n_steps):
+    """
+    Check that an elastix registration succeeded: it exited without error, its log reports none, and it wrote the
+    transform of each step and the registered image of the last one.
+
+    Arguments
+    ---------
+    result_directory : str or Path
+        The result directory of the run.
+    return_code : int
+        The exit code of elastix (negative: killed by that signal).
+    n_steps : int
+        The number of parameter files of the run.
+
+    Raises
+    ------
+    ElastixFailedError
+        If one of these checks fails. The message names the log.
+    """
     result_directory = Path(result_directory)
-    log_path = result_directory / 'elastix.log'
-    with open(log_path) as f:
-        if 'fail' in f.read():
-            raise ClearMapRuntimeError(f'Elastix failed, check log file: "{log_path}"')
+    log_path = result_directory / ELASTIX_LOG_FILE_NAME
+    if return_code != 0:
+        raise ElastixFailedError(f'Elastix exited with code {return_code}, check its log: "{log_path}"')
+    if not log_path.exists():
+        raise ElastixFailedError(f'Elastix wrote no log in "{result_directory}": it did not run there')
+    log = log_path.read_text(errors='replace')
+    reported = [marker for marker in ELASTIX_LOG_ERROR_MARKERS if marker in log]
+    if reported:
+        raise ElastixFailedError(f'Elastix reported an error ({reported[0]!r}), check its log: "{log_path}"')
+    expected = [ELASTIX_TRANSFORM_PARAMETERS_FILE_NAME_TEMPLATE.format(step=step) for step in range(n_steps)]
+    expected.append(ELASTIX_RESULT_IMAGE_FILE_NAME_TEMPLATE.format(step=n_steps - 1))
+    missing = [name for name in expected if not (result_directory / name).exists()]
+    if missing:
+        raise ElastixFailedError(f'Elastix did not write {", ".join(missing)} in "{result_directory}", '
+                                 f'check its log: "{log_path}"')
 
 
 def set_elastix_library_path(elastix_lib_path=None):
@@ -671,7 +713,8 @@ def align(fixed_image, moving_image, affine_parameter_file=None, bspline_paramet
     fixed_landmarks_path : str
         Path to the fixed landmarks file.
     check_alignment_success : bool
-        Check if the alignment was successful.
+        Raise :class:`~ClearMap.Utils.exceptions.ElastixFailedError` if the alignment failed (see
+        :func:`check_success`).
 
     Returns
     -------
@@ -755,7 +798,7 @@ def align(fixed_image, moving_image, affine_parameter_file=None, bspline_paramet
                 workspace.process = None
 
     if not itk_mode and check_alignment_success:
-        check_success(result_directory)
+        check_success(result_directory, return_code=proc.returncode, n_steps=len(parameter_files))
 
     return result_directory
 

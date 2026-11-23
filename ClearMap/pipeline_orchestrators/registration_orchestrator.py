@@ -23,7 +23,8 @@ from ClearMap.Utils.events import (ChannelRenamed, UiAtlasIdChanged,
                                    UiAtlasStructureTreeIdChanged,  RegistrationStatusChanged, WorkspaceChannelsUpdated)
 from ClearMap.Utils.exceptions import (ClearMapAssetError, ParamsOrientationError, MissingRequirementException,
                                        NotAnOmeFile, MetadataError, ClearMapRuntimeError, ClearMapConfigError,
-                                       ReversedRegistrationWarning, AssetNotFoundError, ClearMapNotImplementedError)
+                                       ReversedRegistrationWarning, AssetNotFoundError, ClearMapNotImplementedError,
+                                       ElastixFailedError)
 from ClearMap.Utils.utilities import runs_on_ui, check_stopped, sanitize_n_processes
 from ClearMap.config.orientation import DEFAULT_ORIENTATION, validate_orientation
 
@@ -527,7 +528,12 @@ class RegistrationProcessor(IndependentChannelsPipelineOrchestrator):
         else:
             landmarks_files = {'moving_landmarks_path': '', 'fixed_landmarks_path': ''}  # Disable landmarks w/ empty str
         landmarks_weights = [elastix_landmarks_weight(percent) for percent in channel_cfg['landmarks_weights']]
-        elastix.align_from_dict(align_parameters, landmarks_files, landmarks_weights=landmarks_weights)
+        try:
+            elastix.align_from_dict(align_parameters, landmarks_files, landmarks_weights=landmarks_weights)
+        except ElastixFailedError:
+            if self.stopped:  # stop_process terminated elastix: a cancel, not a failed registration
+                raise CanceledProcessing from None
+            raise
 
     def annotator_of(self, channel: str) -> Annotation:
         """
